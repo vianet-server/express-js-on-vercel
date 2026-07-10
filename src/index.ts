@@ -14,7 +14,7 @@ app.get('/', (req, res) => {
     <html>
       <head>
         <meta charset="utf-8"/>
-        <title>Express on Vercel</title>
+        <title>vianet</title>
         <link rel="stylesheet" href="/style.css" />
       </head>
       <body>
