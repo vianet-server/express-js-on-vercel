@@ -1,6 +1,8 @@
+import 'dotenv/config'
 import express from 'express'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import pg from 'pg'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -44,6 +46,48 @@ app.get('/api-data', (req, res) => {
     message: 'Here is some sample API data',
     items: ['apple', 'banana', 'cherry'],
   })
+})
+
+// Check Neon connection
+app.get('/check-neon', async (_, res) => {
+  const url = process.env.DATABASE_URL
+  if (!url) return res.status(500).json({ ok: false, error: 'DATABASE_URL not set' })
+  try {
+    const pool = new pg.Pool({ connectionString: url, max: 1, idleTimeoutMillis: 5000 })
+    const result = await pool.query('SELECT 1 AS ok')
+    await pool.end()
+    res.json({ ok: true, db: 'neon', rows: result.rows })
+  } catch (error: any) {
+    res.status(500).json({ ok: false, db: 'neon', error: error.message })
+  }
+})
+
+// Check Prisma connection (using POSTGRES_PRISMA_URL)
+app.get('/check-prisma', async (_, res) => {
+  const url = process.env.POSTGRES_PRISMA_URL
+  if (!url) return res.status(500).json({ ok: false, error: 'POSTGRES_PRISMA_URL not set' })
+  try {
+    const pool = new pg.Pool({ connectionString: url, max: 1, idleTimeoutMillis: 5000 })
+    const result = await pool.query('SELECT 1 AS ok')
+    await pool.end()
+    res.json({ ok: true, db: 'prisma', rows: result.rows })
+  } catch (error: any) {
+    res.status(500).json({ ok: false, db: 'prisma', error: error.message })
+  }
+})
+
+// Check Supabase connection
+app.get('/check-supabase', async (_, res) => {
+  const url = process.env.vianetinternaldatabase_POSTGRES_URL
+  if (!url) return res.status(500).json({ ok: false, error: 'vianetinternaldatabase_POSTGRES_URL not set' })
+  try {
+    const pool = new pg.Pool({ connectionString: url, max: 1, idleTimeoutMillis: 5000 })
+    const result = await pool.query('SELECT 1 AS ok')
+    await pool.end()
+    res.json({ ok: true, db: 'supabase', rows: result.rows })
+  } catch (error: any) {
+    res.status(500).json({ ok: false, db: 'supabase', error: error.message })
+  }
 })
 
 // Health check
