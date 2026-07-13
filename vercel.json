@@ -1,0 +1,3 @@
+{
+  "buildCommand": "cd vianet && npm ci && npm run build"
+}

@@ -7,29 +7,31 @@ const __dirname = path.dirname(__filename)
 
 const app = express()
 
-// Home route - HTML
-app.get('/', (req, res) => {
-  res.type('html').send(`
-    <!doctype html>
-    <html>
-      <head>
-        <meta charset="utf-8"/>
-        <title>vianet</title>
-        <link rel="stylesheet" href="/style.css" />
-      </head>
-      <body>
-        <nav>
-          <a href="/">Home</a>
-          <a href="/about">About</a>
-          <a href="/api-data">API Data</a>
-          <a href="/healthz">Health</a>
-        </nav>
-        <h1>this vianet dev app route under development🚀</h1>
-        <p>This is a minimal example without a database or forms.</p>
-        <img src="/logo.png" alt="Logo" width="120" />
-      </body>
-    </html>
-  `)
+const root = process.cwd()
+const vianetDist = path.join(root, 'vianet', 'dist')
+
+// Serve vianet frontend static assets
+app.use('/assets', express.static(path.join(vianetDist, 'assets')))
+app.use('/favicon.svg', express.static(path.join(vianetDist, 'favicon.svg')))
+
+// Admin frontend
+app.get('/admin', (_, res) => {
+  res.sendFile(path.join(vianetDist, 'admin.html'))
+})
+
+// Employee frontend
+app.get('/employ', (_, res) => {
+  res.sendFile(path.join(vianetDist, 'employ.html'))
+})
+
+// App frontend
+app.get('/app', (_, res) => {
+  res.sendFile(path.join(vianetDist, 'app.html'))
+})
+
+// Redirect / to /app
+app.get('/', (_, res) => {
+  res.redirect('/app')
 })
 
 app.get('/about', function (req, res) {
