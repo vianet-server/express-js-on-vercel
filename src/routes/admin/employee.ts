@@ -31,7 +31,7 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { email, password, employee_id, first_name, last_name, phone, designation, is_active } = req.body;
-    const bcrypt = require('bcrypt');
+    const bcrypt = require('bcryptjs');
     const password_hash = await bcrypt.hash(password, 10);
     const result = await neonDb.query(
       'INSERT INTO app.users (email, password_hash, usertype, is_active, created_at, updated_at) VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING userid, email, usertype, is_active',

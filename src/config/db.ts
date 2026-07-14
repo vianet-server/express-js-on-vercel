@@ -1,7 +1,8 @@
 // db.ts
-import pg from 'pg'
+const pg = require('pg');
 
-const { Pool } = pg
+const { Pool } = pg;
+
 
 const neonUrl = process.env.POSTGRES_URL
 const prismaUrl = process.env.POSTGRES_PRISMA_URL

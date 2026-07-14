@@ -6,7 +6,7 @@
  */
 
 const express = require('express');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const { neonDb } = require('../../config/db');
 const adminAuth = require('../../middleware/adminAuth');
 

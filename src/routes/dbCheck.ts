@@ -1,4 +1,4 @@
-import { neonPool } from '../config/db.js';
+const { neonPool } = require('../config/db');
 
 async function dbCheck(req, res) {
   try {
@@ -12,4 +12,4 @@ async function dbCheck(req, res) {
   }
 }
 
-export default dbCheck;
+module.exports = dbCheck;
