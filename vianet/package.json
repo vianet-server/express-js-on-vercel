@@ -11,6 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@auth0/auth0-react": "^2.21.0",
     "@base-ui-components/react": "^1.0.0-rc.0",
     "@base-ui/react": "^1.6.0",
     "@fission-ai/openspec": "^1.5.0",

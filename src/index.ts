@@ -3,6 +3,7 @@ import express from 'express'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import pg from 'pg'
+import dbCheck from './routes/dbCheck.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -84,9 +85,14 @@ app.get('/check-supabase', async (_, res) => {
   }
 })
 
+// DB check — return first user with all fields
+app.get('/db-check', dbCheck)
+
 // Health check
 app.get('/healthz', (req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() })
 })
+
+
 
 export default app

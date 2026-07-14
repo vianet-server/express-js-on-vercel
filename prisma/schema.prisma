@@ -1,0 +1,106 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  userid        Int               @id @default(autoincrement())
+  email         String            @unique
+  password_hash String?
+  usertype      String?
+  is_active     Boolean?
+  created_at    DateTime          @default(now())
+  updated_at    DateTime          @default(now())
+  api_keys      ApiKey[]
+  employee_profile EmployeeProfile?
+  partner_profile  PartnerProfile?
+}
+
+model EmployeeProfile {
+  user_id     Int      @id
+  employee_id String?
+  first_name  String?
+  last_name   String?
+  phone       String?
+  designation String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now())
+  user        User     @relation(fields: [user_id], references: [userid])
+}
+
+model PartnerProfile {
+  user_id      Int      @id
+  company_name String?
+  phone        String?
+  address      String?
+  created_at   DateTime @default(now())
+  updated_at   DateTime @default(now())
+  user         User     @relation(fields: [user_id], references: [userid])
+}
+
+model StockItem {
+  id          Int         @id @default(autoincrement())
+  name        String?
+  sku         String?
+  description String?
+  quantity    Float?
+  price       Float?
+  created_at  DateTime    @default(now())
+  updated_at  DateTime    @default(now())
+  inventory   Inventory[]
+}
+
+model Godown {
+  id         Int         @id @default(autoincrement())
+  name       String?
+  address    String?
+  created_at DateTime    @default(now())
+  updated_at DateTime    @default(now())
+  inventory  Inventory[]
+}
+
+model Inventory {
+  id           Int      @id @default(autoincrement())
+  stockitem_id Int?
+  godown_id    Int?
+  quantity     Float?
+  created_at   DateTime @default(now())
+  updated_at   DateTime @default(now())
+  stockitem    StockItem? @relation(fields: [stockitem_id], references: [id])
+  godown       Godown?    @relation(fields: [godown_id], references: [id])
+}
+
+model Ledger {
+  id              Int      @id @default(autoincrement())
+  name            String?
+  group_name      String?
+  opening_balance Float?
+  type            String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @default(now())
+}
+
+model Voucher {
+  id         Int      @id @default(autoincrement())
+  type       String?
+  number     String?
+  date       DateTime?
+  amount     Float?
+  narration  String?
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+}
+
+model ApiKey {
+  id         Int      @id @default(autoincrement())
+  key_name   String?
+  api_key    String?
+  user_id    Int?
+  is_active  Boolean?
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+  user       User?    @relation(fields: [user_id], references: [userid])
+}

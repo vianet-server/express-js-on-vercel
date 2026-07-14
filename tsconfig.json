@@ -6,7 +6,9 @@
     "outDir": "./dist",
     "rootDir": ".",
     "esModuleInterop": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "noImplicitAny": false,
+    "useUnknownInCatchVariables": false
   },
   "exclude": ["vianet"]
 }
