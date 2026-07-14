@@ -1,0 +1,26 @@
+[{
+	"resource": "/D:/vianet-server/cmt web/src/adminPages/inventoryStock.tsx",
+	"owner": "eslint2",
+	"severity": 8,
+	"message": "Parsing error: ')' expected.",
+	"source": "eslint",
+	"startLineNumber": 84,
+	"startColumn": 3,
+	"endLineNumber": 84,
+	"endColumn": 3,
+	"modelVersionId": 4,
+	"origin": "extHost1"
+},{
+	"resource": "/D:/vianet-server/cmt web/src/adminPages/inventoryStock.tsx",
+	"owner": "typescript",
+	"code": "1005",
+	"severity": 8,
+	"message": "')' expected.",
+	"source": "ts",
+	"startLineNumber": 84,
+	"startColumn": 4,
+	"endLineNumber": 84,
+	"endColumn": 5,
+	"modelVersionId": 4,
+	"origin": "extHost1"
+}]
