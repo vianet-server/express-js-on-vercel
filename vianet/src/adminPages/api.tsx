@@ -72,7 +72,7 @@ export function Api() {
   const [newKeyDuration, setNewKeyDuration] = useState('');
 
   useEffect(() => {
-    api.get('/admin/api')
+    api.get('/api/admin/api')
       .then((keysData) => {
         setKeys(keysData);
       }).catch(console.error).finally(() => setLoading(false));
@@ -84,7 +84,7 @@ export function Api() {
 
   const createKey = () => {
     if (!newKeyName || !newKeyGroup || newKeyPerms.length === 0) return;
-    api.post('/admin/api', {
+    api.post('/api/admin/api', {
       key_name: newKeyName,
     }).then((newKey) => {
       setKeys(prev => [...prev, newKey]);
@@ -97,7 +97,7 @@ export function Api() {
   };
 
   const revokeKey = (id: string) => {
-    api.put('/admin/api', { id, is_active: false }).then(() => {
+    api.put('/api/admin/api', { id, is_active: false }).then(() => {
       setKeys(prev => prev.map(k => k.id === id ? { ...k, status: 'revoked' } : k));
     }).catch(console.error);
   };

@@ -18,13 +18,13 @@ router.post('/register', async (req, res) => {
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required' });
     }
-    const existing = await neonDb.query('SELECT * FROM users WHERE email = $1', [email]);
+    const existing = await neonDb.query('SELECT * FROM app.users WHERE email = $1', [email]);
     if (existing.rows.length > 0) {
       return res.status(409).json({ message: 'User already exists' });
     }
     const password_hash = await bcrypt.hash(password, 10);
     const result = await neonDb.query(
-      'INSERT INTO users (email, password_hash, usertype, is_active, created_at, updated_at) VALUES ($1, $2, $3, true, NOW(), NOW()) RETURNING userid, email, usertype',
+      'INSERT INTO app.users (email, password_hash, usertype, is_active, created_at, updated_at) VALUES ($1, $2, $3, true, NOW(), NOW()) RETURNING userid, email, usertype',
       [email, password_hash, 'partner']
     );
     if (company_name || phone || address) {
@@ -51,7 +51,7 @@ router.post('/login', async (req, res) => {
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required', token: null });
     }
-    const result = await neonDb.query('SELECT * FROM users WHERE email = $1 AND usertype = $2', [email, 'partner']);
+    const result = await neonDb.query('SELECT * FROM app.users WHERE email = $1 AND usertype = $2', [email, 'partner']);
     const user = result.rows[0];
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials', token: null });

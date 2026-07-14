@@ -23,7 +23,7 @@ export function AdminLogin() {
     setLoading(true);
     try {
       const data = await api.post<{ token: string; email: string; usertype?: string }>(
-        '/admin/login',
+        '/api/admin/login',
         { email: username, password },
       );
       login(data.token, { username: data.email || username, role: data.usertype || 'admin' });

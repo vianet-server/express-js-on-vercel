@@ -20,6 +20,8 @@ export const neonPool = new Pool({
   idleTimeoutMillis: 5000,
 })
 
+export const neonDb = neonPool;
+
 export const prismaPool = new Pool({
   connectionString: prismaUrl,
   max: 1,

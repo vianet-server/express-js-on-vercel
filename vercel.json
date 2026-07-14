@@ -1,3 +1,14 @@
 {
-  "buildCommand": "cd vianet && npm ci && npm run build"
+  "buildCommand": "cd vianet && npm ci && npm run build",
+  "functions": {
+    "src/index.ts": {
+      "includeFiles": "vianet/dist/**"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/src/index.ts"
+    }
+  ]
 }

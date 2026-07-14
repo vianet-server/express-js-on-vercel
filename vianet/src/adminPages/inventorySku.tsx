@@ -39,7 +39,7 @@ export function InventorySku() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; row: SkuRow } | null>(null);
 
   useEffect(() => {
-    api.get('/admin/inventory/sku').then((res: SkuRow[]) => {
+    api.get('/api/admin/inventory/sku').then((res: SkuRow[]) => {
       dispatch(setSkuData(res));
       setLoading(false);
     }).catch(() => setLoading(false));

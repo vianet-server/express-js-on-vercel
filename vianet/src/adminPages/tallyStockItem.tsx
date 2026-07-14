@@ -11,7 +11,7 @@ export function StockItem() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   useEffect(() => {
-    api.get('/admin/stock-item').then(setData).catch(console.error).finally(() => setLoading(false));
+    api.get('/api/admin/stock-item').then(setData).catch(console.error).finally(() => setLoading(false));
   }, []);
   const filtered = data.filter(s => s.name?.toLowerCase().includes(search.toLowerCase()) || s.category?.toLowerCase().includes(search.toLowerCase()));
   return (

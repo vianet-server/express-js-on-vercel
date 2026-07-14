@@ -26,7 +26,7 @@ export function AccessGroupDetail() {
 
   useEffect(() => {
     if (!sku || !decodedGroup) { setLoading(false); return; }
-    api.get(`/admin/inventory/sku/${sku}/access-group/${encodeURIComponent(decodedGroup)}`).then((res: AccessGroupDetailData) => {
+    api.get(`/api/admin/inventory/sku/${sku}/access-group/${encodeURIComponent(decodedGroup)}`).then((res: AccessGroupDetailData) => {
       dispatch(setCurrentAccessGroupDetail(res));
       setStockConfig(res.stockConfig || { maxQty: res.accessGroup.qty, allowDiscount: false, autoApprove: false, notes: '' });
       setLoading(false);

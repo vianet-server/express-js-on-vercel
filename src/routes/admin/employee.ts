@@ -17,7 +17,7 @@ router.use(adminAuth);
 router.get('/', async (req, res) => {
   try {
     const result = await neonDb.query(
-      'SELECT userid, email, usertype, is_active, created_at, updated_at FROM users WHERE usertype = $1',
+      'SELECT userid, email, usertype, is_active, created_at, updated_at FROM app.users WHERE usertype = $1',
       ['employee']
     );
     res.status(200).json({ message: 'Employees fetched', data: result.rows });
@@ -34,7 +34,7 @@ router.post('/', async (req, res) => {
     const bcrypt = require('bcrypt');
     const password_hash = await bcrypt.hash(password, 10);
     const result = await neonDb.query(
-      'INSERT INTO users (email, password_hash, usertype, is_active, created_at, updated_at) VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING userid, email, usertype, is_active',
+      'INSERT INTO app.users (email, password_hash, usertype, is_active, created_at, updated_at) VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING userid, email, usertype, is_active',
       [email, password_hash, 'employee', is_active ?? true]
     );
     if (employee_id || first_name || last_name || phone || designation) {
@@ -55,7 +55,7 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const result = await neonDb.query(
-      'SELECT userid, email, usertype, is_active, created_at, updated_at FROM users WHERE userid = $1 AND usertype = $2',
+      'SELECT userid, email, usertype, is_active, created_at, updated_at FROM app.users WHERE userid = $1 AND usertype = $2',
       [id, 'employee']
     );
     if (result.rows.length === 0) {
@@ -75,7 +75,7 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const { email, employee_id, first_name, last_name, phone, designation, is_active } = req.body;
     const userResult = await neonDb.query(
-      'UPDATE users SET email = $1, is_active = $2, updated_at = NOW() WHERE userid = $3 AND usertype = $4 RETURNING userid, email, usertype, is_active',
+      'UPDATE app.users SET email = $1, is_active = $2, updated_at = NOW() WHERE userid = $3 AND usertype = $4 RETURNING userid, email, usertype, is_active',
       [email, is_active, id, 'employee']
     );
     if (userResult.rows.length === 0) {
@@ -104,7 +104,7 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await neonDb.query('DELETE FROM users WHERE userid = $1 AND usertype = $2 RETURNING userid', [id, 'employee']);
+    const result = await neonDb.query('DELETE FROM app.users WHERE userid = $1 AND usertype = $2 RETURNING userid', [id, 'employee']);
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Employee not found' });
     }

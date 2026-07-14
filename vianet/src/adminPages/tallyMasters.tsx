@@ -11,7 +11,7 @@ export function Masters() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   useEffect(() => {
-    api.get('/admin/masters').then(setData).catch(console.error).finally(() => setLoading(false));
+    api.get('/api/admin/masters').then(setData).catch(console.error).finally(() => setLoading(false));
   }, []);
   const filtered = data.filter(m => m.name?.toLowerCase().includes(search.toLowerCase()) || m.id?.toLowerCase().includes(search.toLowerCase()));
   return (

@@ -44,7 +44,7 @@ export function Settings() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
-    api.get('/admin/settings/settings').then(setData).catch(console.error).finally(() => setLoading(false));
+    api.get('/api/admin/settings/settings').then(setData).catch(console.error).finally(() => setLoading(false));
   }, []);
 
   if (loading) {

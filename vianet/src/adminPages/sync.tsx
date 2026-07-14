@@ -11,7 +11,7 @@ export function Sync() {
   const [autoSync, setAutoSync] = useState(true);
 
   useEffect(() => {
-    api.get('/admin/settings/sync').then(setSyncHistory).catch(console.error).finally(() => setLoading(false));
+    api.get('/api/admin/settings/sync').then(setSyncHistory).catch(console.error).finally(() => setLoading(false));
   }, []);
 
   const lastSync = syncHistory.length > 0 ? syncHistory[0] : null;

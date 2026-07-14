@@ -55,10 +55,10 @@ export function Dashboard() {
 
   useEffect(() => {
     Promise.all([
-      api.get<typeof stats>('/admin/dashboard/stats'),
-      api.get<{ name: string, sales: number }[]>('/admin/dashboard/top-salesmen'),
-      api.get<{ month: string, sales: number, profit: number }[]>('/admin/dashboard/monthly-trend'),
-      api.get<{ name: string, value: number }[]>('/admin/dashboard/product-share'),
+      api.get<typeof stats>('/api/admin/dashboard/stats'),
+      api.get<{ name: string, sales: number }[]>('/api/admin/dashboard/top-salesmen'),
+      api.get<{ month: string, sales: number, profit: number }[]>('/api/admin/dashboard/monthly-trend'),
+      api.get<{ name: string, value: number }[]>('/api/admin/dashboard/product-share'),
     ]).then(([s, sm, ct, pd]) => {
       setStats(s);
       setTopSalesmen(sm);

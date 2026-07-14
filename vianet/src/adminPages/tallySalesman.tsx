@@ -11,7 +11,7 @@ export function Salesman() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   useEffect(() => {
-    api.get('/admin/salesman').then(setData).catch(console.error).finally(() => setLoading(false));
+    api.get('/api/admin/salesman').then(setData).catch(console.error).finally(() => setLoading(false));
   }, []);
   const filtered = data.filter(s => s.name?.toLowerCase().includes(search.toLowerCase()) || s.region?.toLowerCase().includes(search.toLowerCase()));
   return (

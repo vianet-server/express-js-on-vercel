@@ -20,7 +20,7 @@ router.post('/accesscontrol', async (req, res) => {
     const { email, password, usertype, is_active } = req.body;
     const password_hash = await bcrypt.hash(password, 10);
     const result = await neonDb.query(
-      'INSERT INTO users (email, password_hash, usertype, is_active, created_at, updated_at) VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING userid, email, usertype, is_active',
+      'INSERT INTO app.users (email, password_hash, usertype, is_active, created_at, updated_at) VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING userid, email, usertype, is_active',
       [email, password_hash, usertype, is_active ?? true]
     );
     res.status(201).json({ message: 'User created', data: result.rows[0] });
@@ -30,11 +30,11 @@ router.post('/accesscontrol', async (req, res) => {
   }
 });
 
-// Get all users / access control records with optional filtering
+// Get all app.users / access control records with optional filtering
 router.get('/accesscontrol', async (req, res) => {
   try {
     const { email, usertype, is_active } = req.query;
-    let query = 'SELECT userid, email, usertype, is_active, created_at, updated_at FROM users WHERE 1=1';
+    let query = 'SELECT userid, email, usertype, is_active, created_at, updated_at FROM app.users WHERE 1=1';
     const params: any[] = [];
     let idx = 1;
     if (email) { query += ` AND email ILIKE $${idx++}`; params.push(`%${email}%`); }
@@ -53,7 +53,7 @@ router.put('/accesscontrol', async (req, res) => {
   try {
     const { userid, email, usertype, is_active } = req.body;
     const result = await neonDb.query(
-      'UPDATE users SET email = $1, usertype = $2, is_active = $3, updated_at = NOW() WHERE userid = $4 RETURNING userid, email, usertype, is_active',
+      'UPDATE app.users SET email = $1, usertype = $2, is_active = $3, updated_at = NOW() WHERE userid = $4 RETURNING userid, email, usertype, is_active',
       [email, usertype, is_active, userid]
     );
     if (result.rows.length === 0) {
@@ -70,7 +70,7 @@ router.put('/accesscontrol', async (req, res) => {
 router.delete('/accesscontrol', async (req, res) => {
   try {
     const { userid } = req.body;
-    const result = await neonDb.query('DELETE FROM users WHERE userid = $1 RETURNING userid', [userid]);
+    const result = await neonDb.query('DELETE FROM app.users WHERE userid = $1 RETURNING userid', [userid]);
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'User not found' });
     }

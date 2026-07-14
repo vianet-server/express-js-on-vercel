@@ -61,7 +61,7 @@ export function Pnl() {
   const [datewiseCols, setDatewiseCols] = useState<string[]>([]);
 
   useEffect(() => {
-    api.get('/admin/reports/pnl')
+    api.get('/api/admin/reports/pnl')
       .then(res => setData(res))
       .catch(console.error)
       .finally(() => setLoading(false));

@@ -32,7 +32,7 @@ export function InventoryControl() {
   const accessGroups = useAppSelector((state) => state.inventory.allAccessGroups);
 
   useEffect(() => {
-    api.get('/admin/inventory/control').then(res => {
+    api.get('/api/admin/inventory/control').then(res => {
       const d = res;
       setCategories(d.categories || []);
       setSettings(d.controlSettings || []);
@@ -60,7 +60,7 @@ export function InventoryControl() {
     if (!form.name.trim()) return;
     setSubmitting(true);
     try {
-      const res = await api.post('/admin/api/access-group', { name: form.name });
+      const res = await api.post('/api/admin/api/access-group', { name: form.name });
       setCreatedLink(res.link || '');
     } catch (e) {
       setCreatedLink('');

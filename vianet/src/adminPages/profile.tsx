@@ -20,7 +20,7 @@ export function Profile() {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
-    api.get('/admin/settings/profile').then(setProfile).catch(console.error).finally(() => setLoading(false));
+    api.get('/api/admin/settings/profile').then(setProfile).catch(console.error).finally(() => setLoading(false));
   }, []);
 
   if (loading) {

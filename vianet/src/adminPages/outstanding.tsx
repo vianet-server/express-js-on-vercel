@@ -86,7 +86,7 @@ export function Outstanding() {
   const [datewiseCols, setDatewiseCols] = useState<string[]>([]);
 
   useEffect(() => {
-    api.get('/admin/reports/outstanding')
+    api.get('/api/admin/reports/outstanding')
       .then(res => setData(res))
       .catch(console.error)
       .finally(() => setLoading(false));

@@ -31,7 +31,7 @@ export function Daybook() {
   const toggle = (id: number) => setOpenIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
 
   useEffect(() => {
-    api.get('/admin/reports/daybook')
+    api.get('/api/admin/reports/daybook')
       .then(res => {
         setTransactionsData(res);
         setDailyTotals([]);

@@ -67,7 +67,7 @@ export function BalanceSheet() {
   const [datewiseCols, setDatewiseCols] = useState<string[]>([]);
 
   useEffect(() => {
-    api.get('/admin/reports/balance-sheet')
+    api.get('/api/admin/reports/balance-sheet')
       .then(res => setData(res))
       .catch(console.error)
       .finally(() => setLoading(false));

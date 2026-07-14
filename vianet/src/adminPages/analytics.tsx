@@ -35,13 +35,13 @@ export function Analytics() {
 
   useEffect(() => {
     Promise.all([
-      api.get('/admin/analytics/stats') as any,
-      api.get('/admin/analytics/monthly-trend') as any,
-      api.get('/admin/analytics/category-data') as any,
-      api.get('/admin/analytics/top-customers') as any,
-      api.get('/admin/analytics/daily-sales') as any,
-      api.get('/admin/analytics/sales-by-region') as any,
-      api.get('/admin/analytics/orders-by-channel') as any,
+      api.get('/api/admin/analytics/stats') as any,
+      api.get('/api/admin/analytics/monthly-trend') as any,
+      api.get('/api/admin/analytics/category-data') as any,
+      api.get('/api/admin/analytics/top-customers') as any,
+      api.get('/api/admin/analytics/daily-sales') as any,
+      api.get('/api/admin/analytics/sales-by-region') as any,
+      api.get('/api/admin/analytics/orders-by-channel') as any,
     ]).then(([s, mt, cd, tc, ds, sbr, obc]: any[]) => {
       setStats({
         totalRevenue: `\u20b9${Number(s.totalRevenue).toLocaleString('en-IN')}`,

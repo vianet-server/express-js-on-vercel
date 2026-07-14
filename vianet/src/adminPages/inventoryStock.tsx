@@ -59,7 +59,7 @@ export function InventoryStock() {
   const fetchPage = useCallback(async (offset: number, limit = pageLimit) => {
     setLoadingMore(true)
     try {
-      const res = await api.get<StockPageResponse>(`/admin/inventory/stock?limit=${limit}&offset=${offset}`)
+      const res = await api.get<StockPageResponse>(`/api/admin/inventory/stock?limit=${limit}&offset=${offset}`)
       dispatch(appendStockItems({ items: res.rows, total: res.total, offset }))
       return res
     } finally {

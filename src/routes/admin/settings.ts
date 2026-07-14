@@ -8,21 +8,21 @@ router.use(adminAuth);
 
 router.get('/settings', async (req, res) => {
   try {
-    const users = await neonDb.query("SELECT userid, email, usertype, is_active, created_at FROM users ORDER BY created_at DESC LIMIT 10");
+    const users = await neonDb.query("SELECT userid, email, usertype, is_active, created_at FROM app.users ORDER BY created_at DESC LIMIT 10");
     res.json(users.rows);
   } catch { res.json([]); }
 });
 
 router.get('/controls', async (req, res) => {
   try {
-    const users = await neonDb.query("SELECT usertype AS category, COUNT(*) AS items FROM users GROUP BY usertype");
+    const users = await neonDb.query("SELECT usertype AS category, COUNT(*) AS items FROM app.users GROUP BY usertype");
     res.json(users.rows);
   } catch { res.json([]); }
 });
 
 router.get('/profile', async (req, res) => {
   try {
-    const user = await neonDb.query("SELECT userid, email, usertype, is_active, created_at, updated_at FROM users WHERE userid = $1", [req.user.id]);
+    const user = await neonDb.query("SELECT userid, email, usertype, is_active, created_at, updated_at FROM app.users WHERE userid = $1", [req.user.id]);
     res.json(user.rows[0] || {});
   } catch { res.json({}); }
 });
