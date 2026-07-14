@@ -16,28 +16,22 @@ const vianetDist = path.join(root, 'vianet', 'dist')
 app.use('/assets', express.static(path.join(vianetDist, 'assets')))
 app.use('/favicon.svg', express.static(path.join(vianetDist, 'favicon.svg')))
 
-// Admin frontend
-app.get('/admin', (_, res) => {
-  res.sendFile(path.join(vianetDist, 'admin.html'))
+app.get('/about', function (req, res) {
+  res.sendFile(path.join(__dirname, '..', 'components', 'about.htm'))
 })
 
-// Employee frontend
-app.get('/employ', (_, res) => {
-  res.sendFile(path.join(vianetDist, 'employ.html'))
-})
-
-// App frontend
-app.get('/app', (_, res) => {
-  res.sendFile(path.join(vianetDist, 'app.html'))
-})
+// SPA fallback — serve index.html for all frontend routes
+// Note: Register API routes BEFORE this if they share a prefix (e.g. /admin/api/*)
+const spaIndex = path.join(vianetDist, 'index.html')
+const spaPaths = ['/auth', '/app', '/employ', '/admin']
+for (const p of spaPaths) {
+  app.get(p, (_, res) => res.sendFile(spaIndex))
+  app.get(`${p}/*`, (_, res) => res.sendFile(spaIndex))
+}
 
 // Redirect / to /app
 app.get('/', (_, res) => {
   res.redirect('/app')
-})
-
-app.get('/about', function (req, res) {
-  res.sendFile(path.join(__dirname, '..', 'components', 'about.htm'))
 })
 
 // Example API endpoint - JSON
