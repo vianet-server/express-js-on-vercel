@@ -95,7 +95,6 @@ export function AccessGroupDetail() {
             <AccessGroupComparisonTable
               items={item.accessGroups}
               currentGroup={decodedGroup}
-              productName={item.name}
               onGroupClick={(g) => navigate(`/admin/inventory/sku/${item.sku}/access-group/${encodeURIComponent(g)}`)}
             />
           </CardContent>

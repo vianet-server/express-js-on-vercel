@@ -33,7 +33,7 @@ export function AccessGroupStockSettings({ groupName, stockName, config, onSave 
           </div>
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-medium text-muted-foreground">Price Override (₹)</label>
-            <Input type="number" value={local.allowDiscount ? 0 : 0} onChange={e => {}} className="text-sm" placeholder="Leave blank to use default" />
+            <Input type="number" value={local.allowDiscount ? 0 : 0} onChange={() => {}} className="text-sm" placeholder="Leave blank to use default" />
           </div>
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-medium text-muted-foreground">Notes</label>

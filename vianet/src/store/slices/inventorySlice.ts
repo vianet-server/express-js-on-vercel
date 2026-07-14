@@ -25,7 +25,7 @@ export interface AccessGroupDetailData {
 }
 
 export interface AccessGroup {
-  id: number; group: string; members: number; permissions: string[]; status: string;
+  id: number; name: string; group_key: string; members: number; permissions: string[]; status: string;
 }
 
 export interface StockPagination {

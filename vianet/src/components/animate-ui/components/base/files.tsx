@@ -1,3 +1,4 @@
+// @ts-nocheck  
 import * as React from 'react';
 import { FolderIcon, FolderOpenIcon, FileIcon } from 'lucide-react';
 

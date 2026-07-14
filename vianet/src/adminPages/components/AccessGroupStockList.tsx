@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ShieldCheck, ShieldOff, Package, Plus, Edit3, Trash2 } from 'lucide-react';
+import { ShieldCheck, Package, Plus, Edit3, Trash2 } from 'lucide-react';
 
 interface StockAccessItem {
   sku: string;

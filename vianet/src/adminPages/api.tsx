@@ -61,7 +61,7 @@ const methodStyles: Record<string, string> = {
 
 export function Api() {
   const [keys, setKeys] = useState<ApiKey[]>([]);
-  const [usage, setUsage] = useState<any>(null);
+  const [usage] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
@@ -248,7 +248,7 @@ export function Api() {
             </div>
             <div className="flex flex-col gap-1.5">
               <Label>Associated Access Group</Label>
-              <Select value={newKeyGroup} onValueChange={setNewKeyGroup}>
+              <Select value={newKeyGroup} onValueChange={(v) => v && setNewKeyGroup(v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select access group..." />
                 </SelectTrigger>
@@ -272,7 +272,7 @@ export function Api() {
             </div>
             <div className="flex flex-col gap-1.5">
               <Label>Max User Active Duration</Label>
-              <Select value={newKeyDuration} onValueChange={setNewKeyDuration}>
+              <Select value={newKeyDuration} onValueChange={(v) => v && setNewKeyDuration(v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select duration..." />
                 </SelectTrigger>
