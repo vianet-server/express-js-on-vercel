@@ -4,3 +4,4 @@ node_modules
 .env.local
 err.txt
 errVercelDeploy.txt
+0

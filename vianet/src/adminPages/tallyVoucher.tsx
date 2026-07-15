@@ -14,9 +14,9 @@ export function Voucher() {
     api.get('/api/admin/voucher').then(r => setData(Array.isArray(r) ? r : r?.data ?? [])).catch(() => setLoading(false));
   }, []);
   const filtered = data.filter(v =>
-    v.id?.toLowerCase().includes(search.toLowerCase()) ||
-    v.party?.toLowerCase().includes(search.toLowerCase()) ||
-    v.type?.toLowerCase().includes(search.toLowerCase())
+    (v.party_ledger_name || '')?.toLowerCase().includes(search.toLowerCase()) ||
+    (v.voucher_type || v.type || '')?.toLowerCase().includes(search.toLowerCase()) ||
+    (v.voucher_number || '')?.toLowerCase().includes(search.toLowerCase())
   );
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -36,16 +36,15 @@ export function Voucher() {
           ) : (
           <table className="w-full text-sm">
             <thead><tr className="border-b text-left text-muted-foreground">
-              <th className="pb-2 font-medium">ID</th><th className="pb-2 font-medium">Type</th><th className="pb-2 font-medium">Party</th><th className="pb-2 font-medium">Date</th><th className="pb-2 font-medium text-right">Amount</th><th className="pb-2 font-medium">Status</th>
+              <th className="pb-2 font-medium">ID</th><th className="pb-2 font-medium">Type</th><th className="pb-2 font-medium">Party</th><th className="pb-2 font-medium">Date</th><th className="pb-2 font-medium text-right">Amount</th>
             </tr></thead>
             <tbody>{filtered.map((v) => (
               <tr key={v.id} className="border-b last:border-0">
-                <td className="py-2.5 font-mono text-xs text-muted-foreground">{v.id}</td>
-                <td className="py-2.5"><Badge variant="outline" className="text-[10px]">{v.type}</Badge></td>
-                <td className="py-2.5 font-medium">{v.party}</td>
-                <td className="py-2.5 text-muted-foreground">{v.date}</td>
-                <td className="py-2.5 text-right font-medium">₹{v.amount?.toLocaleString()}</td>
-                <td className="py-2.5"><Badge variant={v.status === 'Confirmed' ? 'default' : 'secondary'} className="text-[10px]">{v.status}</Badge></td>
+                <td className="py-2.5 font-mono text-xs text-muted-foreground">{v.voucher_number || v.id}</td>
+                <td className="py-2.5"><Badge variant="outline" className="text-[10px]">{v.voucher_type || v.type}</Badge></td>
+                <td className="py-2.5 font-medium">{v.party_ledger_name || v.narration || '-'}</td>
+                <td className="py-2.5 text-muted-foreground">{v.date ? new Date(v.date).toLocaleDateString() : ''}</td>
+                <td className="py-2.5 text-right font-medium">₹{(v.amount ?? 0).toLocaleString()}</td>
               </tr>
             ))}</tbody>
           </table>

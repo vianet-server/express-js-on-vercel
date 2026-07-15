@@ -3,34 +3,108 @@ const { neonDb } = require('../../config/db');
 const adminAuth = require('../../middleware/adminAuth');
 
 const router = express.Router();
-
 router.use(adminAuth);
 
+// === P&L — use pre-computed data from app.profitloss ===
 router.get('/pnl', async (req, res) => {
   try {
-    const ledgers = await neonDb.query("SELECT id, name, COALESCE(opening_balance, 0) AS balance, type FROM ledgers ORDER BY name");
-    res.json(ledgers.rows);
+    const result = await neonDb.query(
+      "SELECT data FROM app.profitloss ORDER BY id DESC LIMIT 1"
+    );
+    if (result.rows.length === 0) return res.json([]);
+    const pl = result.rows[0].data;
+    const rows = (pl.rows || []).map((r: any, i: number) => ({
+      id: i + 1,
+      label: r.name || 'Unknown',
+      amount: Math.abs(parseFloat(r.amount) || 0),
+      type: (parseFloat(r.amount) || 0) >= 0 ? 'income' : 'expense',
+      subs: [],
+    }));
+    res.json(rows);
   } catch { res.json([]); }
 });
 
+// === Outstanding — use app.vouchers with correct column names ===
 router.get('/outstanding', async (req, res) => {
   try {
-    const ledgers = await neonDb.query("SELECT id, name, COALESCE(opening_balance, 0) AS amount, type AS status FROM ledgers ORDER BY name");
-    res.json(ledgers.rows);
+    const vouchers = await neonDb.query(
+      `SELECT id, date, voucher_type, voucher_number, narration, party_ledger_name,
+              COALESCE((SELECT SUM((e->>'amount')::numeric) FROM jsonb_array_elements(ledgerentries) e
+                        WHERE (e->>'isdeemedpositive') = 'No'), 0) AS amount
+       FROM app.vouchers ORDER BY date DESC LIMIT 200`
+    );
+    const rows = vouchers.rows.map((r: any) => {
+      const days = r.date ? Math.floor((Date.now() - new Date(r.date).getTime()) / 86400000) : 0;
+      let status = 'due';
+      if (days > 60) status = 'critical';
+      else if (days > 30) status = 'overdue';
+      return {
+        id: r.id,
+        customer: r.party_ledger_name || r.narration || `Voucher #${r.voucher_number || r.id}`,
+        amount: Math.abs(parseFloat(r.amount) || 0),
+        days,
+        date: r.date ? new Date(r.date).toISOString().split('T')[0] : '',
+        status,
+        subs: [{
+          invoice: r.voucher_number || `V-${r.id}`,
+          amount: Math.abs(parseFloat(r.amount) || 0),
+          due: r.date ? new Date(r.date).toISOString().split('T')[0] : '',
+        }],
+      };
+    });
+    res.json(rows);
   } catch { res.json([]); }
 });
 
+// === Balance Sheet — use pre-computed data from app.balancesheet ===
 router.get('/balance-sheet', async (req, res) => {
   try {
-    const ledgers = await neonDb.query("SELECT id, name, COALESCE(opening_balance, 0) AS balance, type FROM ledgers ORDER BY type, name");
-    res.json(ledgers.rows);
+    const result = await neonDb.query(
+      "SELECT data FROM app.balancesheet ORDER BY id DESC LIMIT 1"
+    );
+    if (result.rows.length === 0) return res.json([]);
+    const bs = result.rows[0].data;
+    const rows = (bs.rows || []).map((r: any, i: number) => ({
+      id: i + 1,
+      label: r.name || 'Unknown',
+      amount: Math.abs(parseFloat(r.amount) || 0),
+      type: (parseFloat(r.amount) || 0) >= 0 ? 'liability' : 'asset',
+      subs: [],
+    }));
+    res.json(rows);
   } catch { res.json([]); }
 });
 
+// === Daybook — use app.vouchers with correct column names ===
 router.get('/daybook', async (req, res) => {
   try {
-    const vouchers = await neonDb.query("SELECT id, type, number, date, amount, narration FROM vouchers ORDER BY date DESC LIMIT 100");
-    res.json(vouchers.rows);
+    const vouchers = await neonDb.query(
+      `SELECT id, date, voucher_type, voucher_number, narration, party_ledger_name,
+              billagentname,
+              COALESCE((SELECT SUM((e->>'amount')::numeric) FROM jsonb_array_elements(ledgerentries) e
+                        WHERE (e->>'isdeemedpositive') = 'No'), 0) AS amount
+       FROM app.vouchers ORDER BY date DESC LIMIT 100`
+    );
+    const rows = vouchers.rows.map((r: any) => {
+      const raw = r.voucher_type || '';
+      let displayType = 'Sale';
+      if (/payment/i.test(raw)) displayType = 'Payment';
+      else if (/purchase/i.test(raw)) displayType = 'Purchase';
+      else if (/expense|cost/i.test(raw)) displayType = 'Expense';
+      else if (/receipt/i.test(raw)) displayType = 'Payment';
+      return {
+        id: r.id,
+        date: r.date ? new Date(r.date).toISOString().split('T')[0] : '',
+        type: displayType,
+        customer: r.party_ledger_name || r.narration || '',
+        ref: r.voucher_number || '',
+        salesman: r.billagentname || '',
+        amount: Math.abs(parseFloat(r.amount) || 0),
+        mode: 'Cash',
+        subs: [],
+      };
+    });
+    res.json(rows);
   } catch { res.json([]); }
 });
 

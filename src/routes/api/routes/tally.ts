@@ -1,15 +1,11 @@
-/**
- * api/routes/tally.js
- *
- * Public Tally ERP routes for stock items, ledgers, vouchers, and godowns.
- * Uses standard auth middleware for protected endpoints.
- */
-
+const crypto = require('crypto');
 const express = require('express');
 const { neonDb } = require('../../../config/db');
 const auth = require('../../../middleware/auth');
 
 const router = express.Router();
+
+function genGuid() { return crypto.randomUUID(); }
 
 // ==================== STOCK ITEM CRUD ====================
 
@@ -17,8 +13,8 @@ router.post('/stock-item', auth('user'), async (req, res) => {
   try {
     const { name, quantity, price } = req.body;
     const result = await neonDb.query(
-      'INSERT INTO app.stock (stockname, quantity, price, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW()) RETURNING *',
-      [name, quantity, price]
+      'INSERT INTO app.stock (stockname, guid, quantity, price, masterid, created_at, updated_at) VALUES ($1, $2, $3, $4, 0, NOW(), NOW()) RETURNING *',
+      [name, genGuid(), quantity, price]
     );
     res.status(201).json({ message: 'Stock item created', data: result.rows[0] });
   } catch (err) {
@@ -29,7 +25,7 @@ router.post('/stock-item', auth('user'), async (req, res) => {
 
 router.get('/stock-item', auth('user'), async (req, res) => {
   try {
-    const { name, sku } = req.query;
+    const { name } = req.query;
     let query = 'SELECT * FROM app.stock WHERE 1=1';
     const params: any[] = [];
     let idx = 1;
@@ -49,9 +45,7 @@ router.put('/stock-item', auth('user'), async (req, res) => {
       'UPDATE app.stock SET stockname = $1, quantity = $2, price = $3, updated_at = NOW() WHERE id = $4 RETURNING *',
       [name, quantity, price, id]
     );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Stock item not found' });
-    }
+    if (result.rows.length === 0) return res.status(404).json({ message: 'Stock item not found' });
     res.status(200).json({ message: 'Stock item updated', data: result.rows[0] });
   } catch (err) {
     console.error('[api/tally] stock-item PUT error:', err);
@@ -63,9 +57,7 @@ router.delete('/stock-item', auth('user'), async (req, res) => {
   try {
     const { id } = req.body;
     const result = await neonDb.query('DELETE FROM app.stock WHERE id = $1 RETURNING id', [id]);
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Stock item not found' });
-    }
+    if (result.rows.length === 0) return res.status(404).json({ message: 'Stock item not found' });
     res.status(200).json({ message: 'Stock item deleted' });
   } catch (err) {
     console.error('[api/tally] stock-item DELETE error:', err);
@@ -77,10 +69,10 @@ router.delete('/stock-item', auth('user'), async (req, res) => {
 
 router.post('/ledger', auth('user'), async (req, res) => {
   try {
-    const { name, group_name, opening_balance, type } = req.body;
+    const { name, address, mobile } = req.body;
     const result = await neonDb.query(
-      'INSERT INTO ledgers (name, group_name, opening_balance, type, created_at, updated_at) VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING *',
-      [name, group_name, opening_balance, type]
+      'INSERT INTO app.ledger (guid, name, address, mobile) VALUES ($1, $2, $3, $4) RETURNING *',
+      [genGuid(), name, address ? [address] : null, mobile ? [mobile] : null]
     );
     res.status(201).json({ message: 'Ledger created', data: result.rows[0] });
   } catch (err) {
@@ -91,13 +83,12 @@ router.post('/ledger', auth('user'), async (req, res) => {
 
 router.get('/ledger', auth('user'), async (req, res) => {
   try {
-    const { name, group_name, type } = req.query;
-    let query = 'SELECT * FROM ledgers WHERE 1=1';
+    const { name } = req.query;
+    let query = 'SELECT id, guid, name, address, mobile, ledgername FROM app.ledger WHERE 1=1';
     const params: any[] = [];
     let idx = 1;
     if (name) { query += ` AND name ILIKE $${idx++}`; params.push(`%${name}%`); }
-    if (group_name) { query += ` AND group_name = $${idx++}`; params.push(group_name); }
-    if (type) { query += ` AND type = $${idx++}`; params.push(type); }
+    query += ' ORDER BY name';
     const result = await neonDb.query(query, params);
     res.status(200).json({ message: 'Ledgers fetched', data: result.rows });
   } catch (err) {
@@ -108,14 +99,12 @@ router.get('/ledger', auth('user'), async (req, res) => {
 
 router.put('/ledger', auth('user'), async (req, res) => {
   try {
-    const { id, name, group_name, opening_balance, type } = req.body;
+    const { id, name, address, mobile } = req.body;
     const result = await neonDb.query(
-      'UPDATE ledgers SET name = $1, group_name = $2, opening_balance = $3, type = $4, updated_at = NOW() WHERE id = $5 RETURNING *',
-      [name, group_name, opening_balance, type, id]
+      'UPDATE app.ledger SET name = $1, address = $2, mobile = $3 WHERE id = $4 RETURNING *',
+      [name, address ? [address] : null, mobile ? [mobile] : null, id]
     );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Ledger not found' });
-    }
+    if (result.rows.length === 0) return res.status(404).json({ message: 'Ledger not found' });
     res.status(200).json({ message: 'Ledger updated', data: result.rows[0] });
   } catch (err) {
     console.error('[api/tally] ledger PUT error:', err);
@@ -126,10 +115,8 @@ router.put('/ledger', auth('user'), async (req, res) => {
 router.delete('/ledger', auth('user'), async (req, res) => {
   try {
     const { id } = req.body;
-    const result = await neonDb.query('DELETE FROM ledgers WHERE id = $1 RETURNING id', [id]);
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Ledger not found' });
-    }
+    const result = await neonDb.query('DELETE FROM app.ledger WHERE id = $1 RETURNING id', [id]);
+    if (result.rows.length === 0) return res.status(404).json({ message: 'Ledger not found' });
     res.status(200).json({ message: 'Ledger deleted' });
   } catch (err) {
     console.error('[api/tally] ledger DELETE error:', err);
@@ -141,10 +128,11 @@ router.delete('/ledger', auth('user'), async (req, res) => {
 
 router.post('/voucher', auth('user'), async (req, res) => {
   try {
-    const { type, number, date, amount, narration } = req.body;
+    const { voucher_type, voucher_number, date, narration, party_ledger_name } = req.body;
     const result = await neonDb.query(
-      'INSERT INTO vouchers (type, number, date, amount, narration, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING *',
-      [type, number, date, amount, narration]
+      `INSERT INTO app.vouchers (guid, date, voucher_type, voucher_number, party_ledger_name, narration)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [genGuid(), date, voucher_type, voucher_number, party_ledger_name, narration]
     );
     res.status(201).json({ message: 'Voucher created', data: result.rows[0] });
   } catch (err) {
@@ -155,16 +143,25 @@ router.post('/voucher', auth('user'), async (req, res) => {
 
 router.get('/voucher', auth('user'), async (req, res) => {
   try {
-    const { type, number, from_date, to_date } = req.query;
-    let query = 'SELECT * FROM vouchers WHERE 1=1';
+    const { voucher_type, voucher_number, from_date, to_date } = req.query;
+    let query = `SELECT id, guid, date, voucher_type, voucher_number, party_ledger_name,
+                        narration, ledgerentries, inventoryentries, created_at, billagentname
+                 FROM app.vouchers WHERE 1=1`;
     const params: any[] = [];
     let idx = 1;
-    if (type) { query += ` AND type = $${idx++}`; params.push(type); }
-    if (number) { query += ` AND number = $${idx++}`; params.push(number); }
+    if (voucher_type) { query += ` AND voucher_type = $${idx++}`; params.push(voucher_type); }
+    if (voucher_number) { query += ` AND voucher_number = $${idx++}`; params.push(voucher_number); }
     if (from_date) { query += ` AND date >= $${idx++}`; params.push(from_date); }
     if (to_date) { query += ` AND date <= $${idx++}`; params.push(to_date); }
+    query += ' ORDER BY date DESC LIMIT 200';
     const result = await neonDb.query(query, params);
-    res.status(200).json({ message: 'Vouchers fetched', data: result.rows });
+    const rows = result.rows.map((r: any) => ({
+      ...r,
+      type: r.voucher_type,
+      number: r.voucher_number,
+      amount: r.ledgerentries ? r.ledgerentries.reduce((s: number, e: any) => s + (parseFloat(e.amount) || 0), 0) : 0,
+    }));
+    res.status(200).json({ message: 'Vouchers fetched', data: rows });
   } catch (err) {
     console.error('[api/tally] voucher GET error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
@@ -173,14 +170,13 @@ router.get('/voucher', auth('user'), async (req, res) => {
 
 router.put('/voucher', auth('user'), async (req, res) => {
   try {
-    const { id, type, number, date, amount, narration } = req.body;
+    const { id, voucher_type, voucher_number, date, narration, party_ledger_name } = req.body;
     const result = await neonDb.query(
-      'UPDATE vouchers SET type = $1, number = $2, date = $3, amount = $4, narration = $5, updated_at = NOW() WHERE id = $6 RETURNING *',
-      [type, number, date, amount, narration, id]
+      `UPDATE app.vouchers SET voucher_type = $1, voucher_number = $2, date = $3,
+       narration = $4, party_ledger_name = $5 WHERE id = $6 RETURNING *`,
+      [voucher_type, voucher_number, date, narration, party_ledger_name, id]
     );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Voucher not found' });
-    }
+    if (result.rows.length === 0) return res.status(404).json({ message: 'Voucher not found' });
     res.status(200).json({ message: 'Voucher updated', data: result.rows[0] });
   } catch (err) {
     console.error('[api/tally] voucher PUT error:', err);
@@ -191,10 +187,8 @@ router.put('/voucher', auth('user'), async (req, res) => {
 router.delete('/voucher', auth('user'), async (req, res) => {
   try {
     const { id } = req.body;
-    const result = await neonDb.query('DELETE FROM vouchers WHERE id = $1 RETURNING id', [id]);
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Voucher not found' });
-    }
+    const result = await neonDb.query('DELETE FROM app.vouchers WHERE id = $1 RETURNING id', [id]);
+    if (result.rows.length === 0) return res.status(404).json({ message: 'Voucher not found' });
     res.status(200).json({ message: 'Voucher deleted' });
   } catch (err) {
     console.error('[api/tally] voucher DELETE error:', err);
@@ -240,9 +234,7 @@ router.put('/godown', auth('user'), async (req, res) => {
       'UPDATE godowns SET name = $1, address = $2, updated_at = NOW() WHERE id = $3 RETURNING *',
       [name, address, id]
     );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Godown not found' });
-    }
+    if (result.rows.length === 0) return res.status(404).json({ message: 'Godown not found' });
     res.status(200).json({ message: 'Godown updated', data: result.rows[0] });
   } catch (err) {
     console.error('[api/tally] godown PUT error:', err);
@@ -254,9 +246,7 @@ router.delete('/godown', auth('user'), async (req, res) => {
   try {
     const { id } = req.body;
     const result = await neonDb.query('DELETE FROM godowns WHERE id = $1 RETURNING id', [id]);
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Godown not found' });
-    }
+    if (result.rows.length === 0) return res.status(404).json({ message: 'Godown not found' });
     res.status(200).json({ message: 'Godown deleted' });
   } catch (err) {
     console.error('[api/tally] godown DELETE error:', err);

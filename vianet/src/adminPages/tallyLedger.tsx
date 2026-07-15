@@ -13,7 +13,7 @@ export function Ledger() {
   useEffect(() => {
     api.get('/api/admin/ledger').then(r => setData(Array.isArray(r) ? r : r?.data ?? [])).catch(() => setLoading(false));
   }, []);
-  const filtered = data.filter(l => l.name?.toLowerCase().includes(search.toLowerCase()) || l.type?.toLowerCase().includes(search.toLowerCase()));
+  const filtered = data.filter(l => l.name?.toLowerCase().includes(search.toLowerCase()));
   return (
     <div className="flex flex-col gap-6 p-6">
       <div className="flex items-center justify-between">
@@ -32,15 +32,14 @@ export function Ledger() {
           ) : (
           <table className="w-full text-sm">
             <thead><tr className="border-b text-left text-muted-foreground">
-              <th className="pb-2 font-medium">Name</th><th className="pb-2 font-medium">Type</th><th className="pb-2 font-medium text-right">Opening</th><th className="pb-2 font-medium text-right">Closing</th><th className="pb-2 font-medium">Status</th>
+              <th className="pb-2 font-medium">Name</th><th className="pb-2 font-medium">Mobile</th><th className="pb-2 font-medium">Address</th><th className="pb-2 font-medium">Ledger Name</th>
             </tr></thead>
             <tbody>{filtered.map((l) => (
-              <tr key={l.name} className="border-b last:border-0">
+              <tr key={l.id || l.name} className="border-b last:border-0">
                 <td className="py-2.5 font-medium">{l.name}</td>
-                <td className="py-2.5"><Badge variant="outline" className="text-[10px]">{l.type}</Badge></td>
-                <td className="py-2.5 text-right text-muted-foreground">₹{l.opening?.toLocaleString()}</td>
-                <td className="py-2.5 text-right font-medium">₹{l.closing?.toLocaleString()}</td>
-                <td className="py-2.5"><Badge variant={l.status === 'Active' ? 'default' : 'secondary'} className="text-[10px]">{l.status}</Badge></td>
+                <td className="py-2.5 text-muted-foreground">{(l.mobile || []).join(', ') || '-'}</td>
+                <td className="py-2.5 text-muted-foreground">{(l.address || []).join(', ') || '-'}</td>
+                <td className="py-2.5">{l.ledgername || '-'}</td>
               </tr>
             ))}</tbody>
           </table>
