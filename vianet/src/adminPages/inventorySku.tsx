@@ -33,10 +33,10 @@ export function InventorySku() {
   useEffect(() => {
     Promise.all([
       api.get<SkuRow[]>('/api/admin/inventory/sku'),
-      api.get<any[]>('/api/admin/inventory/control').then(r => r.accessGroups || []).catch(() => []),
-    ]).then(([skus, groups]) => {
+      api.get<any>('/api/admin/inventory/control').then((r: any) => r?.accessGroups || []).catch(() => []),
+    ]).then(([skus, groups]: [SkuRow[], any[]]) => {
       dispatch(setSkuData(skus));
-      setSelectedGroups(groups.map(g => g.name));
+      setSelectedGroups((groups ?? []).map((g: any) => g.name));
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [dispatch]);
