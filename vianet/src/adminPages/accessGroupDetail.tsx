@@ -28,7 +28,7 @@ export function AccessGroupDetail() {
     if (!sku || !decodedGroup) { setLoading(false); return; }
     api.get(`/api/admin/inventory/sku/${sku}/access-group/${encodeURIComponent(decodedGroup)}`).then((res: AccessGroupDetailData) => {
       dispatch(setCurrentAccessGroupDetail(res));
-      setStockConfig(res.stockConfig || { maxQty: res.accessGroup.qty, allowDiscount: false, autoApprove: false, notes: '' });
+      setStockConfig(res.stockConfig || { maxQty: res.accessGroup?.qty ?? 0, allowDiscount: false, autoApprove: false, notes: '' });
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [sku, decodedGroup, dispatch]);

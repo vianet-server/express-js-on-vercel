@@ -20,7 +20,7 @@ interface StockItem {
   qty: number; price: number; gst: number; min: number; max: number;
 }
 
-const LIMIT_OPTIONS = [10, 25, 50, 100]
+const LIMIT_OPTIONS = [10, 25, 30, 50, 100]
 
 const editFields = [
   { key: 'name', label: 'Stock Name', type: 'text' },
@@ -38,8 +38,8 @@ const editFields = [
 export function InventoryStock() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
-  const items = useAppSelector((state) => state.inventory.stockItems);
-  const pagination = useAppSelector((state) => state.inventory.stockPagination) ?? { offset: 0, limit: 50, total: 0 };
+  const items = useAppSelector((state) => state.inventory?.stockItems ?? []);
+  const pagination = useAppSelector((state) => state.inventory?.stockPagination ?? { offset: 0, limit: 50, total: 0 });
   const [search, setSearch] = useState('')
   const [initialLoading, setInitialLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -88,9 +88,9 @@ export function InventoryStock() {
   };
 
   const filtered = items.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.brand.toLowerCase().includes(search.toLowerCase()) ||
-    p.model.toLowerCase().includes(search.toLowerCase())
+    (p.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+    (p.brand ?? '').toLowerCase().includes(search.toLowerCase()) ||
+    (p.model ?? '').toLowerCase().includes(search.toLowerCase())
   )
 
   const hasMore = items.length < pagination.total

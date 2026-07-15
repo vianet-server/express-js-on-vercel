@@ -21,7 +21,7 @@ interface StockAccessListProps {
   onRemove: (sku: string) => void;
 }
 
-export function AccessGroupStockList({ stocks, groupName, onEdit, onAdd, onRemove }: StockAccessListProps) {
+export function AccessGroupStockList({ stocks = [], groupName, onEdit, onAdd, onRemove }: StockAccessListProps) {
   const [editTarget, setEditTarget] = useState<{ sku: string; qty: number; price: number } | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [addTarget, setAddTarget] = useState<{ sku: string; qty: string; price: string } | null>(null);

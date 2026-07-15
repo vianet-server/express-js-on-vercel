@@ -8,10 +8,10 @@ router.use(adminAuth);
 
 router.get('/stats', async (req, res) => {
   try {
-    const stockCount = await neonDb.query('SELECT COUNT(*) FROM stockitems');
-    const totalStock = await neonDb.query('SELECT COALESCE(SUM(quantity), 0) FROM stockitems');
-    const lowStock = await neonDb.query("SELECT COUNT(*) FROM stockitems WHERE quantity <= COALESCE((SELECT 0), 0)");
-    const stockValue = await neonDb.query('SELECT COALESCE(SUM(quantity * price), 0) FROM stockitems');
+    const stockCount = await neonDb.query('SELECT COUNT(*) FROM app.stock');
+    const totalStock = await neonDb.query('SELECT COALESCE(SUM(quantity), 0) FROM app.stock');
+    const lowStock = await neonDb.query("SELECT COUNT(*) FROM app.stock WHERE quantity <= COALESCE((SELECT 0), 0)");
+    const stockValue = await neonDb.query('SELECT COALESCE(SUM(quantity * price), 0) FROM app.stock');
     res.json({
       totalProducts: parseInt(stockCount.rows[0].count),
       totalStock: parseInt(totalStock.rows[0].coalesce),
@@ -37,7 +37,7 @@ router.get('/monthly-trend', async (req, res) => {
 
 router.get('/product-share', async (req, res) => {
   try {
-    const result = await neonDb.query("SELECT name, COALESCE(quantity, 0) AS value FROM stockitems ORDER BY quantity DESC LIMIT 10");
+    const result = await neonDb.query("SELECT stockname AS name, COALESCE(quantity, 0) AS value FROM app.stock ORDER BY quantity DESC LIMIT 10");
     res.json(result.rows);
   } catch { res.json([]); }
 });

@@ -60,11 +60,11 @@ const inventorySlice = createSlice({
       state.stockItems = action.payload
     },
     appendStockItems(state, action: PayloadAction<{ items: StockItem[]; total: number; offset: number }>) {
-      const { items, total, offset } = action.payload
+      const { items = [], total = 0, offset = 0 } = action.payload ?? {}
       if (offset === 0) {
         state.stockItems = items
       } else {
-        const existingIds = new Set(state.stockItems.map(i => i.id))
+        const existingIds = new Set((state.stockItems ?? []).map(i => i.id))
         for (const item of items) {
           if (!existingIds.has(item.id)) {
             state.stockItems.push(item)
@@ -75,7 +75,7 @@ const inventorySlice = createSlice({
       state.stockPagination = { limit: state.stockPagination.limit, total, offset }
     },
     updateStockItem(state, action: PayloadAction<StockItem>) {
-      const idx = state.stockItems.findIndex(i => i.id === action.payload.id)
+      const idx = (state.stockItems ?? []).findIndex(i => i.id === action.payload.id)
       if (idx >= 0) state.stockItems[idx] = action.payload
       if (state.currentStockDetail?.id === action.payload.id) state.currentStockDetail = action.payload
     },
@@ -108,7 +108,7 @@ const inventorySlice = createSlice({
     },
     resetStockPagination(state) {
       state.stockItems = []
-      state.stockPagination = { offset: 0, limit: state.stockPagination.limit, total: 0 }
+      state.stockPagination = { offset: 0, limit: state.stockPagination?.limit ?? 50, total: 0 }
     },
   },
   extraReducers: (builder) => {

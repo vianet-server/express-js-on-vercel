@@ -16,10 +16,10 @@ router.use(adminAuth);
 // Create a new stock item
 router.post('/stockitem', async (req, res) => {
   try {
-    const { name, sku, description, quantity, price } = req.body;
+    const { name, quantity, price } = req.body;
     const result = await neonDb.query(
-      'INSERT INTO stockitems (name, sku, description, quantity, price, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING *',
-      [name, sku, description, quantity, price]
+      'INSERT INTO app.stock (stockname, quantity, price, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW()) RETURNING *',
+      [name, quantity, price]
     );
     res.status(201).json({ message: 'Stock item created', data: result.rows[0] });
   } catch (err) {
@@ -32,7 +32,7 @@ router.post('/stockitem', async (req, res) => {
 router.get('/stockitem', async (req, res) => {
   try {
     const { name, sku } = req.query;
-    let query = 'SELECT * FROM stockitems WHERE 1=1';
+    let query = 'SELECT * FROM app.stock WHERE 1=1';
     const params: any[] = [];
     let idx = 1;
     if (name) { query += ` AND name ILIKE $${idx++}`; params.push(`%${name}%`); }
@@ -48,10 +48,10 @@ router.get('/stockitem', async (req, res) => {
 // Update a stock item by ID
 router.put('/stockitem', async (req, res) => {
   try {
-    const { id, name, sku, description, quantity, price } = req.body;
+    const { id, name, quantity, price } = req.body;
     const result = await neonDb.query(
-      'UPDATE stockitems SET name = $1, sku = $2, description = $3, quantity = $4, price = $5, updated_at = NOW() WHERE id = $6 RETURNING *',
-      [name, sku, description, quantity, price, id]
+      'UPDATE app.stock SET stockname = $1, quantity = $2, price = $3, updated_at = NOW() WHERE id = $4 RETURNING *',
+      [name, quantity, price, id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Stock item not found' });
@@ -67,7 +67,7 @@ router.put('/stockitem', async (req, res) => {
 router.delete('/stockitem', async (req, res) => {
   try {
     const { id } = req.body;
-    const result = await neonDb.query('DELETE FROM stockitems WHERE id = $1 RETURNING id', [id]);
+    const result = await neonDb.query('DELETE FROM app.stock WHERE id = $1 RETURNING id', [id]);
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Stock item not found' });
     }
@@ -85,8 +85,8 @@ router.get('/inventory/stock', async (req, res) => {
     const offset = parseInt(req.query.offset) || 0;
     const search = req.query.search || '';
 
-    let countQuery = 'SELECT COUNT(*) FROM stockitems WHERE 1=1';
-    let dataQuery = 'SELECT * FROM stockitems WHERE 1=1';
+    let countQuery = 'SELECT COUNT(*) FROM app.stock WHERE 1=1';
+    let dataQuery = 'SELECT * FROM app.stock WHERE 1=1';
     const params: any[] = [];
     let idx = 1;
 
@@ -102,13 +102,14 @@ router.get('/inventory/stock', async (req, res) => {
     const total = parseInt(countResult.rows[0].count);
 
     dataQuery += ` ORDER BY id DESC LIMIT $${idx} OFFSET $${idx + 1}`;
+
     params.push(limit, offset);
 
     const dataResult = await neonDb.query(dataQuery, params);
 
     const rows = dataResult.rows.map(r => ({
       id: r.id,
-      name: r.name,
+      name: r.stockname,
       brand: '',
       model: '',
       variant: '',
@@ -130,7 +131,7 @@ router.get('/inventory/stock', async (req, res) => {
 // SKU listing endpoint for inventory management
 router.get('/inventory/sku', async (req, res) => {
   try {
-    const result = await neonDb.query("SELECT id, name, sku, quantity AS qty, price FROM stockitems ORDER BY name");
+    const result = await neonDb.query("SELECT id, stockname AS name, CAST(id AS TEXT) AS sku, quantity AS qty, price FROM app.stock ORDER BY stockname");
     res.json(result.rows.map(r => ({ ...r, brand: '', accessGroups: [], status: 'active' })));
   } catch (err) {
     console.error('[stockitem] GET /inventory/sku error:', err);
@@ -141,7 +142,7 @@ router.get('/inventory/sku', async (req, res) => {
 // Control settings overview
 router.get('/inventory/control', async (req, res) => {
   try {
-    const result = await neonDb.query("SELECT COUNT(*) AS items FROM stockitems");
+    const result = await neonDb.query("SELECT COUNT(*) AS items FROM app.stock");
     res.json({ totalItems: parseInt(result.rows[0].items), categories: [], settings: [], accessGroups: [] });
   } catch { res.json({ totalItems: 0, categories: [], settings: [], accessGroups: [] }); }
 });
@@ -150,13 +151,13 @@ router.get('/inventory/control', async (req, res) => {
 router.get('/inventory/stock/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await neonDb.query('SELECT * FROM stockitems WHERE id = $1', [id]);
+    const result = await neonDb.query('SELECT * FROM app.stock WHERE id = $1', [id]);
     if (result.rows.length === 0) return res.status(404).json({ message: 'Stock item not found' });
     const r = result.rows[0];
     res.json({
-      id: r.id, name: r.name, brand: '', model: '', variant: '', color: '',
+      id: r.id, name: r.stockname, brand: '', model: '', variant: '', color: '',
       qty: r.quantity || 0, price: parseFloat(r.price) || 0, gst: 0,
-      min: 0, max: 0, description: r.description || '', details: '', tags: '', url: '', id_no: '',
+      min: 0, max: 0, description: '', details: '', tags: '', url: '', id_no: '',
     });
   } catch (err) {
     console.error('[stockitem] GET /inventory/stock/:id error:', err);
@@ -168,7 +169,7 @@ router.get('/inventory/stock/:id', async (req, res) => {
 router.get('/inventory/sku/:sku/access-group/:group', async (req, res) => {
   try {
     const { sku, group } = req.params;
-    const item = await neonDb.query("SELECT id, name, sku, quantity AS qty, price FROM stockitems WHERE sku = $1 OR CAST(id AS TEXT) = $1", [sku]);
+    const item = await neonDb.query("SELECT id, stockname AS name, CAST(id AS TEXT) AS sku, quantity AS qty, price FROM app.stock WHERE id = $1", [isNaN(Number(sku)) ? sku : Number(sku)]);
     if (item.rows.length === 0) return res.status(404).json({ message: 'SKU not found' });
     const r = item.rows[0];
     res.json({

@@ -34,7 +34,7 @@ function DetailSection({ title, items, icon }: { title: string; items: any[]; ic
               <div className="flex items-center gap-3">
                 <span className="text-sm font-medium">₹{item.amount.toLocaleString()}</span>
                 <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${statusStyles[item.status as keyof typeof statusStyles]}`}>
-                  {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                  {(item.status ?? '').charAt(0).toUpperCase() + (item.status ?? '').slice(1)}
                 </span>
               </div>
             </div>
@@ -47,7 +47,7 @@ function DetailSection({ title, items, icon }: { title: string; items: any[]; ic
                     <span>Due Date</span>
                   </span>
                 </div>
-                {item.subs.map((sub: any, i: number) => (
+                {(item.subs ?? []).map((sub: any, i: number) => (
                   <div key={i} className="flex items-center justify-between py-1.5 text-sm text-muted-foreground border-b last:border-0">
                     <span>{sub.invoice}</span>
                     <span className="flex gap-4">
@@ -59,7 +59,7 @@ function DetailSection({ title, items, icon }: { title: string; items: any[]; ic
                 <div className="flex items-center justify-between py-2 text-sm font-medium border-t">
                   <span>Total</span>
                   <span className="flex gap-4">
-                    <span className="w-20 text-right">₹{item.subs.reduce((s: number, s2: any) => s + s2.amount, 0).toLocaleString()}</span>
+                    <span className="w-20 text-right">₹{(item.subs ?? []).reduce((s: number, s2: any) => s + s2.amount, 0).toLocaleString()}</span>
                     <span className="w-24 text-right">{item.days}d overdue</span>
                   </span>
                 </div>
@@ -238,7 +238,7 @@ export function Outstanding() {
                       <td className="py-2.5">{item.date}</td>
                       <td className="py-2.5">
                         <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${statusStyles[item.status as keyof typeof statusStyles]}`}>
-                          {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                          {(item.status ?? '').charAt(0).toUpperCase() + (item.status ?? '').slice(1)}
                         </span>
                       </td>
                     </tr>
@@ -297,7 +297,7 @@ export function Outstanding() {
                         <td className="py-2.5 text-right">{item.days}d</td>
                         <td className="py-2.5">
                           <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${statusStyles[item.status as keyof typeof statusStyles]}`}>
-                            {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                            {(item.status ?? '').charAt(0).toUpperCase() + (item.status ?? '').slice(1)}
                           </span>
                         </td>
                       </tr>

@@ -201,7 +201,7 @@ export function Daybook() {
                   </div>
                   <CollapsibleContent>
                     <div className="ml-10 pl-4 border-l-2 border-muted">
-                      {t.subs.length === 0 ? (
+                      {(t.subs ?? []).length === 0 ? (
                         <p className="py-2 text-xs text-muted-foreground">No line items</p>
                       ) : (
                         <div className="py-2">
@@ -213,7 +213,7 @@ export function Daybook() {
                               <span className="w-20 text-right">Amount</span>
                             </div>
                           </div>
-                          {t.subs.map((s: any, i: number) => (
+                          {(t.subs ?? []).map((s: any, i: number) => (
                             <div key={i} className="flex items-center justify-between py-1 text-sm text-muted-foreground border-b last:border-0">
                               <span>{s.item}</span>
                               <div className="flex gap-4">

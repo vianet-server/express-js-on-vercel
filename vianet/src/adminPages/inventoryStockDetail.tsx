@@ -39,6 +39,7 @@ export function InventoryStockDetail() {
   const [confirmDiscard, setConfirmDiscard] = useState(false);
 
   useEffect(() => {
+    if (!id) { setLoading(false); return; }
     api.get(`/api/admin/inventory/stock/${id}`).then(res => {
       setForm(res);
       setLoading(false);

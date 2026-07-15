@@ -127,7 +127,7 @@ export function Dashboard() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Today's Sale</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <div className="text-2xl font-bold">₹{stats.todaySale.toLocaleString()}</div>
+              <div className="text-2xl font-bold">₹{(stats.todaySale ?? 0).toLocaleString()}</div>
               <div className="flex items-center gap-1 text-xs text-green-600">
                 <ArrowUpRight size={14} /> +{stats.saleChangePercent}% <span className="text-muted-foreground ml-1">vs yesterday</span>
               </div>
@@ -145,7 +145,7 @@ export function Dashboard() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Profit</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <div className="text-2xl font-bold">₹{stats.totalProfit.toLocaleString()}</div>
+              <div className="text-2xl font-bold">₹{(stats.totalProfit ?? 0).toLocaleString()}</div>
               <div className="flex items-center gap-1 text-xs text-green-600">
                 <ArrowUpRight size={14} /> +{stats.profitChangePercent}% <span className="text-muted-foreground ml-1">vs last month</span>
               </div>
@@ -163,9 +163,9 @@ export function Dashboard() {
                 <div key={s.name} className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-medium text-muted-foreground w-4">{i + 1}.</span>
-                    <span className="text-sm">{s.name.split(' ')[0]}</span>
+                    <span className="text-sm">{(s.name ?? '').split(' ')[0]}</span>
                   </div>
-                  <span className="text-sm font-medium">₹{s.sales.toLocaleString()}</span>
+                  <span className="text-sm font-medium">₹{(s.sales ?? 0).toLocaleString()}</span>
                 </div>
               ))}
             </CardContent>
@@ -178,7 +178,7 @@ export function Dashboard() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Spend</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <div className="text-2xl font-bold">₹{stats.totalSpend.toLocaleString()}</div>
+              <div className="text-2xl font-bold">₹{(stats.totalSpend ?? 0).toLocaleString()}</div>
               <div className="flex items-center gap-1 text-xs text-red-500">
                 <ArrowDownRight size={14} /> {stats.spendChangePercent}% <span className="text-muted-foreground ml-1">vs last month</span>
               </div>

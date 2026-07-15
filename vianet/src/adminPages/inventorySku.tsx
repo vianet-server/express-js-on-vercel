@@ -55,7 +55,7 @@ export function InventorySku() {
   };
   const visibleGroups = accessGroups.filter(g => selectedGroups.includes(g));
 
-  const filtered = skuData.filter(s =>
+  const filtered = (skuData ?? []).filter(s =>
     (selectedBrands.length === 0 || selectedBrands.includes(s.brand)) &&
     (s.sku.toLowerCase().includes(search.toLowerCase()) || s.name.toLowerCase().includes(search.toLowerCase()) || s.brand.toLowerCase().includes(search.toLowerCase()))
   );
@@ -64,7 +64,7 @@ export function InventorySku() {
   const pageData = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const openEdit = (sku: string, group: string, field: string) => {
-    const item = skuData.find(s => s.sku === sku);
+    const item = (skuData ?? []).find(s => s.sku === sku);
     const ag = item?.accessGroups.find(a => a.group === group);
     setEditTarget({ sku, group, field, value: ag ? field === 'qty' ? ag.qty : ag.price : 0 });
   };
@@ -74,7 +74,7 @@ export function InventorySku() {
     dispatch(updateSkuItem({
       sku: editTarget.sku,
       updates: {
-        accessGroups: skuData
+        accessGroups: (skuData ?? [])
           .find(s => s.sku === editTarget.sku)
           ?.accessGroups.map(a =>
             a.group === editTarget.group ? { ...a, [editTarget.field]: editTarget.value } : a
@@ -172,7 +172,7 @@ export function InventorySku() {
                     <td className="py-2.5 px-3 text-right">{s.qty}</td>
                     <td className="py-2.5 px-3 text-right border-r">₹{s.price.toLocaleString()}</td>
                     {visibleGroups.map(g => {
-                      const ag = s.accessGroups.find(a => a.group === g);
+                      const ag = (s.accessGroups ?? []).find(a => a.group === g);
                       return (
                         <Fragment key={g}>
                           <td className="py-2.5 px-2 text-right cursor-pointer" onClick={() => openEdit(s.sku, g, 'qty')}>
@@ -208,7 +208,7 @@ export function InventorySku() {
             </div>
             <button
               className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-muted transition-colors"
-              onClick={() => { navigate(`/admin/inventory/sku/${contextMenu.row.sku}/access-group/${encodeURIComponent(contextMenu.row.accessGroups[0]?.group || accessGroups[0])}`); setContextMenu(null); }}
+              onClick={() => { navigate(`/admin/inventory/sku/${contextMenu.row.sku}/access-group/${encodeURIComponent((contextMenu.row.accessGroups ?? [])[0]?.group || accessGroups[0])}`); setContextMenu(null); }}
             >
               <div className="flex size-7 items-center justify-center rounded-md bg-blue-100 text-blue-700"><Eye size={14} /></div>
               View Access Details
@@ -270,7 +270,7 @@ export function InventorySku() {
                   <div className="col-span-2 text-right">Price</div>
                   <div className="col-span-4">Privileges</div>
                 </div>
-                {detailGroup.accessGroups.map(ag => {
+                {(detailGroup.accessGroups ?? []).map(ag => {
                   const privs = accessPrivileges[ag.group] || [];
                   const hasAccess = ag.qty > 0;
                   return (

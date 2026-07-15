@@ -23,10 +23,10 @@ router.use(adminAuth);
 // Create a new stock item
 router.post('/stock-item', async (req, res) => {
   try {
-    const { name, sku, description, quantity, price } = req.body;
+    const { name, quantity, price } = req.body;
     const result = await neonDb.query(
-      'INSERT INTO stockitems (name, sku, description, quantity, price, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING *',
-      [name, sku, description, quantity, price]
+      'INSERT INTO app.stock (stockname, quantity, price, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW()) RETURNING *',
+      [name, quantity, price]
     );
     res.status(201).json({ message: 'Stock item created', data: result.rows[0] });
   } catch (err) {
@@ -39,11 +39,10 @@ router.post('/stock-item', async (req, res) => {
 router.get('/stock-item', async (req, res) => {
   try {
     const { name, sku } = req.query;
-    let query = 'SELECT * FROM stockitems WHERE 1=1';
+    let query = 'SELECT * FROM app.stock WHERE 1=1';
     const params: any[] = [];
     let idx = 1;
-    if (name) { query += ` AND name ILIKE $${idx++}`; params.push(`%${name}%`); }
-    if (sku) { query += ` AND sku = $${idx++}`; params.push(sku); }
+    if (name) { query += ` AND stockname ILIKE $${idx++}`; params.push(`%${name}%`); }
     const result = await neonDb.query(query, params);
     res.status(200).json({ message: 'Stock items fetched', data: result.rows });
   } catch (err) {
@@ -55,10 +54,10 @@ router.get('/stock-item', async (req, res) => {
 // Update a stock item by ID
 router.put('/stock-item', async (req, res) => {
   try {
-    const { id, name, sku, description, quantity, price } = req.body;
+    const { id, name, quantity, price } = req.body;
     const result = await neonDb.query(
-      'UPDATE stockitems SET name = $1, sku = $2, description = $3, quantity = $4, price = $5, updated_at = NOW() WHERE id = $6 RETURNING *',
-      [name, sku, description, quantity, price, id]
+      'UPDATE app.stock SET stockname = $1, quantity = $2, price = $3, updated_at = NOW() WHERE id = $4 RETURNING *',
+      [name, quantity, price, id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Stock item not found' });
@@ -74,7 +73,7 @@ router.put('/stock-item', async (req, res) => {
 router.delete('/stock-item', async (req, res) => {
   try {
     const { id } = req.body;
-    const result = await neonDb.query('DELETE FROM stockitems WHERE id = $1 RETURNING id', [id]);
+    const result = await neonDb.query('DELETE FROM app.stock WHERE id = $1 RETURNING id', [id]);
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Stock item not found' });
     }
@@ -291,7 +290,7 @@ router.delete('/godown', async (req, res) => {
 // Tally masters overview
 router.get('/masters', async (req, res) => {
   try {
-    const stock = await neonDb.query('SELECT COUNT(*) FROM stockitems');
+    const stock = await neonDb.query('SELECT COUNT(*) FROM app.stock');
     const ledger = await neonDb.query('SELECT COUNT(*) FROM ledgers');
     const voucher = await neonDb.query('SELECT COUNT(*) FROM vouchers');
     const godown = await neonDb.query('SELECT COUNT(*) FROM godowns');

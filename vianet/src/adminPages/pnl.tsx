@@ -29,7 +29,7 @@ function DetailSection({ title, items, icon }: { title: string; items: any[]; ic
             </div>
             <CollapsibleContent>
               <div className="ml-7 pl-3 border-l-2 border-muted">
-                {item.subs.map((sub: any, i: number) => (
+                {(item.subs ?? []).map((sub: any, i: number) => (
                   <div key={i} className="flex items-center justify-between py-2 text-sm text-muted-foreground border-b last:border-0">
                     <span>{sub.label}</span>
                     <span>₹{sub.amount.toLocaleString()}</span>
@@ -37,7 +37,7 @@ function DetailSection({ title, items, icon }: { title: string; items: any[]; ic
                 ))}
                 <div className="flex items-center justify-between py-2 text-sm font-medium border-t">
                   <span>Total</span>
-                  <span>₹{item.subs.reduce((s: number, s2: any) => s + s2.amount, 0).toLocaleString()}</span>
+                  <span>₹{(item.subs ?? []).reduce((s: number, s2: any) => s + s2.amount, 0).toLocaleString()}</span>
                 </div>
               </div>
             </CollapsibleContent>
@@ -195,7 +195,7 @@ export function Pnl() {
                       <td className="py-2.5 text-right">₹{item.amount.toLocaleString()}</td>
                       <td className="py-2.5">
                         <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${item.type === 'income' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                          {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
+                          {(item.type ?? '').charAt(0).toUpperCase() + (item.type ?? '').slice(1)}
                         </span>
                       </td>
                     </tr>
@@ -250,7 +250,7 @@ export function Pnl() {
                         <td className="py-2.5 text-right">₹{item.amount.toLocaleString()}</td>
                         <td className="py-2.5">
                           <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${item.type === 'income' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                            {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
+                            {(item.type ?? '').charAt(0).toUpperCase() + (item.type ?? '').slice(1)}
                           </span>
                         </td>
                       </tr>

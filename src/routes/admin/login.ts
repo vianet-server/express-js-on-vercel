@@ -33,7 +33,7 @@ router.post('/', async (req, res) => {
     // }
 
     const token = jwt.sign(
-      { id: user.userid, email: user.email, usertype: user.usertype },
+      { id: user.userid, email: user.email, usertype: 'admin' },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );

@@ -179,8 +179,8 @@ export function InventoryControl() {
             </CardHeader>
             <CardContent>
               <div className="flex flex-col">
-                {accessGroups.map((g, i) => (
-                  <div key={g.id} className={`flex items-center justify-between py-3 ${i < accessGroups.length - 1 ? 'border-b' : ''}`}>
+                {(accessGroups ?? []).map((g, i) => (
+                  <div key={g.id} className={`flex items-center justify-between py-3 ${i < (accessGroups ?? []).length - 1 ? 'border-b' : ''}`}>
                     <div className="flex items-start gap-3">
                       <div className="flex size-9 items-center justify-center rounded-lg bg-purple-100 text-purple-700">
                         <Users size={16} />
@@ -214,7 +214,7 @@ export function InventoryControl() {
                   </tr>
                 </thead>
                 <tbody>
-                  {accessGroups.map((g, i) => (
+                  {(accessGroups ?? []).map((g, i) => (
                     <tr key={i} className="border-b last:border-0">
                       <td className="py-2.5 font-medium">{g.name}</td>
                       {['view', 'edit', 'approve', 'configure', 'export'].map(p => (
@@ -357,7 +357,7 @@ export function InventoryControl() {
                     <tr key={i} className="border-b last:border-0">
                       <td className="py-2.5 font-medium">{c.category}</td>
                       <td className="py-2.5 text-right">{c.items}</td>
-                      <td className="py-2.5 text-right">₹{c.value.toLocaleString()}</td>
+                       <td className="py-2.5 text-right">₹{(c.value ?? 0).toLocaleString()}</td>
                       <td className="py-2.5">
                         <Badge variant={c.status === 'Active' ? 'default' : c.status === 'Inactive' ? 'secondary' : 'outline'}>{c.status}</Badge>
                       </td>
