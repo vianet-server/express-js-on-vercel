@@ -3,3 +3,4 @@ node_modules
 .vercel
 .env.local
 err.txt
+errVercelDeploy.txt
