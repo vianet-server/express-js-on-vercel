@@ -61,10 +61,11 @@ export function InventoryControl() {
     if (!form.name.trim()) return;
     setSubmitting(true);
     try {
-      const res = await api.post('/api/admin/api/access-group', { name: form.name });
+      const res = await api.post('/api/admin/access-group', { name: form.name });
       setCreatedLink(res.link || '');
     } catch (e) {
       setCreatedLink('');
+      alert(e instanceof Error ? e.message : 'Failed to create access group');
     }
     setSubmitting(false);
   };

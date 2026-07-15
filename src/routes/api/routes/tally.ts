@@ -26,10 +26,18 @@ router.post('/stock-item', auth('user'), async (req, res) => {
 router.get('/stock-item', auth('user'), async (req, res) => {
   try {
     const { name } = req.query;
-    let query = 'SELECT * FROM app.stock WHERE 1=1';
     const params: any[] = [];
     let idx = 1;
-    if (name) { query += ` AND stockname ILIKE $${idx++}`; params.push(`%${name}%`); }
+    let query;
+
+    if (req.user.usertype === 'admin') {
+      query = 'SELECT s.* FROM app.stock s WHERE 1=1';
+    } else {
+      query = `SELECT s.* FROM app.stock s INNER JOIN app.inventory_access_group iag ON iag.inventoryid = s.id INNER JOIN app.users u ON u.userid = $${idx++} AND u.access_group_id = iag.accessgroupid`;
+      params.push(req.user.id);
+    }
+
+    if (name) { query += ` AND s.stockname ILIKE $${idx++}`; params.push(`%${name}%`); }
     const result = await neonDb.query(query, params);
     res.status(200).json({ message: 'Stock items fetched', data: result.rows });
   } catch (err) {

@@ -79,4 +79,38 @@ router.delete('/api', async (req, res) => {
   }
 });
 
+// GET /access-groups — List all access groups
+router.get('/access-groups', async (req, res) => {
+  try {
+    const result = await neonDb.query('SELECT id, name FROM app.access_groups ORDER BY name');
+    res.json(result.rows);
+  } catch (err) {
+    console.error('[api] GET /access-groups error:', err);
+    res.json([]);
+  }
+});
+
+// POST /access-group — Create a new access group
+router.post('/access-group', async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: 'Group name is required' });
+    }
+    const result = await neonDb.query(
+      'INSERT INTO app.access_groups (name, created_at, updated_at) VALUES ($1, NOW(), NOW()) RETURNING id, name',
+      [name.trim()]
+    );
+    const link = `/admin/inventory/sku?group=${encodeURIComponent(name.trim())}`;
+    res.status(201).json({ message: 'Access group created', data: result.rows[0], link });
+  } catch (err) {
+    console.error('[api] POST /access-group error:', err);
+    // Handle duplicate name
+    if (err.code === '23505') {
+      return res.status(409).json({ message: 'Access group with this name already exists' });
+    }
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
 module.exports = router;

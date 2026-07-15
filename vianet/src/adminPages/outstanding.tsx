@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Calendar, Download, FileDown, FileSpreadsheet, Search, AlertTriangle, ChevronRight, ChevronDown, Plus, Loader2 } from 'lucide-react';
+import { Calendar, Download, FileDown, FileSpreadsheet, Search, AlertTriangle, ChevronRight, ChevronDown, Plus, Loader2, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
 import { api } from '@/lib/api';
 
 const statusStyles = {
@@ -250,21 +250,46 @@ export function Outstanding() {
         </TabsContent>
 
         <TabsContent value="detail" className="mt-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader><CardTitle>On Time</CardTitle></CardHeader>
-              <CardContent>
-                <DetailSection title="Due (&le;30 days)" items={data.filter((i: any) => i.days <= 30)} icon={<span className="size-2.5 rounded-full bg-blue-500 inline-block" />} />
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader><CardTitle>Overdue</CardTitle></CardHeader>
-              <CardContent>
-                <DetailSection title="Overdue (31-60 days)" items={data.filter((i: any) => i.days > 30 && i.days <= 60)} icon={<span className="size-2.5 rounded-full bg-amber-500 inline-block" />} />
-                <DetailSection title="Critical (&gt;60 days)" items={data.filter((i: any) => i.days > 60)} icon={<span className="size-2.5 rounded-full bg-red-500 inline-block" />} />
-              </CardContent>
-            </Card>
-          </div>
+          <Tabs defaultValue="receivable">
+            <TabsList>
+              <TabsTrigger value="receivable" className="gap-2"><ArrowUpCircle size={14} />Bills Receivable ({data.filter((i: any) => i.category === 'receivable').length})</TabsTrigger>
+              <TabsTrigger value="payable" className="gap-2"><ArrowDownCircle size={14} />Bills Payable ({data.filter((i: any) => i.category === 'payable').length})</TabsTrigger>
+            </TabsList>
+            <TabsContent value="receivable" className="mt-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader><CardTitle>On Time</CardTitle></CardHeader>
+                  <CardContent>
+                    <DetailSection title="Due (&le;30 days)" items={data.filter((i: any) => i.category === 'receivable' && i.days <= 30)} icon={<span className="size-2.5 rounded-full bg-blue-500 inline-block" />} />
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader><CardTitle>Overdue</CardTitle></CardHeader>
+                  <CardContent>
+                    <DetailSection title="Overdue (31-60 days)" items={data.filter((i: any) => i.category === 'receivable' && i.days > 30 && i.days <= 60)} icon={<span className="size-2.5 rounded-full bg-amber-500 inline-block" />} />
+                    <DetailSection title="Critical (&gt;60 days)" items={data.filter((i: any) => i.category === 'receivable' && i.days > 60)} icon={<span className="size-2.5 rounded-full bg-red-500 inline-block" />} />
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+            <TabsContent value="payable" className="mt-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader><CardTitle>On Time</CardTitle></CardHeader>
+                  <CardContent>
+                    <DetailSection title="Due (&le;30 days)" items={data.filter((i: any) => i.category === 'payable' && i.days <= 30)} icon={<span className="size-2.5 rounded-full bg-blue-500 inline-block" />} />
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader><CardTitle>Overdue</CardTitle></CardHeader>
+                  <CardContent>
+                    <DetailSection title="Overdue (31-60 days)" items={data.filter((i: any) => i.category === 'payable' && i.days > 30 && i.days <= 60)} icon={<span className="size-2.5 rounded-full bg-amber-500 inline-block" />} />
+                    <DetailSection title="Critical (&gt;60 days)" items={data.filter((i: any) => i.category === 'payable' && i.days > 60)} icon={<span className="size-2.5 rounded-full bg-red-500 inline-block" />} />
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
         <TabsContent value="search" className="mt-6">

@@ -21,3 +21,4 @@ export { Ledger } from './tallyLedger';
 export { StockItem } from './tallyStockItem';
 export { Masters } from './tallyMasters';
 export { Salesman } from './tallySalesman';
+export { AdminUsers } from './adminUsers';

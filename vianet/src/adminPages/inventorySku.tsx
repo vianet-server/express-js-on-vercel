@@ -71,18 +71,27 @@ export function InventorySku() {
     setEditTarget({ sku, group, field, value: ag ? field === 'qty' ? ag.qty : ag.price : 0 });
   };
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (!editTarget) return;
-    dispatch(updateSkuItem({
-      sku: editTarget.sku,
-      updates: {
-        accessGroups: (skuData ?? [])
-          .find(s => s.sku === editTarget.sku)
-          ?.accessGroups.map(a =>
-            a.group === editTarget.group ? { ...a, [editTarget.field]: editTarget.value } : a
-          ) || [],
-      },
-    }));
+    const item = (skuData ?? []).find(s => s.sku === editTarget.sku);
+    const existing = item?.accessGroups?.find(a => a.group === editTarget.group);
+    const qty = editTarget.field === 'qty' ? editTarget.value : (existing?.qty ?? 0);
+    const price = editTarget.field === 'price' ? editTarget.value : (existing?.price ?? 0);
+    try {
+      await api.post(`/api/admin/inventory/sku/${editTarget.sku}/access-group/${encodeURIComponent(editTarget.group)}`, { qty, price });
+      dispatch(updateSkuItem({
+        sku: editTarget.sku,
+        updates: {
+          accessGroups: (skuData ?? [])
+            .find(s => s.sku === editTarget.sku)
+            ?.accessGroups.map(a =>
+              a.group === editTarget.group ? { ...a, [editTarget.field]: editTarget.value } : a
+            ) || [],
+        },
+      }));
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Failed to update stock access');
+    }
     setEditTarget(null);
   };
 

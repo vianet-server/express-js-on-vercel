@@ -38,6 +38,13 @@ router.get('/outstanding', async (req, res) => {
       let status = 'due';
       if (days > 60) status = 'critical';
       else if (days > 30) status = 'overdue';
+      const vt = (r.voucher_type || '').toLowerCase();
+      const category =
+        vt.startsWith('sales') || vt.startsWith('receipt') || vt.includes('receipt') || vt === 'credit note'
+          ? 'receivable'
+          : vt.startsWith('purchase') || vt.startsWith('payment') || vt.startsWith('cash') || vt.startsWith('chq') || vt.startsWith('material') || vt === 'debit note'
+            ? 'payable'
+            : (parseFloat(r.amount) || 0) < 0 ? 'payable' : 'receivable';
       return {
         id: r.id,
         customer: r.party_ledger_name || r.narration || `Voucher #${r.voucher_number || r.id}`,
@@ -45,6 +52,7 @@ router.get('/outstanding', async (req, res) => {
         days,
         date: r.date ? new Date(r.date).toISOString().split('T')[0] : '',
         status,
+        category,
         subs: [{
           invoice: r.voucher_number || `V-${r.id}`,
           amount: Math.abs(parseFloat(r.amount) || 0),

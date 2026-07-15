@@ -27,15 +27,40 @@ router.post('/stock-item', async (req, res) => {
 router.get('/stock-item', async (req, res) => {
   try {
     const { name } = req.query;
-    let query = 'SELECT * FROM app.stock WHERE 1=1';
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 500);
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    let countQuery = 'SELECT COUNT(*) FROM app.stock WHERE 1=1';
+    let dataQuery = 'SELECT * FROM app.stock WHERE 1=1';
     const params: any[] = [];
     let idx = 1;
-    if (name) { query += ` AND stockname ILIKE $${idx++}`; params.push(`%${name}%`); }
-    const result = await neonDb.query(query, params);
-    res.status(200).json({ message: 'Stock items fetched', data: result.rows });
+
+    if (name) {
+      const clause = ` AND stockname ILIKE $${idx++}`;
+      countQuery += clause;
+      dataQuery += clause;
+      params.push(`%${name}%`);
+    }
+
+    const countResult = await neonDb.query(countQuery, params);
+    const total = parseInt(countResult.rows[0].count);
+
+    dataQuery += ` ORDER BY id DESC LIMIT $${idx} OFFSET $${idx + 1}`;
+    params.push(limit, offset);
+
+    const result = await neonDb.query(dataQuery, params);
+    const rows = result.rows.map((r: any) => ({
+      id: r.id,
+      name: r.stockname || '',
+      category: '',
+      qty: r.quantity || 0,
+      value: parseFloat(r.price) || 0,
+      status: 'Active',
+    }));
+    res.json({ rows, total, limit, offset });
   } catch (err) {
     console.error('[tally] stock-item GET error:', err);
-    res.status(500).json({ message: 'Server error', error: err.message });
+    res.json({ rows: [], total: 0, limit: 50, offset: 0 });
   }
 });
 
@@ -259,19 +284,21 @@ router.delete('/godown', async (req, res) => {
 
 router.get('/masters', async (req, res) => {
   try {
-    const stock = await neonDb.query('SELECT COUNT(*) FROM app.stock');
-    const ledger = await neonDb.query('SELECT COUNT(*) FROM app.ledger');
-    const voucher = await neonDb.query('SELECT COUNT(*) FROM app.vouchers');
-    const godown = await neonDb.query('SELECT COUNT(*) FROM godowns');
-    res.json({
-      stockItems: parseInt(stock.rows[0].count),
-      ledgers: parseInt(ledger.rows[0].count),
-      vouchers: parseInt(voucher.rows[0].count),
-      godowns: parseInt(godown.rows[0].count),
-    });
+    const [stock, ledger, voucher, godown] = await Promise.all([
+      neonDb.query("SELECT COUNT(*) FROM app.stock"),
+      neonDb.query("SELECT COUNT(*) FROM app.ledger"),
+      neonDb.query("SELECT COUNT(*) FROM app.vouchers"),
+      neonDb.query("SELECT COUNT(*) FROM godowns"),
+    ]);
+    res.json([
+      { id: 'stock', name: 'Stock Items', records: parseInt(stock.rows[0].count), lastUpdated: '', status: 'Active' },
+      { id: 'ledger', name: 'Ledgers', records: parseInt(ledger.rows[0].count), lastUpdated: '', status: 'Active' },
+      { id: 'voucher', name: 'Vouchers', records: parseInt(voucher.rows[0].count), lastUpdated: '', status: 'Active' },
+      { id: 'godown', name: 'Godowns', records: parseInt(godown.rows[0].count), lastUpdated: '', status: 'Active' },
+    ]);
   } catch (err) {
     console.error('[tally] GET /masters error:', err);
-    res.json({ stockItems: 0, ledgers: 0, vouchers: 0, godowns: 0 });
+    res.json([]);
   }
 });
 

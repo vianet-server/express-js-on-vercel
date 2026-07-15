@@ -57,6 +57,7 @@ import {
   SettingsControl,
   Api,
   Sync,
+  AdminUsers,
 } from './adminPages';
 
 const router = createBrowserRouter([
@@ -164,6 +165,7 @@ const router = createBrowserRouter([
       { path: 'tally/stock-item', element: <StockItem /> },
       { path: 'tally/masters', element: <Masters /> },
       { path: 'tally/salesman', element: <Salesman /> },
+      { path: 'users', element: <AdminUsers /> },
     ],
   },
   { path: '*', element: <NotFound /> },

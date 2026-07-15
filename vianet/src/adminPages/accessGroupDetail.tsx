@@ -33,16 +33,31 @@ export function AccessGroupDetail() {
     }).catch(() => setLoading(false));
   }, [sku, decodedGroup, dispatch]);
 
-  const handleEdit = (itemSku: string, qty: number, price: number) => {
-    dispatch(updateAccessGroupStock({ sku: itemSku, qty, price }));
+  const handleEdit = async (itemSku: string, qty: number, price: number) => {
+    try {
+      await api.put(`/api/admin/inventory/sku/${sku}/access-group/${encodeURIComponent(decodedGroup)}`, { qty, price });
+      dispatch(updateAccessGroupStock({ sku: itemSku, qty, price }));
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Failed to update stock access');
+    }
   };
 
-  const handleAdd = (itemSku: string, qty: number, price: number) => {
-    dispatch(updateAccessGroupStock({ sku: itemSku, qty, price }));
+  const handleAdd = async (itemSku: string, qty: number, price: number) => {
+    try {
+      await api.post(`/api/admin/inventory/sku/${sku}/access-group/${encodeURIComponent(decodedGroup)}`, { qty, price });
+      dispatch(updateAccessGroupStock({ sku: itemSku, qty, price }));
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Failed to add stock access');
+    }
   };
 
-  const handleRemove = (itemSku: string) => {
-    dispatch(updateAccessGroupStock({ sku: itemSku, qty: 0, price: 0 }));
+  const handleRemove = async (itemSku: string) => {
+    try {
+      await api.delete(`/api/admin/inventory/sku/${sku}/access-group/${encodeURIComponent(decodedGroup)}`);
+      dispatch(updateAccessGroupStock({ sku: itemSku, qty: 0, price: 0 }));
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Failed to remove stock access');
+    }
   };
 
   if (loading) {

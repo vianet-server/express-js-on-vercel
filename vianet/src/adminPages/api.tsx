@@ -50,7 +50,7 @@ const methodStyles: Record<string, string> = {
 export function Api() {
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [usage, setUsage] = useState<any>({});
-  const [accessGroups, setAccessGroups] = useState<string[]>([]);
+  const [accessGroups, setAccessGroups] = useState<{ id: number; name: string }[]>([]);
   const [allPermissions, setAllPermissions] = useState<{ id: string; label: string }[]>([]);
   const [endpoints, setEndpoints] = useState(defaultEndpoints);
   const [durationOptions, setDurationOptions] = useState(defaultDurationOptions);
@@ -67,7 +67,7 @@ export function Api() {
     Promise.all([
       api.get('/api/admin/api').catch(() => []),
       api.get('/api/admin/api/usage').catch(() => ({})),
-      api.get('/api/admin/api/access-groups').catch(() => []),
+      api.get('/api/admin/access-groups').catch(() => []),
       api.get('/api/admin/api/permissions').catch(() => []),
       api.get('/api/admin/api/endpoints').catch(() => defaultEndpoints),
       api.get('/api/admin/api/durations').catch(() => defaultDurationOptions),
@@ -265,7 +265,7 @@ export function Api() {
                 </SelectTrigger>
                 <SelectContent>
                   {accessGroups.map(g => (
-                    <SelectItem key={g} value={g}>{g}</SelectItem>
+                    <SelectItem key={g.id} value={g.name}>{g.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
