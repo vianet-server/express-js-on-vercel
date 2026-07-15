@@ -22,11 +22,11 @@ export function AdminLogin() {
     setError('');
     setLoading(true);
     try {
-      const data = await api.post<{ token: string; email: string; usertype?: string }>(
+      const data = await api.post<{ token: string; message?: string; user?: { email?: string; usertype?: string } }>(
         '/api/admin/login',
         { email: username, password },
       );
-      login(data.token, { username: data.email || username, role: data.usertype || 'admin' });
+      login(data.token, { username: data.user?.email || username, role: data.user?.usertype || 'admin' });
       const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname;
       navigate(from && from.startsWith('/admin') ? from : '/admin/dashboard', { replace: true });
     } catch (err) {

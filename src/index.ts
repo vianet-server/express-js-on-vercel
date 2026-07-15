@@ -1,11 +1,17 @@
 const express = require('express');
 const path = require('path');
+const cors = require('cors');
 const adminRoutes = require('./routes/admin/index');
 const apiRoutes = require('./routes/api/index');
 const partnerRoutes = require('./routes/partner/index');
 const employeeRoutes = require('./routes/employee/index');
 
 const app = express();
+
+app.use(cors({
+  origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+  credentials: true,
+}));
 
 app.use(express.json());
 
