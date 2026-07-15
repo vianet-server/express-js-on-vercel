@@ -34,6 +34,7 @@ export function InventoryStockDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<StockItem | null>(null);
   const [dirty, setDirty] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -45,6 +46,18 @@ export function InventoryStockDetail() {
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [id]);
+
+  const save = async () => {
+    if (!form || !id) return;
+    setSaving(true);
+    try {
+      await api.put(`/api/admin/inventory/stock/${id}`, form);
+      setDirty(false);
+    } catch (e) {
+      console.error('Save failed', e);
+    }
+    setSaving(false);
+  };
 
   if (loading) {
     return (
@@ -68,10 +81,6 @@ export function InventoryStockDetail() {
     setDirty(true);
   };
 
-  const save = () => {
-    setDirty(false);
-  };
-
   const handleBack = () => {
     if (dirty) { setConfirmDiscard(true); return; }
     navigate('/admin/inventory/stock');
@@ -92,7 +101,10 @@ export function InventoryStockDetail() {
           </Button>
           {dirty && <span className="text-xs text-amber-600 font-medium">Unsaved changes</span>}
           <Button variant="outline" size="sm" onClick={() => navigate('/admin/inventory/stock')}>Cancel</Button>
-          <Button size="sm" onClick={save} disabled={!dirty}><Save size={14} /> Save</Button>
+          <Button size="sm" onClick={save} disabled={!dirty || saving}>
+            {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            {saving ? 'Saving...' : 'Save'}
+          </Button>
         </div>
       </div>
 
@@ -190,7 +202,7 @@ export function InventoryStockDetail() {
                   <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all ${form.qty <= form.min ? 'bg-red-500' : form.qty >= form.max * 0.9 ? 'bg-amber-500' : 'bg-green-500'}`}
-                      style={{ width: `${Math.min(100, (form.qty / form.max) * 100)}%` }}
+                      style={{ width: `${Math.min(100, (form.qty / Math.max(1, form.max)) * 100)}%` }}
                     />
                   </div>
                 </div>
@@ -207,7 +219,7 @@ export function InventoryStockDetail() {
               <div className="flex flex-col gap-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Unit Price</span>
-                  <span className="font-bold">₹{(form.price ?? 0).toLocaleString()}</span>
+                  <span className="font-bold">\u20b9{(form.price ?? 0).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">GST</span>
@@ -215,7 +227,7 @@ export function InventoryStockDetail() {
                 </div>
                 <div className="flex justify-between text-sm border-t pt-2">
                   <span className="text-muted-foreground">Stock Value</span>
-                  <span className="font-bold">₹{(form.qty * (form.price ?? 0)).toLocaleString()}</span>
+                  <span className="font-bold">\u20b9{(form.qty * (form.price ?? 0)).toLocaleString()}</span>
                 </div>
               </div>
             </CardContent>

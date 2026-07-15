@@ -9,19 +9,32 @@ export function Sync() {
   const [syncHistory, setSyncHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [autoSync, setAutoSync] = useState(true);
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
-    api.get('/api/admin/settings/sync').then(setSyncHistory).catch(console.error).finally(() => setLoading(false));
+    api.get('/api/admin/settings/sync').then(r => { const arr = Array.isArray(r) ? r : r?.data ?? []; setSyncHistory(arr.filter((x: any) => x.date || x.status)); }).catch(() => setLoading(false));
   }, []);
 
   const lastSync = syncHistory.length > 0 ? syncHistory[0] : null;
+
+  const triggerSync = async () => {
+    setSyncing(true);
+    try {
+      const res = await api.post('/api/admin/settings/sync');
+      setSyncHistory(prev => [res, ...prev]);
+    } catch (e) {
+      console.error(e);
+    }
+    setSyncing(false);
+  };
 
   return (
     <div className="flex flex-col gap-6 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Sync</h1>
-        <Button size="sm">
-          <RefreshCw size={14} className="mr-1" /> Sync Now
+        <Button size="sm" onClick={triggerSync} disabled={syncing}>
+          <RefreshCw size={14} className={`mr-1 ${syncing ? 'animate-spin' : ''}`} />
+          {syncing ? 'Syncing...' : 'Sync Now'}
         </Button>
       </div>
 
@@ -49,11 +62,11 @@ export function Sync() {
               </div>
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Items Synced</p>
-                <p className="text-lg font-semibold">{lastSync?.items?.toLocaleString() || '0'}</p>
+                <p className="text-lg font-semibold">{(lastSync?.items ?? 0).toLocaleString()}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Failed Items</p>
-                <p className="text-lg font-semibold text-red-600">0</p>
+                <p className="text-lg font-semibold text-red-600">{(lastSync?.failed ?? 0).toLocaleString()}</p>
               </div>
             </div>
             )}
@@ -69,11 +82,11 @@ export function Sync() {
           <CardContent className="space-y-4">
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Frequency</p>
-              <p className="text-lg font-semibold">Daily</p>
+              <p className="text-lg font-semibold">{lastSync?.frequency ?? 'Daily'}</p>
             </div>
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Next Scheduled</p>
-              <p className="text-lg font-semibold">2026-07-04 08:00 AM</p>
+              <p className="text-lg font-semibold">{lastSync?.nextScheduled ?? 'N/A'}</p>
             </div>
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">Auto Sync</p>
@@ -114,7 +127,7 @@ export function Sync() {
             </thead>
             <tbody>
               {syncHistory.map((row, i) => (
-                <tr key={i} className="border-b last:border-0">
+                <tr key={row.id ?? i} className="border-b last:border-0">
                   <td className="py-2.5">{row.date}</td>
                   <td className="py-2.5 font-medium">{row.type}</td>
                   <td className="py-2.5">
@@ -133,7 +146,7 @@ export function Sync() {
                       {row.status === 'success' ? 'Success' : 'Failed'}
                     </Badge>
                   </td>
-                  <td className="py-2.5 text-right">{row.items?.toLocaleString()}</td>
+                  <td className="py-2.5 text-right">{(row.items ?? 0).toLocaleString()}</td>
                   <td className="py-2.5 text-right font-mono">{row.duration}</td>
                 </tr>
               ))}

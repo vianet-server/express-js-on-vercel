@@ -91,7 +91,7 @@ router.get('/inventory/stock', async (req, res) => {
     let idx = 1;
 
     if (search) {
-      const clause = ` AND (name ILIKE $${idx} OR sku ILIKE $${idx} OR COALESCE(description, '') ILIKE $${idx})`;
+      const clause = ` AND (stockname ILIKE $${idx})`;
       countQuery += clause;
       dataQuery += clause;
       params.push(`%${search}%`);

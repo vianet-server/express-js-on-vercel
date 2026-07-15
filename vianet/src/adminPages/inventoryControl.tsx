@@ -21,6 +21,7 @@ interface ControlSetting {
 
 interface GroupSetting {
   group: string; maxQty: number; allowDiscount: boolean; autoApprove: boolean; active: boolean;
+  accessibleStockCount?: number;
 }
 
 export function InventoryControl() {
@@ -219,7 +220,9 @@ export function InventoryControl() {
                       <td className="py-2.5 font-medium">{g.name}</td>
                       {['view', 'edit', 'approve', 'configure', 'export'].map(p => (
                         <td key={p} className="py-2.5 text-center">
-                          <X size={14} className="text-muted-foreground/40 inline" />
+                          {g.permissions?.includes(p)
+                            ? <CheckCircle size={14} className="text-green-600 inline" />
+                            : <X size={14} className="text-muted-foreground/40 inline" />}
                         </td>
                       ))}
                     </tr>
@@ -279,7 +282,6 @@ export function InventoryControl() {
                   </thead>
                   <tbody>
                     {grpSettings.map((g) => {
-                      const count = Math.floor(Math.random() * 8) + 1;
                       const restrictions: string[] = [];
                       if (!g.allowDiscount) restrictions.push('No Discount');
                       if (!g.autoApprove) restrictions.push('Manual Approval');
@@ -290,7 +292,7 @@ export function InventoryControl() {
                             <div className={`flex size-7 items-center justify-center rounded-md ${g.active ? 'bg-purple-100 text-purple-700' : 'bg-muted text-muted-foreground'}`}><Users size={13} /></div>
                             {g.group}
                           </td>
-                           <td className="py-2.5 text-muted-foreground">{count} of {(categories ?? []).length} categories</td>
+                           <td className="py-2.5 text-muted-foreground">{(g.accessibleStockCount ?? 0)} of {(categories ?? []).length} categories</td>
                           <td className="py-2.5 text-right font-medium">{(g.maxQty ?? 0).toLocaleString()} units</td>
                           <td className="py-2.5">
                             <div className="flex gap-1 flex-wrap">
@@ -357,7 +359,7 @@ export function InventoryControl() {
                     <tr key={i} className="border-b last:border-0">
                       <td className="py-2.5 font-medium">{c.category}</td>
                       <td className="py-2.5 text-right">{c.items}</td>
-                       <td className="py-2.5 text-right">₹{(c.value ?? 0).toLocaleString()}</td>
+                       <td className="py-2.5 text-right">\u20b9{(c.value ?? 0).toLocaleString()}</td>
                       <td className="py-2.5">
                         <Badge variant={c.status === 'Active' ? 'default' : c.status === 'Inactive' ? 'secondary' : 'outline'}>{c.status}</Badge>
                       </td>

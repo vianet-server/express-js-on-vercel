@@ -19,7 +19,7 @@ const COLORS = ['#2563eb', '#16a34a', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 export function Analytics() {
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({ totalRevenue: '', totalOrders: '', avgOrderValue: '', conversionRate: '' });
+  const [stats, setStats] = useState<any>({});
   const [monthlyTrend, setMonthlyTrend] = useState([]);
   const [categoryData, setCategoryData] = useState([]);
   const [topCustomers, setTopCustomers] = useState([]);
@@ -35,38 +35,34 @@ export function Analytics() {
 
   useEffect(() => {
     Promise.all([
-      api.get('/api/admin/analytics/stats') as any,
-      api.get('/api/admin/analytics/monthly-trend') as any,
-      api.get('/api/admin/analytics/category-data') as any,
-      api.get('/api/admin/analytics/top-customers') as any,
-      api.get('/api/admin/analytics/daily-sales') as any,
-      api.get('/api/admin/analytics/sales-by-region') as any,
-      api.get('/api/admin/analytics/orders-by-channel') as any,
+      api.get('/api/admin/analytics/stats').catch(() => ({})),
+      api.get('/api/admin/analytics/monthly-trend').catch(() => []),
+      api.get('/api/admin/analytics/category-data').catch(() => []),
+      api.get('/api/admin/analytics/top-customers').catch(() => []),
+      api.get('/api/admin/analytics/daily-sales').catch(() => []),
+      api.get('/api/admin/analytics/sales-by-region').catch(() => []),
+      api.get('/api/admin/analytics/orders-by-channel').catch(() => []),
     ]).then(([s, mt, cd, tc, ds, sbr, obc]: any[]) => {
-      setStats({
-        totalRevenue: `\u20b9${Number(s.totalRevenue).toLocaleString('en-IN')}`,
-        totalOrders: Number(s.totalOrders).toLocaleString('en-IN'),
-        avgOrderValue: `\u20b9${Number(s.avgOrderValue).toFixed(2)}`,
-        conversionRate: `${Number(s.conversionRate).toFixed(2)}%`,
-      });
-      setMonthlyTrend(mt.map((m: any) => ({ ...m, revenue: m.sales, orders: m.profit })));
-      setCategoryData(cd);
-      setTopCustomers(tc);
-      setDailySales(ds);
-      setSalesByRegion(sbr.map((r: any) => ({ month: r.region, sales: r.sales })));
-      setOrdersByChannel(obc.map((o: any) => ({ name: o.month, direct: o.direct, online: o.online, phone: o.phone })));
+      setStats(s);
+      setMonthlyTrend((mt ?? []).map((m: any) => ({ ...m, revenue: m.sales, orders: m.profit })));
+      setCategoryData(cd ?? []);
+      setTopCustomers(tc ?? []);
+      setDailySales(ds ?? []);
+      setSalesByRegion((sbr ?? []).map((r: any) => ({ month: r.region, sales: r.sales })));
+      setOrdersByChannel((obc ?? []).map((o: any) => ({ name: o.month, direct: o.direct, online: o.online, phone: o.phone })));
     }).catch(console.error)
     .finally(() => setLoading(false));
   }, []);
 
-  // TODO: Replace with ML model endpoint for Advanced tab data
-
   const handleCustomApply = useCallback(() => {
     if (dateFrom && dateTo) {
-      setActivePeriod(`${dateFrom} \u2014 ${dateTo}`);
+      setActivePeriod(`${dateFrom} — ${dateTo}`);
       setShowDateRange(false);
     }
   }, [dateFrom, dateTo]);
+
+  const fmt = (v: any) => v != null ? Number(v).toLocaleString('en-IN') : 'N/A';
+  const pct = (v: any, pos = true) => v != null ? `${pos && Number(v) >= 0 ? '+' : ''}${Number(v).toFixed(1)}% vs last period` : '';
 
   if (loading) {
     return (
@@ -182,29 +178,29 @@ export function Analytics() {
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Total Revenue</CardTitle></CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalRevenue}</div>
-              <div className="text-xs text-green-600 mt-1">+14.5% vs last period</div>
+              <div className="text-2xl font-bold">₹{fmt(stats.totalRevenue)}</div>
+              <div className={`text-xs mt-1 ${(stats.revenueChange ?? 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}>{pct(stats.revenueChange)}</div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Total Orders</CardTitle></CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalOrders}</div>
-              <div className="text-xs text-green-600 mt-1">+11.2% vs last period</div>
+              <div className="text-2xl font-bold">{fmt(stats.totalOrders)}</div>
+              <div className={`text-xs mt-1 ${(stats.ordersChange ?? 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}>{pct(stats.ordersChange)}</div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Avg Order Value</CardTitle></CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.avgOrderValue}</div>
-              <div className="text-xs text-green-600 mt-1">+3.1% vs last period</div>
+              <div className="text-2xl font-bold">₹{stats.avgOrderValue != null ? Number(stats.avgOrderValue).toFixed(2) : 'N/A'}</div>
+              <div className={`text-xs mt-1 ${(stats.avgOrderValueChange ?? 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}>{pct(stats.avgOrderValueChange)}</div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Conversion Rate</CardTitle></CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.conversionRate}</div>
-              <div className="text-xs text-red-500 mt-1">-0.8% vs last period</div>
+              <div className="text-2xl font-bold">{stats.conversionRate != null ? `${Number(stats.conversionRate).toFixed(2)}%` : 'N/A'}</div>
+              <div className={`text-xs mt-1 ${(stats.conversionRateChange ?? 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}>{pct(stats.conversionRateChange)}</div>
             </CardContent>
           </Card>
         </div>
@@ -233,7 +229,7 @@ export function Analytics() {
                 <PieChart>
                   <Pie data={categoryData} cx="50%" cy="50%" innerRadius={45} outerRadius={80} dataKey="value" paddingAngle={3}>
                     {categoryData.map((_: any, i: number) => (
-                      <Cell key={i} fill={COLORS[i]} />
+                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
                     ))}
                   </Pie>
                   <ChartTooltip content={<ChartTooltipContent />} />
@@ -243,7 +239,7 @@ export function Analytics() {
                 {categoryData.map((item: any, i: number) => (
                   <div key={item.name} className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-1.5">
-                      <span className="size-2.5 rounded-full inline-block" style={{ backgroundColor: COLORS[i] }} />
+                      <span className="size-2.5 rounded-full inline-block" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
                       {item.name}
                     </div>
                     <span className="font-medium">{item.value}%</span>

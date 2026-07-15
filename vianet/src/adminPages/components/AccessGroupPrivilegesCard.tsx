@@ -3,17 +3,17 @@ import { CheckCircle } from 'lucide-react';
 
 interface PrivilegesCardProps {
   privileges: string[];
+  allPermissions?: string[];
 }
 
-const allPermissions = ['view', 'edit', 'approve', 'configure', 'export'];
-
-export function AccessGroupPrivilegesCard({ privileges }: PrivilegesCardProps) {
+export function AccessGroupPrivilegesCard({ privileges, allPermissions }: PrivilegesCardProps) {
+  const perms = allPermissions ?? ['view', 'edit', 'approve', 'configure', 'export'];
   return (
     <Card>
       <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Privileges</CardTitle></CardHeader>
       <CardContent>
         <div className="flex flex-col gap-2">
-          {allPermissions.map(p => (
+          {perms.map(p => (
             <div key={p} className="flex items-center justify-between text-sm">
               <span className="capitalize text-muted-foreground">{p}</span>
               {privileges.includes(p)

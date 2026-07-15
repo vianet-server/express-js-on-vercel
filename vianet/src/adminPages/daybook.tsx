@@ -33,22 +33,30 @@ export function Daybook() {
   useEffect(() => {
     api.get('/api/admin/reports/daybook')
       .then(res => {
-        setTransactionsData(res);
-        setDailyTotals([]);
+        const txns = Array.isArray(res) ? res : [];
+        setTransactionsData(txns);
+        const daily: Record<string, { income: number; expense: number }> = {};
+        for (const t of txns) {
+          const day = t.date ? t.date.split('T')[0] : 'Unknown';
+          if (!daily[day]) daily[day] = { income: 0, expense: 0 };
+          if (t.type === 'Sale' || t.type === 'Payment') daily[day].income += t.amount ?? 0;
+          else daily[day].expense += t.amount ?? 0;
+        }
+        setDailyTotals(Object.entries(daily).map(([day, v]) => ({ day, income: v.income, expense: v.expense })));
       })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
 
   const filtered = transactionsData.filter((t: any) =>
-    t.customer.toLowerCase().includes(search.toLowerCase()) ||
-    t.ref.toLowerCase().includes(search.toLowerCase()) ||
-    t.salesman.toLowerCase().includes(search.toLowerCase())
+    (t.customer ?? '').toLowerCase().includes(search.toLowerCase()) ||
+    (t.ref ?? '').toLowerCase().includes(search.toLowerCase()) ||
+    (t.salesman ?? '').toLowerCase().includes(search.toLowerCase())
   );
 
-  const totalSales = transactionsData.filter((t: any) => t.type === 'Sale').reduce((s: number, t: any) => s + t.amount, 0);
-  const totalPayments = transactionsData.filter((t: any) => t.type === 'Payment').reduce((s: number, t: any) => s + t.amount, 0);
-  const totalExpenses = transactionsData.filter((t: any) => t.type === 'Expense').reduce((s: number, t: any) => s + t.amount, 0);
+  const totalSales = transactionsData.filter((t: any) => t.type === 'Sale').reduce((s: number, t: any) => s + (t.amount ?? 0), 0);
+  const totalPayments = transactionsData.filter((t: any) => t.type === 'Payment').reduce((s: number, t: any) => s + (t.amount ?? 0), 0);
+  const totalExpenses = transactionsData.filter((t: any) => t.type === 'Expense').reduce((s: number, t: any) => s + (t.amount ?? 0), 0);
   const netCash = totalSales + totalPayments - totalExpenses;
 
   if (loading) {
@@ -82,19 +90,19 @@ export function Daybook() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1"><TrendingUp size={14} /> Total Sales</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-bold text-green-600">₹{totalSales.toLocaleString()}</div></CardContent>
+              <CardContent><div className="text-2xl font-bold text-green-600">\u20b9{totalSales.toLocaleString()}</div></CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1"><Receipt size={14} /> Total Payments</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-bold text-blue-600">₹{totalPayments.toLocaleString()}</div></CardContent>
+              <CardContent><div className="text-2xl font-bold text-blue-600">\u20b9{totalPayments.toLocaleString()}</div></CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1"><TrendingDown size={14} /> Total Expenses</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-bold text-red-600">₹{totalExpenses.toLocaleString()}</div></CardContent>
+              <CardContent><div className="text-2xl font-bold text-red-600">\u20b9{totalExpenses.toLocaleString()}</div></CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1"><DollarSign size={14} /> Net Cash Flow</CardTitle></CardHeader>
-              <CardContent><div className={`text-2xl font-bold ${netCash >= 0 ? 'text-green-600' : 'text-red-600'}`}>₹{netCash.toLocaleString()}</div></CardContent>
+              <CardContent><div className={`text-2xl font-bold ${netCash >= 0 ? 'text-green-600' : 'text-red-600'}`}>\u20b9{netCash.toLocaleString()}</div></CardContent>
             </Card>
           </div>
 
@@ -102,6 +110,9 @@ export function Daybook() {
             <Card>
               <CardHeader><CardTitle>Daily Income vs Expense</CardTitle></CardHeader>
               <CardContent>
+                {dailyTotals.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">No daily data available</p>
+                ) : (
                 <ChartContainer config={chartConfig} className="h-64 w-full">
                   <BarChart data={dailyTotals}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -112,6 +123,7 @@ export function Daybook() {
                     <Bar dataKey="expense" fill="var(--color-expense)" radius={[4, 4, 0, 0]} barSize={24} />
                   </BarChart>
                 </ChartContainer>
+                )}
               </CardContent>
             </Card>
 
@@ -120,9 +132,10 @@ export function Daybook() {
               <CardContent>
                 <div className="flex flex-col gap-3">
                   {Object.entries(typeColors).map(([type, color]) => {
-                    const total = transactionsData.filter((t: any) => t.type === type).reduce((s: number, t: any) => s + t.amount, 0);
+                    const total = transactionsData.filter((t: any) => t.type === type).reduce((s: number, t: any) => s + (t.amount ?? 0), 0);
                     const count = transactionsData.filter((t: any) => t.type === type).length;
-                    const pct = Math.round((total / transactionsData.reduce((s: number, t: any) => s + t.amount, 0)) * 100);
+                    const grandTotal = transactionsData.reduce((s: number, t: any) => s + (t.amount ?? 0), 0);
+                    const pct = grandTotal > 0 ? Math.round((total / grandTotal) * 100) : 0;
                     return (
                       <div key={type} className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -133,7 +146,7 @@ export function Daybook() {
                           <div className="w-24 h-2 rounded-full bg-muted overflow-hidden">
                             <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color.match(/text-\w+-\d+/)?.[0]?.replace('text', 'bg') ? undefined : '#888' }} />
                           </div>
-                          <span className="text-sm font-medium w-24 text-right">₹{total.toLocaleString()}</span>
+                          <span className="text-sm font-medium w-24 text-right">\u20b9{total.toLocaleString()}</span>
                         </div>
                       </div>
                     );
@@ -160,15 +173,15 @@ export function Daybook() {
                     transactionsData.filter((t: any) => t.type === 'Sale').reduce((acc: any, t: any) => {
                       acc[t.salesman] = acc[t.salesman] || { count: 0, total: 0 };
                       acc[t.salesman].count++;
-                      acc[t.salesman].total += t.amount;
+                      acc[t.salesman].total += t.amount ?? 0;
                       return acc;
                     }, {} as Record<string, { count: number; total: number }>)
                   ).map(([name, data]: [string, any], i: number) => (
                     <tr key={i} className="border-b last:border-0">
                       <td className="py-2.5 font-medium">{name}</td>
                       <td className="py-2.5 text-right">{data.count}</td>
-                      <td className="py-2.5 text-right">₹{data.total.toLocaleString()}</td>
-                      <td className="py-2.5 text-right">₹{Math.round(data.total / data.count).toLocaleString()}</td>
+                      <td className="py-2.5 text-right">\u20b9{data.total.toLocaleString()}</td>
+                      <td className="py-2.5 text-right">\u20b9{Math.round(data.total / data.count).toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -195,7 +208,7 @@ export function Daybook() {
                       </span>
                     </CollapsibleTrigger>
                     <div className="flex items-center gap-3">
-                      <span className="text-sm font-medium">₹{t.amount.toLocaleString()}</span>
+                      <span className="text-sm font-medium">\u20b9{(t.amount ?? 0).toLocaleString()}</span>
                       <span className="text-xs text-muted-foreground">{t.mode}</span>
                     </div>
                   </div>
@@ -218,8 +231,8 @@ export function Daybook() {
                               <span>{s.item}</span>
                               <div className="flex gap-4">
                                 <span className="w-12 text-right">{s.qty}</span>
-                                <span className="w-16 text-right">₹{s.rate}</span>
-                                <span className="w-20 text-right">₹{s.amount.toLocaleString()}</span>
+                                <span className="w-16 text-right">\u20b9{s.rate}</span>
+                                <span className="w-20 text-right">\u20b9{(s.amount ?? 0).toLocaleString()}</span>
                               </div>
                             </div>
                           ))}

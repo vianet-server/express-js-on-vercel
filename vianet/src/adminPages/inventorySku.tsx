@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from 'react';
+import { useState, useEffect, Fragment, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,25 +12,17 @@ import { api } from '@/lib/api';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setSkuData, updateSkuItem, type SkuRow } from '@/store/slices/inventorySlice';
 
-const accessGroups = ['Warehouse Mgrs', 'Purchase Team', 'Sales Team', 'Auditors', 'Admin', 'Vendors'];
-const accessPrivileges: Record<string, string[]> = {
-  'Warehouse Mgrs': ['view', 'edit', 'approve'],
-  'Purchase Team': ['view', 'edit'],
-  'Sales Team': ['view', 'edit'],
-  'Auditors': ['view', 'export'],
-  'Admin': ['view', 'edit', 'approve', 'configure'],
-  'Vendors': [],
-};
 const PAGE_SIZE = 8;
-const allBrands = ['FashionCo', 'TechSound', 'NatureLeaf', 'EcoLiving', 'LuxLeather', 'SportFit', 'ZenFit'];
 
 export function InventorySku() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const skuData = useAppSelector((state) => state.inventory.skuData);
+  const allAccessGroups = useAppSelector((state) => state.inventory.allAccessGroups);
+  const accessGroupNames = useMemo(() => (allAccessGroups ?? []).map(g => g.name), [allAccessGroups]);
   const [search, setSearch] = useState('');
-  const [selectedGroups, setSelectedGroups] = useState<string[]>(accessGroups);
-  const [selectedBrands, setSelectedBrands] = useState<string[]>(allBrands);
+  const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
+  const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
 
@@ -39,11 +31,21 @@ export function InventorySku() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; row: SkuRow } | null>(null);
 
   useEffect(() => {
-    api.get('/api/admin/inventory/sku').then((res: SkuRow[]) => {
-      dispatch(setSkuData(res));
+    Promise.all([
+      api.get<SkuRow[]>('/api/admin/inventory/sku'),
+      api.get<any[]>('/api/admin/inventory/control').then(r => r.accessGroups || []).catch(() => []),
+    ]).then(([skus, groups]) => {
+      dispatch(setSkuData(skus));
+      setSelectedGroups(groups.map(g => g.name));
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [dispatch]);
+
+  const allBrands = useMemo(() => [...new Set((skuData ?? []).map(s => s.brand).filter(Boolean))], [skuData]);
+
+  useEffect(() => {
+    setSelectedBrands(prev => prev.length === 0 ? allBrands : prev);
+  }, [allBrands]);
 
   const toggleGroup = (group: string) => {
     setSelectedGroups(prev => prev.includes(group) ? prev.filter(g => g !== group) : [...prev, group]);
@@ -53,7 +55,7 @@ export function InventorySku() {
     setSelectedBrands(prev => prev.includes(brand) ? prev.filter(b => b !== brand) : [...prev, brand]);
     setPage(1);
   };
-  const visibleGroups = accessGroups.filter(g => selectedGroups.includes(g));
+  const visibleGroups = accessGroupNames.filter(g => selectedGroups.includes(g));
 
   const filtered = (skuData ?? []).filter(s =>
     (selectedBrands.length === 0 || selectedBrands.includes(s.brand)) &&
@@ -65,7 +67,7 @@ export function InventorySku() {
 
   const openEdit = (sku: string, group: string, field: string) => {
     const item = (skuData ?? []).find(s => s.sku === sku);
-    const ag = item?.accessGroups.find(a => a.group === group);
+    const ag = item?.accessGroups?.find(a => a.group === group);
     setEditTarget({ sku, group, field, value: ag ? field === 'qty' ? ag.qty : ag.price : 0 });
   };
 
@@ -117,7 +119,7 @@ export function InventorySku() {
             </PopoverTrigger>
             <PopoverContent className="w-56 p-2">
               <div className="flex flex-col gap-1">
-                {accessGroups.map(g => (
+                {accessGroupNames.map(g => (
                   <label key={g} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer text-sm">
                     <Checkbox checked={selectedGroups.includes(g)} onCheckedChange={() => toggleGroup(g)} />{g}
                   </label>
@@ -170,7 +172,7 @@ export function InventorySku() {
                     <td className="py-2.5 px-3 font-medium">{s.name}</td>
                     <td className="py-2.5 px-3 text-muted-foreground">{s.brand}</td>
                     <td className="py-2.5 px-3 text-right">{s.qty}</td>
-                    <td className="py-2.5 px-3 text-right border-r">₹{s.price.toLocaleString()}</td>
+                    <td className="py-2.5 px-3 text-right border-r">₹{(s.price ?? 0).toLocaleString()}</td>
                     {visibleGroups.map(g => {
                       const ag = (s.accessGroups ?? []).find(a => a.group === g);
                       return (
@@ -208,7 +210,7 @@ export function InventorySku() {
             </div>
             <button
               className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-muted transition-colors"
-              onClick={() => { navigate(`/admin/inventory/sku/${contextMenu.row.sku}/access-group/${encodeURIComponent((contextMenu.row.accessGroups ?? [])[0]?.group || accessGroups[0])}`); setContextMenu(null); }}
+              onClick={() => { navigate(`/admin/inventory/sku/${contextMenu.row.sku}/access-group/${encodeURIComponent((contextMenu.row.accessGroups ?? [])[0]?.group || visibleGroups[0])}`); setContextMenu(null); }}
             >
               <div className="flex size-7 items-center justify-center rounded-md bg-blue-100 text-blue-700"><Eye size={14} /></div>
               View Access Details
@@ -216,7 +218,7 @@ export function InventorySku() {
             <div className="border-t mx-2" />
             <button
               className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-muted transition-colors"
-              onClick={() => { openEdit(contextMenu.row.sku, visibleGroups[0] || accessGroups[0], 'qty'); setContextMenu(null); }}
+              onClick={() => { openEdit(contextMenu.row.sku, visibleGroups[0] || accessGroupNames[0], 'qty'); setContextMenu(null); }}
             >
               <div className="flex size-7 items-center justify-center rounded-md bg-amber-100 text-amber-700"><Edit3 size={14} /></div>
               Edit Price & Quantity
@@ -227,7 +229,7 @@ export function InventorySku() {
 
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Showing {filtered.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} SKUs
+          Showing {filtered.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}&ndash;{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} SKUs
         </p>
         <div className="flex items-center gap-1.5">
           <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Prev</Button>
@@ -240,7 +242,7 @@ export function InventorySku() {
 
       <Dialog open={!!editTarget} onOpenChange={open => !open && setEditTarget(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Edit {editTarget?.field === 'qty' ? 'Quantity' : 'Price'} — {editTarget?.group}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Edit {editTarget?.field === 'qty' ? 'Quantity' : 'Price'} &mdash; {editTarget?.group}</DialogTitle></DialogHeader>
           <div className="flex flex-col gap-3 py-2">
             <label className="text-sm font-medium text-muted-foreground">SKU: {editTarget?.sku}</label>
             <Input type="number" value={editTarget?.value ?? 0} onChange={e => setEditTarget(prev => prev ? { ...prev, value: Number(e.target.value) } : prev)} className="text-sm" />
@@ -254,7 +256,7 @@ export function InventorySku() {
 
       <Dialog open={!!detailGroup} onOpenChange={open => !open && setDetailGroup(null)}>
         <DialogContent className="max-w-2xl">
-          <DialogHeader><DialogTitle>Access Group Details — {detailGroup?.name}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Access Group Details &mdash; {detailGroup?.name}</DialogTitle></DialogHeader>
           {detailGroup && (
             <div className="flex flex-col gap-4 py-2">
               <div className="grid grid-cols-2 gap-4">
@@ -271,7 +273,6 @@ export function InventorySku() {
                   <div className="col-span-4">Privileges</div>
                 </div>
                 {(detailGroup.accessGroups ?? []).map(ag => {
-                  const privs = accessPrivileges[ag.group] || [];
                   const hasAccess = ag.qty > 0;
                   return (
                     <div key={ag.group} className={`grid grid-cols-12 gap-2 px-3 py-2.5 text-sm border-b last:border-0 ${hasAccess ? '' : 'bg-amber-50'}`}>
@@ -280,12 +281,8 @@ export function InventorySku() {
                         {ag.group}
                       </div>
                       <div className="col-span-2 text-right">{hasAccess ? ag.qty : <span className="text-amber-600">Blocked</span>}</div>
-                      <div className="col-span-2 text-right">{hasAccess ? `₹${ag.price.toLocaleString()}` : <span className="text-amber-600">Blocked</span>}</div>
-                      <div className="col-span-4 flex gap-1 flex-wrap">
-                        {privs.length > 0 ? privs.map(p => (
-                          <span key={p} className="inline-block rounded-full bg-blue-100 text-blue-700 px-2 py-0.5 text-[10px] font-medium capitalize">{p}</span>
-                        )) : <span className="text-amber-600 text-xs">No access</span>}
-                      </div>
+                      <div className="col-span-2 text-right">{hasAccess ? `\u20b9${(ag.price ?? 0).toLocaleString()}` : <span className="text-amber-600">Blocked</span>}</div>
+                      <div className="col-span-4" />
                     </div>
                   );
                 })}

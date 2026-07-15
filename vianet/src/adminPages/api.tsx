@@ -22,34 +22,22 @@ interface ApiKey {
   duration: string;
 }
 
-const accessGroups = ['Warehouse Mgrs', 'Purchase Team', 'Sales Team', 'Auditors', 'Admin', 'Vendors'];
-
-const allPermissions = [
-  { id: 'read_inventory', label: 'Read Inventory' },
-  { id: 'write_inventory', label: 'Write Inventory' },
-  { id: 'read_users', label: 'Read Users' },
-  { id: 'write_users', label: 'Write Users' },
-  { id: 'read_reports', label: 'Read Reports' },
-  { id: 'write_reports', label: 'Write Reports' },
-  { id: 'access_control', label: 'Access Control Management' },
-];
-
-const durationOptions = [
-  { value: '1h', label: '1 Hour' },
-  { value: '6h', label: '6 Hours' },
-  { value: '24h', label: '24 Hours' },
-  { value: '7d', label: '7 Days' },
-  { value: '30d', label: '30 Days' },
-  { value: 'never', label: 'Never Expire' },
-];
-
-const endpoints = [
+const defaultEndpoints = [
   { method: 'GET', path: '/api/v1/products', description: 'Retrieve all products with optional filters' },
   { method: 'GET', path: '/api/v1/products/:id', description: 'Get a single product by ID' },
   { method: 'POST', path: '/api/v1/products', description: 'Create a new product' },
   { method: 'PUT', path: '/api/v1/products/:id', description: 'Update an existing product' },
   { method: 'DELETE', path: '/api/v1/products/:id', description: 'Delete a product' },
   { method: 'GET', path: '/api/v1/analytics/sales', description: 'Get sales analytics data' },
+];
+
+const defaultDurationOptions = [
+  { value: '1h', label: '1 Hour' },
+  { value: '6h', label: '6 Hours' },
+  { value: '24h', label: '24 Hours' },
+  { value: '7d', label: '7 Days' },
+  { value: '30d', label: '30 Days' },
+  { value: 'never', label: 'Never Expire' },
 ];
 
 const methodStyles: Record<string, string> = {
@@ -61,7 +49,11 @@ const methodStyles: Record<string, string> = {
 
 export function Api() {
   const [keys, setKeys] = useState<ApiKey[]>([]);
-  const [usage] = useState<any>(null);
+  const [usage, setUsage] = useState<any>({});
+  const [accessGroups, setAccessGroups] = useState<string[]>([]);
+  const [allPermissions, setAllPermissions] = useState<{ id: string; label: string }[]>([]);
+  const [endpoints, setEndpoints] = useState(defaultEndpoints);
+  const [durationOptions, setDurationOptions] = useState(defaultDurationOptions);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
@@ -72,10 +64,24 @@ export function Api() {
   const [newKeyDuration, setNewKeyDuration] = useState('');
 
   useEffect(() => {
-    api.get('/api/admin/api')
-      .then((keysData) => {
-        setKeys(keysData);
-      }).catch(console.error).finally(() => setLoading(false));
+    Promise.all([
+      api.get('/api/admin/api').catch(() => []),
+      api.get('/api/admin/api/usage').catch(() => ({})),
+      api.get('/api/admin/api/access-groups').catch(() => []),
+      api.get('/api/admin/api/permissions').catch(() => []),
+      api.get('/api/admin/api/endpoints').catch(() => defaultEndpoints),
+      api.get('/api/admin/api/durations').catch(() => defaultDurationOptions),
+    ]).then(([keysData, usageData, groupsData, permsData, endpointsData, durationsData]) => {
+      setKeys(Array.isArray(keysData) ? keysData as ApiKey[] : keysData?.data ?? []);
+      setUsage(usageData?.data ?? usageData ?? {});
+      setAccessGroups(Array.isArray(groupsData) ? groupsData as string[] : groupsData?.data ?? []);
+      const perms = Array.isArray(permsData) ? permsData as { id: string; label: string }[] : permsData?.data ?? [];
+      setAllPermissions(perms);
+      const eps = Array.isArray(endpointsData) ? endpointsData : endpointsData?.data ?? [];
+      if (eps.length > 0) setEndpoints(eps);
+      const durs = Array.isArray(durationsData) ? durationsData : durationsData?.data ?? [];
+      if (durs.length > 0) setDurationOptions(durs);
+    }).catch(() => setLoading(false));
   }, []);
 
   const togglePerm = (id: string) => {
@@ -86,6 +92,9 @@ export function Api() {
     if (!newKeyName || !newKeyGroup || newKeyPerms.length === 0) return;
     api.post('/api/admin/api', {
       key_name: newKeyName,
+      group: newKeyGroup,
+      permissions: newKeyPerms,
+      duration: newKeyDuration,
     }).then((newKey) => {
       setKeys(prev => [...prev, newKey]);
       setNewKeyName('');
@@ -103,9 +112,9 @@ export function Api() {
   };
 
   const filteredKeys = keys.filter(k =>
-    k.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    k.key.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    k.group.toLowerCase().includes(searchTerm.toLowerCase())
+    k.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    k.key?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    k.group?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -178,11 +187,11 @@ export function Api() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Today's Requests</p>
-              <p className="text-2xl font-bold">{usage?.todayRequests?.toLocaleString() || 'N/A'}</p>
+              <p className="text-2xl font-bold">{(usage?.todayRequests ?? 0).toLocaleString()}</p>
             </div>
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">This Month</p>
-              <p className="text-2xl font-bold">{usage?.monthRequests?.toLocaleString() || 'N/A'}</p>
+              <p className="text-2xl font-bold">{(usage?.monthRequests ?? 0).toLocaleString()}</p>
             </div>
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Active Keys</p>
@@ -190,7 +199,7 @@ export function Api() {
             </div>
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Quota Remaining</p>
-              <p className="text-2xl font-bold text-amber-600">{usage?.quotaRemaining?.toLocaleString() || 'N/A'}</p>
+              <p className="text-2xl font-bold text-amber-600">{(usage?.quotaRemaining ?? 0).toLocaleString()}</p>
             </div>
           </div>
           )}
@@ -222,7 +231,9 @@ export function Api() {
               </tr>
             </thead>
             <tbody>
-              {endpoints.map((ep) => (
+              {endpoints.filter(ep =>
+                !searchTerm || ep.path?.toLowerCase().includes(searchTerm.toLowerCase()) || ep.description?.toLowerCase().includes(searchTerm.toLowerCase())
+              ).map((ep) => (
                 <tr key={ep.path} className="border-b last:border-0">
                   <td className="py-2.5">
                     <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${methodStyles[ep.method]}`}>

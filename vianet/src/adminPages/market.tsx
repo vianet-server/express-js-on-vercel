@@ -1,27 +1,31 @@
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, TrendingDown, Activity, BarChart3 } from 'lucide-react';
-
-// TODO: fetch from backend
-
-const topMovers = [
-  { rank: 1, product: 'Steel', category: 'Metals', price: 58400, change: 4.8 },
-  { rank: 2, product: 'Cotton', category: 'Agriculture', price: 12500, change: 3.2 },
-  { rank: 3, product: 'Silver', category: 'Metals', price: 74200, change: -2.6 },
-  { rank: 4, product: 'Crude Oil', category: 'Energy', price: 6120, change: 5.1 },
-  { rank: 5, product: 'Wheat', category: 'Agriculture', price: 2850, change: -1.8 },
-  { rank: 6, product: 'Copper', category: 'Metals', price: 45800, change: 2.4 },
-];
-
-const marketSummary = [
-  { label: 'Demand Index', value: '87.4' },
-  { label: 'Supply Index', value: '62.1' },
-  { label: 'Price Trend', value: 'Bullish' },
-  { label: 'Competition Level', value: 'Moderate' },
-  { label: 'Market Sentiment', value: 'Positive' },
-];
+import { TrendingUp, TrendingDown, Activity, BarChart3, Loader2 } from 'lucide-react';
+import { api } from '@/lib/api';
 
 export function Market() {
+  const [loading, setLoading] = useState(true);
+  const [topMovers, setTopMovers] = useState<any[]>([]);
+  const [marketSummary, setMarketSummary] = useState<any[]>([]);
+  const [marketIndex, setMarketIndex] = useState<any>({});
+
+  useEffect(() => {
+    api.get('/api/admin/market').then(res => {
+      setTopMovers(res.topMovers ?? []);
+      setMarketSummary(res.marketSummary ?? []);
+      setMarketIndex(res.marketIndex ?? {});
+    }).catch(console.error).finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="animate-spin size-8 text-muted-foreground" />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-6 p-6">
       <h1 className="text-3xl font-bold tracking-tight">Market</h1>
@@ -34,9 +38,10 @@ export function Market() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">24,582.40</div>
-            <div className="flex items-center gap-1 text-xs text-green-600 mt-1">
-              <TrendingUp size={14} /> +2.3% today
+            <div className="text-2xl font-bold">{marketIndex.value ?? 'N/A'}</div>
+            <div className={`flex items-center gap-1 text-xs mt-1 ${(marketIndex.change ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {(marketIndex.change ?? 0) >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+              {(marketIndex.change ?? 0) >= 0 ? '+' : ''}{(marketIndex.changePct ?? marketIndex.change) ?? '0'}%
             </div>
           </CardContent>
         </Card>
@@ -48,9 +53,11 @@ export function Market() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">+563.20</div>
-            <div className="flex items-center gap-1 text-xs text-green-600 mt-1">
-              <TrendingUp size={14} /> +2.34% increase
+            <div className={`text-2xl font-bold ${(marketIndex.dayChange ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {(marketIndex.dayChange ?? 0) >= 0 ? '+' : ''}{marketIndex.dayChange ?? 'N/A'}
+            </div>
+            <div className={`flex items-center gap-1 text-xs mt-1 ${(marketIndex.dayChangePct ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <TrendingUp size={14} /> {(marketIndex.dayChangePct ?? 0) >= 0 ? '+' : ''}{marketIndex.dayChangePct ?? '0'}%
             </div>
           </CardContent>
         </Card>
@@ -62,9 +69,9 @@ export function Market() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">1,84,72,500</div>
-            <div className="flex items-center gap-1 text-xs text-green-600 mt-1">
-              <TrendingUp size={14} /> +12.8% vs yesterday
+            <div className="text-2xl font-bold">{(marketIndex.volume ?? 0).toLocaleString()}</div>
+            <div className={`flex items-center gap-1 text-xs mt-1 ${(marketIndex.volumeChange ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <TrendingUp size={14} /> {(marketIndex.volumeChange ?? 0) >= 0 ? '+' : ''}{marketIndex.volumeChange ?? '0'}% vs yesterday
             </div>
           </CardContent>
         </Card>
@@ -76,6 +83,9 @@ export function Market() {
             <CardTitle>Top Movers</CardTitle>
           </CardHeader>
           <CardContent>
+            {topMovers.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">No top movers data available</p>
+            ) : (
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left text-muted-foreground">
@@ -87,24 +97,24 @@ export function Market() {
                 </tr>
               </thead>
               <tbody>
-                {topMovers.map((m) => (
-                  <tr key={m.rank} className="border-b last:border-0">
-                    <td className="py-2.5 text-muted-foreground">{m.rank}</td>
-                    <td className="py-2.5 font-medium">{m.product}</td>
+                {topMovers.map((m, i) => (
+                  <tr key={m.rank ?? i} className="border-b last:border-0">
+                    <td className="py-2.5 text-muted-foreground">{m.rank ?? i + 1}</td>
+                    <td className="py-2.5 font-medium">{m.product ?? m.name}</td>
                     <td className="py-2.5">
                       <Badge variant="secondary" className="font-normal">
                         {m.category}
                       </Badge>
                     </td>
-                    <td className="py-2.5 text-right font-mono">₹{m.price.toLocaleString()}</td>
+                    <td className="py-2.5 text-right font-mono">\u20b9{(m.price ?? 0).toLocaleString()}</td>
                     <td className="py-2.5 text-right">
                       <span
                         className={`inline-flex items-center gap-0.5 font-medium ${
-                          m.change >= 0 ? 'text-green-600' : 'text-red-600'
+                          (m.change ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'
                         }`}
                       >
-                        {m.change >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                        {m.change >= 0 ? '+' : ''}
+                        {(m.change ?? 0) >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                        {(m.change ?? 0) >= 0 ? '+' : ''}
                         {m.change}%
                       </span>
                     </td>
@@ -112,6 +122,7 @@ export function Market() {
                 ))}
               </tbody>
             </table>
+            )}
           </CardContent>
         </Card>
 
@@ -120,12 +131,16 @@ export function Market() {
             <CardTitle>Market Summary</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {marketSummary.map((item) => (
-              <div key={item.label} className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">{item.label}</span>
-                <span className="text-sm font-semibold">{item.value}</span>
-              </div>
-            ))}
+            {marketSummary.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No summary data</p>
+            ) : (
+              marketSummary.map((item: any) => (
+                <div key={item.label ?? item.name} className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">{item.label ?? item.name}</span>
+                  <span className="text-sm font-semibold">{item.value}</span>
+                </div>
+              ))
+            )}
           </CardContent>
         </Card>
       </div>
