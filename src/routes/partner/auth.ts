@@ -22,7 +22,7 @@ router.post('/register', async (req, res) => {
     if (existing.rows.length > 0) {
       return res.status(409).json({ message: 'User already exists' });
     }
-    const password_hash = await bcrypt.hash(password, 10);
+    const password_hash =  bcrypt.hash(password, 10);
     const result = await neonDb.query(
       'INSERT INTO app.users (email, password_hash, usertype, is_active, created_at, updated_at) VALUES ($1, $2, $3, true, NOW(), NOW()) RETURNING userid, email, usertype',
       [email, password_hash, 'partner']

@@ -27,10 +27,10 @@ router.post('/', async (req, res) => {
     }
 
     const hash = user.password_hash || user.password;
-    const validPassword = await bcrypt.compare(password, hash);
-    // if (!validPassword) {
-    //   return res.status(401).json({ message: 'Invalid credentials', token: null });
-    // }
+    const validPassword = bcrypt.compare(password, hash);
+    if (!validPassword) {
+      return res.status(401).json({ message: 'Invalid credentials', token: null });
+    }
 
     const token = jwt.sign(
       { id: user.userid, email: user.email, usertype: 'admin' },
