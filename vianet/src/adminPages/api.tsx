@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Key, Activity, Globe, CheckCircle, XCircle, Search, Plus, Shield, Trash2, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { api } from '@/lib/api';
 
 interface ApiKey {
@@ -72,15 +73,13 @@ export function Api() {
       api.get('/api/admin/api/endpoints').catch(() => defaultEndpoints),
       api.get('/api/admin/api/durations').catch(() => defaultDurationOptions),
     ]).then(([keysData, usageData, groupsData, permsData, endpointsData, durationsData]) => {
-      setKeys(Array.isArray(keysData) ? keysData as ApiKey[] : keysData?.data ?? []);
-      setUsage(usageData?.data ?? usageData ?? {});
-      setAccessGroups(Array.isArray(groupsData) ? groupsData as string[] : groupsData?.data ?? []);
-      const perms = Array.isArray(permsData) ? permsData as { id: string; label: string }[] : permsData?.data ?? [];
-      setAllPermissions(perms);
-      const eps = Array.isArray(endpointsData) ? endpointsData : endpointsData?.data ?? [];
-      if (eps.length > 0) setEndpoints(eps);
-      const durs = Array.isArray(durationsData) ? durationsData : durationsData?.data ?? [];
-      if (durs.length > 0) setDurationOptions(durs);
+      setKeys(Array.isArray(keysData) ? keysData as ApiKey[] : []);
+      setUsage(typeof usageData === 'object' && usageData !== null ? usageData : {});
+      setAccessGroups(Array.isArray(groupsData) ? groupsData as { id: number; name: string }[] : []);
+      setAllPermissions(Array.isArray(permsData) ? permsData as { id: string; label: string }[] : []);
+      if (Array.isArray(endpointsData) && endpointsData.length > 0) setEndpoints(endpointsData);
+      if (Array.isArray(durationsData) && durationsData.length > 0) setDurationOptions(durationsData);
+      setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
 
@@ -96,13 +95,16 @@ export function Api() {
       permissions: newKeyPerms,
       duration: newKeyDuration,
     }).then((newKey) => {
-      setKeys(prev => [...prev, newKey]);
+      setKeys(prev => [...prev, newKey as ApiKey]);
       setNewKeyName('');
       setNewKeyGroup('');
       setNewKeyPerms([]);
       setNewKeyDuration('');
       setCreateOpen(false);
-    }).catch(console.error);
+      toast.success('API key created');
+    }).catch((err: Error) => {
+      toast.error(err.message || 'Failed to create API key');
+    });
   };
 
   const revokeKey = (id: string) => {
@@ -234,7 +236,7 @@ export function Api() {
               {endpoints.filter(ep =>
                 !searchTerm || ep.path?.toLowerCase().includes(searchTerm.toLowerCase()) || ep.description?.toLowerCase().includes(searchTerm.toLowerCase())
               ).map((ep) => (
-                <tr key={ep.path} className="border-b last:border-0">
+                <tr key={ep.method + ep.path} className="border-b last:border-0">
                   <td className="py-2.5">
                     <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${methodStyles[ep.method]}`}>
                       {ep.method}

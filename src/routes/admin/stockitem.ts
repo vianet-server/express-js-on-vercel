@@ -131,8 +131,49 @@ router.get('/inventory/stock', async (req, res) => {
 // SKU listing endpoint for inventory management
 router.get('/inventory/sku', async (req, res) => {
   try {
-    const result = await neonDb.query("SELECT id, stockname AS name, CAST(id AS TEXT) AS sku, quantity AS qty, price FROM app.stock ORDER BY stockname");
-    res.json(result.rows.map(r => ({ ...r, brand: '', accessGroups: [], status: 'active' })));
+    let hasInvTable = false;
+    try {
+      const schemaCheck = await neonDb.query("SELECT column_name FROM information_schema.columns WHERE table_schema='app' AND table_name='inventory' AND column_name IN ('brand','model')");
+      hasInvTable = schemaCheck.rows.length === 2;
+    } catch {}
+    const sql = hasInvTable
+      ? `
+          SELECT s.id, s.stockname AS name, CAST(s.id AS TEXT) AS sku, s.quantity AS qty, s.price,
+                 COALESCE(inv.brand,'') AS brand,
+                 COALESCE(inv.model,'') AS model,
+                 COALESCE(
+                   json_agg(
+                     json_build_object('group', g.name, 'qty', iag.quantity, 'price', iag.oprice)
+                     ORDER BY g.name
+                   ) FILTER (WHERE g.id IS NOT NULL),
+                   '[]'
+                 ) AS accessGroups
+          FROM app.stock s
+          LEFT JOIN app.inventory inv ON inv.id = s.id
+          LEFT JOIN app.inventory_access_group iag ON iag.inventoryid = s.id
+          LEFT JOIN app.access_groups g ON g.id = iag.accessgroupid
+          GROUP BY s.id, s.stockname, s.quantity, s.price, inv.brand, inv.model
+          ORDER BY s.stockname
+        `
+      : `
+          SELECT s.id, s.stockname AS name, CAST(s.id AS TEXT) AS sku, s.quantity AS qty, s.price,
+                 '' AS brand,
+                 '' AS model,
+                 COALESCE(
+                   json_agg(
+                     json_build_object('group', g.name, 'qty', iag.quantity, 'price', iag.oprice)
+                     ORDER BY g.name
+                   ) FILTER (WHERE g.id IS NOT NULL),
+                   '[]'
+                 ) AS accessGroups
+          FROM app.stock s
+          LEFT JOIN app.inventory_access_group iag ON iag.inventoryid = s.id
+          LEFT JOIN app.access_groups g ON g.id = iag.accessgroupid
+          GROUP BY s.id, s.stockname, s.quantity, s.price
+          ORDER BY s.stockname
+        `;
+    const result = await neonDb.query(sql);
+    res.json(result.rows.map(r => ({ ...r, status: 'active' })));
   } catch (err) {
     console.error('[stockitem] GET /inventory/sku error:', err);
     res.json([]);

@@ -7,7 +7,7 @@ export interface StockItem {
 }
 
 export interface SkuRow {
-  sku: string; name: string; brand: string; qty: number; price: number;
+  sku: string; name: string; brand: string; model?: string; qty: number; price: number;
   accessGroups: { group: string; qty: number; price: number }[];
   status: string;
 }

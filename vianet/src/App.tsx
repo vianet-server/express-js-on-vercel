@@ -84,6 +84,7 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <Navigate to="/app/home" replace /> },
       { path: 'login', element: <AppLogin /> },
+      { path: 'signup', element: <Signup /> },
       {
         element: (
           <ProtectedRoute loginPath="/app/login" allowedRoles={['user']}>

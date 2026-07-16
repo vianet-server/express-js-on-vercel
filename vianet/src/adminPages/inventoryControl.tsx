@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ShieldCheck, Package, Settings, AlertTriangle, CheckCircle, ToggleLeft, ToggleRight, UserCheck, Users, UserCog, X, Hash, Loader2, Copy, Check } from 'lucide-react';
+import { ShieldCheck, Package, Settings, AlertTriangle, CheckCircle, ToggleLeft, ToggleRight, UserCheck, Users, UserCog, X, Hash, Loader2, Copy, Check, Trash2, Info } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setAllAccessGroups } from '@/store/slices/inventorySlice';
@@ -57,6 +57,10 @@ export function InventoryControl() {
   const [copied, setCopied] = useState(false);
   const [form, setForm] = useState({ name: '', group_key: '' });
 
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [detailGroup, setDetailGroup] = useState<any | null>(null);
+
   const handleCreateGroup = async () => {
     if (!form.name.trim()) return;
     setSubmitting(true);
@@ -82,6 +86,20 @@ export function InventoryControl() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
+  };
+
+  const handleDeleteGroup = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/api/admin/access-group/${deleteTarget.id}`);
+      setDeleteTarget(null);
+      const res = await api.get('/api/admin/inventory/control');
+      if (res.accessGroups) dispatch(setAllAccessGroups(res.accessGroups));
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Failed to delete access group');
+    }
+    setDeleting(false);
   };
 
   if (loading) {
@@ -183,17 +201,20 @@ export function InventoryControl() {
               <div className="flex flex-col">
                 {(accessGroups ?? []).map((g, i) => (
                   <div key={g.id} className={`flex items-center justify-between py-3 ${i < (accessGroups ?? []).length - 1 ? 'border-b' : ''}`}>
-                    <div className="flex items-start gap-3">
+                    <div className="flex items-start gap-3 cursor-pointer" onClick={() => setDetailGroup(g)}>
                       <div className="flex size-9 items-center justify-center rounded-lg bg-purple-100 text-purple-700">
                         <Users size={16} />
                       </div>
                       <div>
-                        <div className="text-sm font-medium">{g.name}</div>
+                        <div className="text-sm font-medium hover:underline">{g.name}</div>
                         {g.group_key && <div className="text-xs text-muted-foreground">Key: {g.group_key}</div>}
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
                       <Badge variant="default" className="text-[10px]">Active</Badge>
+                      <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-red-600" onClick={() => setDeleteTarget(g)}>
+                        <Trash2 size={14} />
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -416,6 +437,55 @@ export function InventoryControl() {
               <Button variant="outline" onClick={() => { setShowAddGroup(false); setCreatedLink(''); }}>Close</Button>
             </DialogFooter>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!deleteTarget} onOpenChange={open => !open && setDeleteTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600"><AlertTriangle size={16} /> Delete Access Group</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to delete <strong>{deleteTarget?.name}</strong>? This will also remove all stock mappings for this group.
+          </p>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDeleteGroup} disabled={deleting}>
+              {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+              {deleting ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!detailGroup} onOpenChange={open => !open && setDetailGroup(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Info size={16} /> {detailGroup?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 py-2">
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <span className="text-xs text-muted-foreground">Group Key</span>
+                <div className="font-mono text-xs mt-0.5">{detailGroup?.group_key || '—'}</div>
+              </div>
+              <div>
+                <span className="text-xs text-muted-foreground">Status</span>
+                <div className="mt-0.5"><Badge variant="default" className="text-[10px]">Active</Badge></div>
+              </div>
+              <div>
+                <span className="text-xs text-muted-foreground">Permissions</span>
+                <div className="flex gap-1 mt-0.5 flex-wrap">
+                  {(detailGroup?.permissions ?? []).length > 0
+                    ? detailGroup.permissions.map((p: string) => <Badge key={p} variant="outline" className="text-[10px]">{p}</Badge>)
+                    : <span className="text-xs text-muted-foreground">None configured</span>}
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDetailGroup(null)}>Close</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
