@@ -1,7 +1,9 @@
 ## Objective
-- Resolve undefined variable runtime errors and replace hardcoded placeholder/mock data with real server-fetched data across the frontend.
+
+- Resolve undefined variable runtime errors and replace hardcoded placeholder/mock data with real server-fetched data across the frontend.ergf
 
 ## Important Details
+
 - Backend table is `app.stock` (singular) with column `stockname` instead of `name`; analytics endpoints may not map all fields.
 - Admin login forces `usertype: 'admin'` for adminAuth middleware.
 - API helper uses relative `BASE_URL = ''` (works via Vite proxy/Vercel rewrites).
@@ -9,7 +11,9 @@
 - Redux store initializes `allAccessGroups: []` and `skuData: []`.
 
 ## Work State
+
 ### Completed
+
 - **Undefined variable fixes** (`?? []` / `?? {}` / `?? 0` / `?? ''` fallbacks): `balanceSheet.tsx`, `pnl.tsx`, `outstanding.tsx`, `daybook.tsx`, `inventoryStock.tsx`, `inventorySku.tsx`, `inventoryStockDetail.tsx`, `inventoryControl.tsx`, `dashboard.tsx`, `analytics.tsx`, `accessGroupDetail.tsx`, `AccessGroupStockList.tsx`, `AccessGroupComparisonTable.tsx`.
 - **Bug fixes**: `accessGroups.map()` (2 places), `c.value.toLocaleString()` in `inventoryControl.tsx`; `stats.todaySale`/`totalProfit`/`totalSpend`/`s.sales` in `dashboard.tsx`.
 - **API layer**: Fixed `BASE_URL` from `http://localhost:3000` to `''`; added CORS middleware to `src/index.ts`.
@@ -29,6 +33,7 @@
 - **TypeScript**: `npx tsc --noEmit` passes with zero errors.
 
 ### Remaining / Blocked
+
 - **Stock list page (`/api/admin/inventory/stock`) still returns 500** — the server error is unresolved. Possible causes: column mapping, query syntax, or database connection.
 - **Advanced tab in analytics** still uses hardcoded ML/demo data (model accuracy, forecast chart data, insights, model health) — requires a real ML endpoint to replace.
 - **Export functionality** in analytics/market pages is UI-only (no actual export logic connected).
@@ -36,6 +41,7 @@
 - **Daybook** Daily Income vs Expense chart reference `chartConfig` keys `income`/`expense` but the config object uses `color-income`/`color-expense` which won't match CSS variable resolution (cosmetic, works with fallback).
 
 ## Relevant Files
+
 - `D:\vercel\express\express-js-on-vercel\src\routes\admin\stockitem.ts` — Main stock CRUD + paginated/SKU/access-group endpoints
 - `D:\vercel\express\express-js-on-vercel\src\routes\admin\dashboard.ts` — Dashboard stats queries
 - `D:\vercel\express\express-js-on-vercel\src\routes\admin\tally.ts` — Tally stock-item CRUD
