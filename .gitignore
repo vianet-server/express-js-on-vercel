@@ -5,3 +5,6 @@ node_modules
 err.txt
 errVercelDeploy.txt
 0
+admin.json
+hash.txt
+user-template.json

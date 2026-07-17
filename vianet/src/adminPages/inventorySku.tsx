@@ -1,14 +1,13 @@
 import { useState, useEffect, Fragment, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Plus, Users, Tag, Edit3, Eye, ShieldCheck, ShieldOff, Loader2, X } from 'lucide-react';
+import { Search, Plus, Users, Tag, Edit3, Eye, ShieldCheck, ShieldOff, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setSkuData, updateSkuItem, type SkuRow } from '@/store/slices/inventorySlice';
@@ -340,7 +339,7 @@ export function InventorySku() {
           <DialogHeader><DialogTitle>Add Stock Access</DialogTitle></DialogHeader>
           <div className="flex flex-col gap-4 py-2">
             <div className="grid grid-cols-4 gap-4">
-              <Select value={addAccess?.group ?? ''} onValueChange={v => setAddAccess(prev => prev ? { ...prev, group: v } : prev)}>
+              <Select value={addAccess?.group ?? ''} onValueChange={v => setAddAccess(prev => prev ? { ...prev, group: v } : null)}>
                 <SelectTrigger><SelectValue placeholder="Select access group" /></SelectTrigger>
                 <SelectContent>
                   {accessGroupNames.map(g => (
