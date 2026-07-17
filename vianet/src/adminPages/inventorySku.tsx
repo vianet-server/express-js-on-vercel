@@ -339,7 +339,7 @@ export function InventorySku() {
           <DialogHeader><DialogTitle>Add Stock Access</DialogTitle></DialogHeader>
           <div className="flex flex-col gap-4 py-2">
             <div className="grid grid-cols-4 gap-4">
-              <Select value={addAccess?.group ?? ''} onValueChange={v => setAddAccess(prev => prev ? { ...prev, group: v } : null)}>
+              <Select value={addAccess?.group ?? ''} onValueChange={v => setAddAccess(prev => prev ? { ...prev, group: v ?? prev.group } : null)}>
                 <SelectTrigger><SelectValue placeholder="Select access group" /></SelectTrigger>
                 <SelectContent>
                   {accessGroupNames.map(g => (
