@@ -16,6 +16,7 @@ export { Api } from './api';
 export { Sync } from './sync';
 export { InventoryStockDetail } from './inventoryStockDetail';
 export { AccessGroupDetail } from './accessGroupDetail';
+export { AccessGroupStocks } from './accessGroupStocks';
 export { Voucher } from './tallyVoucher';
 export { Ledger } from './tallyLedger';
 export { StockItem } from './tallyStockItem';

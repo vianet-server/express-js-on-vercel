@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { setCurrentAccessGroupDetail, updateAccessGroupStock, type AccessGroupDetailData } from '@/store/slices/inventorySlice';
+import { setCurrentAccessGroupDetail, type AccessGroupDetailData } from '@/store/slices/inventorySlice';
 import { AccessGroupHeader } from './components/AccessGroupHeader';
 import { AccessGroupInfoCard } from './components/AccessGroupInfoCard';
 import { AccessGroupPricingCards } from './components/AccessGroupPricingCards';
@@ -24,7 +24,7 @@ export function AccessGroupDetail() {
   const [stockConfig, setStockConfig] = useState({ maxQty: 0, allowDiscount: false, autoApprove: false, notes: '' });
   const decodedGroup = decodeURIComponent(group || '');
 
-  useEffect(() => {
+  const fetchDetail = useCallback(() => {
     if (!sku || !decodedGroup) { setLoading(false); return; }
     api.get(`/api/admin/inventory/sku/${sku}/access-group/${encodeURIComponent(decodedGroup)}`).then((res: AccessGroupDetailData) => {
       dispatch(setCurrentAccessGroupDetail(res));
@@ -33,10 +33,12 @@ export function AccessGroupDetail() {
     }).catch(() => setLoading(false));
   }, [sku, decodedGroup, dispatch]);
 
+  useEffect(() => { fetchDetail(); }, [fetchDetail]);
+
   const handleEdit = async (itemSku: string, qty: number, price: number) => {
     try {
-      await api.put(`/api/admin/inventory/sku/${sku}/access-group/${encodeURIComponent(decodedGroup)}`, { qty, price });
-      dispatch(updateAccessGroupStock({ sku: itemSku, qty, price }));
+      await api.put(`/api/admin/inventory/sku/${itemSku}/access-group/${encodeURIComponent(decodedGroup)}`, { qty, price });
+      fetchDetail();
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Failed to update stock access');
     }
@@ -44,8 +46,8 @@ export function AccessGroupDetail() {
 
   const handleAdd = async (itemSku: string, qty: number, price: number) => {
     try {
-      await api.post(`/api/admin/inventory/sku/${sku}/access-group/${encodeURIComponent(decodedGroup)}`, { qty, price });
-      dispatch(updateAccessGroupStock({ sku: itemSku, qty, price }));
+      await api.post(`/api/admin/inventory/sku/${itemSku}/access-group/${encodeURIComponent(decodedGroup)}`, { qty, price });
+      fetchDetail();
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Failed to add stock access');
     }
@@ -53,8 +55,8 @@ export function AccessGroupDetail() {
 
   const handleRemove = async (itemSku: string) => {
     try {
-      await api.delete(`/api/admin/inventory/sku/${sku}/access-group/${encodeURIComponent(decodedGroup)}`);
-      dispatch(updateAccessGroupStock({ sku: itemSku, qty: 0, price: 0 }));
+      await api.delete(`/api/admin/inventory/sku/${itemSku}/access-group/${encodeURIComponent(decodedGroup)}`);
+      fetchDetail();
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Failed to remove stock access');
     }

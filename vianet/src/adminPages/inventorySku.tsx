@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment, useMemo } from 'react';
+import { useState, useEffect, Fragment, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -63,17 +63,26 @@ export function InventorySku() {
     }).catch(() => setStocksLoading(false));
   };
 
-  useEffect(() => {
+  const fetchAll = useCallback(() => {
+    setLoading(true);
     Promise.all([
       api.get<SkuRow[]>('/api/admin/inventory/sku').catch(() => [] as SkuRow[]),
       api.get<any>('/api/admin/inventory/control').then((r: any) => r?.accessGroups || []).catch(() => []),
     ]).then(([skus, groups]: [SkuRow[], any[]]) => {
-  dispatch(setSkuData(skus));
-  dispatch(setAllAccessGroups(groups ?? []));
-  setSelectedGroups((groups ?? []).map((g: any) => g.name));
-  setLoading(false);
+      dispatch(setSkuData(skus));
+      dispatch(setAllAccessGroups(groups ?? []));
+      setSelectedGroups((groups ?? []).map((g: any) => g.name));
+      setLoading(false);
     }).catch(() => setLoading(false));
   }, [dispatch]);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  useEffect(() => {
+    const onFocus = () => { fetchAll(); };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [fetchAll]);
 
   const allBrands = useMemo(() => [...new Set((skuData ?? []).map(s => s.brand).filter(Boolean))], [skuData]);
 
@@ -211,7 +220,7 @@ export function InventorySku() {
               <th rowSpan={2} className="sticky left-0 z-10 bg-white dark:bg-gray-900 pb-2 pt-3 px-3 font-medium text-left text-muted-foreground min-w-[72px]">SKU ID</th>
               <th colSpan={4} className="pb-1 pt-3 px-3 font-semibold text-center text-xs text-muted-foreground border-x bg-muted/30">Inventory</th>
               {visibleGroups.map(g => (
-                <th key={g} colSpan={2} className="pb-1 pt-3 px-2 font-semibold text-center text-[10px] text-muted-foreground border-x bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors min-w-[90px]" onClick={() => { if (pageData.length > 0) navigate(`/admin/inventory/sku/${pageData[0].sku}/access-group/${encodeURIComponent(g)}`); }}>
+                <th key={g} colSpan={2} className="pb-1 pt-3 px-2 font-semibold text-center text-[10px] text-muted-foreground border-x bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors min-w-[90px]" onClick={() => { navigate(`/admin/inventory/access-group/${encodeURIComponent(g)}`); }}>
                   <div className="flex items-center justify-center gap-1"><Users size={10} />{g}</div>
                 </th>
               ))}
@@ -273,7 +282,7 @@ export function InventorySku() {
             </div>
             <button
               className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-muted transition-colors"
-              onClick={() => { navigate(`/admin/inventory/sku/${contextMenu.row.sku}/access-group/${encodeURIComponent((contextMenu.row.accessGroups ?? [])[0]?.group || visibleGroups[0])}`); setContextMenu(null); }}
+              onClick={() => { navigate(`/admin/inventory/access-group/${encodeURIComponent((contextMenu.row.accessGroups ?? [])[0]?.group || visibleGroups[0])}`); setContextMenu(null); }}
             >
               <div className="flex size-7 items-center justify-center rounded-md bg-blue-100 text-blue-700"><Eye size={14} /></div>
               View Access Details

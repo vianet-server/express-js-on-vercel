@@ -230,11 +230,12 @@ router.get('/inventory/stock/:id', async (req, res) => {
   }
 });
 
-// Access group detail
+// Access group detail — returns stock info, group pricing, all group stocks, all stock groups
 router.get('/inventory/sku/:sku/access-group/:group', async (req, res) => {
   try {
     const { sku, group } = req.params;
-    const item = await neonDb.query("SELECT id, stockname AS name, CAST(id AS TEXT) AS sku, quantity AS qty, price FROM app.stock WHERE id = $1", [isNaN(Number(sku)) ? sku : Number(sku)]);
+    const stockId = isNaN(Number(sku)) ? sku : Number(sku);
+    const item = await neonDb.query("SELECT id, stockname AS name, CAST(id AS TEXT) AS sku, quantity AS qty, price FROM app.stock WHERE id = $1", [stockId]);
     if (item.rows.length === 0) return res.status(404).json({ message: 'SKU not found' });
     const r = item.rows[0];
 
@@ -256,17 +257,36 @@ router.get('/inventory/sku/:sku/access-group/:group', async (req, res) => {
       }
     }
 
+    // All access groups for this stock
+    const allAg = await neonDb.query(`
+      SELECT g.name AS group, iag.quantity AS qty, iag.oprice AS price
+      FROM app.inventory_access_group iag
+      JOIN app.access_groups g ON g.id = iag.accessgroupid
+      WHERE iag.inventoryid = $1 ORDER BY g.name
+    `, [r.id]);
+
+    // All stocks this access group sees
+    const groupStocks = await neonDb.query(`
+      SELECT s.id, s.stockname AS name, COALESCE(inv.brand,'') AS brand, COALESCE(inv.model,'') AS model,
+             iag.quantity AS qty, iag.oprice AS price
+      FROM app.stock s
+      JOIN app.inventory_access_group iag ON iag.inventoryid = s.id
+      LEFT JOIN app.inventory inv ON inv.id = iag.inventoryid
+      WHERE iag.accessgroupid = $1
+      ORDER BY s.stockname
+    `, [groupRow.rows.length > 0 ? groupRow.rows[0].id : 0]);
+
     res.json({
       item: {
         sku: r.sku || String(r.id),
         name: r.name,
         brand: '',
         status: 'active',
-        accessGroups: [{ group, qty: accessGroupData.qty, price: accessGroupData.price }],
+        accessGroups: allAg.rows.map(a => ({ group: a.group, qty: parseInt(a.qty) || 0, price: parseFloat(a.price) || 0 })),
       },
       accessGroup: accessGroupData,
       privileges: ['view', 'order'],
-      groupStocks: [{ sku: r.sku || String(r.id), name: r.name, brand: '', qty: r.qty || 0, price: parseFloat(r.price) || 0 }],
+      groupStocks: groupStocks.rows.map(s => ({ sku: String(s.id), name: s.name, brand: s.brand, qty: parseInt(s.qty) || 0, price: parseFloat(s.price) || 0 })),
       stockConfig: { maxQty: 100, allowDiscount: true, autoApprove: false, notes: '' },
     });
   } catch (err) {
@@ -360,6 +380,40 @@ router.delete('/inventory/sku/:sku/access-group/:group', async (req, res) => {
     res.json({ message: 'Stock access removed' });
   } catch (err) {
     console.error('[stockitem] DELETE access-group error:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// GET /inventory/access-group/:name — All stocks with group-specific price/qty
+router.get('/inventory/access-group/:name', async (req, res) => {
+  try {
+    const { name } = req.params;
+    const groupRow = await neonDb.query('SELECT id, name FROM app.access_groups WHERE TRIM(name) ILIKE TRIM($1)', [name]);
+    if (groupRow.rows.length === 0) {
+      console.warn('[stockitem] access-group not found for:', JSON.stringify(name));
+      return res.status(404).json({ message: `Access group "${name}" not found` });
+    }
+    const group = groupRow.rows[0];
+
+    const rows = await neonDb.query(`
+      SELECT
+        s.id,
+        s.stockname AS name,
+        COALESCE(inv.brand, '') AS brand,
+        COALESCE(inv.model, '') AS model,
+        COALESCE(inv.quantity, 0) + COALESCE(inv.vquantity, 0) + COALESCE(iag.quantity, 0) AS qty,
+        iag.oprice AS price,
+        inv.gst
+      FROM app.stock s
+      JOIN app.inventory_access_group iag ON iag.inventoryid = s.id
+      LEFT JOIN app.inventory inv ON inv.id = iag.inventoryid
+      WHERE iag.accessgroupid = $1
+      ORDER BY s.stockname
+    `, [group.id]);
+
+    res.json({ group, items: rows.rows });
+  } catch (err) {
+    console.error('[stockitem] GET access-group stocks error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });

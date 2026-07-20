@@ -31,8 +31,8 @@ router.get('/accesscontrol', async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit) || 50, 500);
     const offset = parseInt(req.query.offset) || 0;
 
-    const filters = [];
-    const params = [];
+    const filters: string[] = [];
+    const params: (string | number)[] = [];
     let idx = 1;
 
     if (email) { filters.push(`u.email ILIKE $${idx++}`); params.push(`%${email}%`); }

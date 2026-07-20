@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +27,7 @@ interface GroupSetting {
 
 export function InventoryControl() {
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
   const [settings, setSettings] = useState<ControlSetting[]>([]);
@@ -215,6 +217,7 @@ export function InventoryControl() {
                     </div>
                     <div className="flex items-center gap-3">
                       <Badge variant="default" className="text-[10px]">Active</Badge>
+                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => navigate(`/admin/inventory/access-group/${encodeURIComponent(g.name)}`)}>Stocks</Button>
                       <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-red-600" onClick={() => setDeleteTarget(g)}>
                         <Trash2 size={14} />
                       </Button>
