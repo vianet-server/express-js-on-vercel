@@ -24,11 +24,11 @@ router.get('/stock-item', auth('user'), async (req, res) => {
         const params = [];
         let idx = 1;
         let query;
-        if (req.user.usertype === 'admin') {
+        if (req.user.user_type === 'admin') {
             query = 'SELECT s.* FROM app.stock s WHERE 1=1';
         }
         else {
-            query = `SELECT s.* FROM app.stock s INNER JOIN app.inventory_access_group iag ON iag.inventoryid = s.id INNER JOIN app.users u ON u.userid = $${idx++} AND u.access_group_id = iag.accessgroupid`;
+            query = `SELECT s.* FROM app.stock s INNER JOIN app.inventory_access_group iag ON iag.inventoryid = s.id INNER JOIN app.users u ON u.id = $${idx++} AND u.access_group_id = iag.accessgroupid`;
             params.push(req.user.id);
         }
         if (name) {
@@ -36,6 +36,9 @@ router.get('/stock-item', auth('user'), async (req, res) => {
             params.push(`%${name}%`);
         }
         const result = await neonDb.query(query, params);
+        if (req.user.user_type !== 'admin' && result.rows.length === 0) {
+            return res.status(200).json({ message: 'No stock access. Contact the team.', data: [], noAccess: true });
+        }
         res.status(200).json({ message: 'Stock items fetched', data: result.rows });
     }
     catch (err) {

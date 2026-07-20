@@ -1,10 +1,3 @@
-/**
- * Admin Partner Routes
- *
- * Handles partner profile and related operations.
- * All routes require admin authentication via adminAuth middleware.
- */
-
 const express = require('express');
 const { neonDb } = require('../../config/db');
 const adminAuth = require('../../middleware/adminAuth');
@@ -13,11 +6,10 @@ const router = express.Router();
 
 router.use(adminAuth);
 
-// Get all partners (users with usertype = 'partner')
 router.get('/', async (req, res) => {
   try {
     const result = await neonDb.query(
-      'SELECT userid, email, usertype, is_active, created_at, updated_at FROM app.users WHERE usertype = $1',
+      'SELECT id, email, user_type, created_at, updated_at FROM app.users WHERE user_type = $1',
       ['partner']
     );
     res.status(200).json({ message: 'Partners fetched', data: result.rows });
@@ -27,20 +19,26 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Create a new partner
 router.post('/', async (req, res) => {
   try {
-    const { email, password, company_name, phone, address, is_active } = req.body;
+    const { email, password, company_name, phone, address } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required' });
+    }
     const bcrypt = require('bcryptjs');
     const password_hash = await bcrypt.hash(password, 10);
+    const groupId = (await neonDb.query('SELECT MIN(id) as id FROM app.access_groups')).rows[0]?.id;
+    if (!groupId) {
+      return res.status(400).json({ message: 'No access group available.' });
+    }
     const result = await neonDb.query(
-      'INSERT INTO app.users (email, password_hash, usertype, is_active, created_at, updated_at) VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING userid, email, usertype, is_active',
-      [email, password_hash, 'partner', is_active ?? true]
+      'INSERT INTO app.users (email, password, user_type, access_group_id, created_at, updated_at) VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING id, email, user_type',
+      [email, password_hash, 'partner', groupId]
     );
     if (company_name || phone || address) {
       await neonDb.query(
         'INSERT INTO partner_profiles (user_id, company_name, phone, address, created_at, updated_at) VALUES ($1, $2, $3, $4, NOW(), NOW())',
-        [result.rows[0].userid, company_name, phone, address]
+        [result.rows[0].id, company_name, phone, address]
       );
     }
     res.status(201).json({ message: 'Partner created', data: result.rows[0] });
@@ -50,12 +48,11 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Get a single partner by ID
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const result = await neonDb.query(
-      'SELECT userid, email, usertype, is_active, created_at, updated_at FROM app.users WHERE userid = $1 AND usertype = $2',
+      'SELECT id, email, user_type, created_at, updated_at FROM app.users WHERE id = $1 AND user_type = $2',
       [id, 'partner']
     );
     if (result.rows.length === 0) {
@@ -69,14 +66,13 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Update a partner by ID
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { email, company_name, phone, address, is_active } = req.body;
+    const { email, company_name, phone, address } = req.body;
     const userResult = await neonDb.query(
-      'UPDATE app.users SET email = $1, is_active = $2, updated_at = NOW() WHERE userid = $3 AND usertype = $4 RETURNING userid, email, usertype, is_active',
-      [email, is_active, id, 'partner']
+      'UPDATE app.users SET email = $1, updated_at = NOW() WHERE id = $2 AND user_type = $3 RETURNING id, email, user_type',
+      [email, id, 'partner']
     );
     if (userResult.rows.length === 0) {
       return res.status(404).json({ message: 'Partner not found' });
@@ -100,11 +96,10 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// Delete a partner by ID
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await neonDb.query('DELETE FROM app.users WHERE userid = $1 AND usertype = $2 RETURNING userid', [id, 'partner']);
+    const result = await neonDb.query('DELETE FROM app.users WHERE id = $1 AND user_type = $2 RETURNING id', [id, 'partner']);
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Partner not found' });
     }

@@ -3,16 +3,15 @@ import { Eye, EyeOff, Loader2, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { Link, useNavigate } from 'react-router-dom';
 
-export function EmployLogin() {
+export function EmploySignup() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -21,25 +20,24 @@ export function EmployLogin() {
     setError('');
     setLoading(true);
     try {
-      const res = await fetch('/employee/auth/login', {
+      const res = await fetch('/employee/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({
+          email,
+          password,
+          first_name: name,
+          phone,
+        }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || data.error || 'Login failed');
-      login(data.token, { username: data.email || email, role: data.user_type || 'employee' });
-      const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname;
-      navigate(from && from.startsWith('/employ') ? from : '/employ/home', { replace: true });
+      if (!res.ok) throw new Error(data.message || data.error || 'Signup failed');
+      navigate('/employ/login', { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed');
+      setError(err instanceof Error ? err.message : 'Signup failed');
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleSignup = () => {
-    navigate('/employ/signup');
   };
 
   return (
@@ -49,11 +47,22 @@ export function EmployLogin() {
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <Building2 className="h-6 w-6" />
           </div>
-          <CardTitle className="text-2xl mt-4">Employ Portal</CardTitle>
-          <CardDescription>Sign in to access your employer dashboard</CardDescription>
+          <CardTitle className="text-2xl mt-4">Create Employ Account</CardTitle>
+          <CardDescription>Sign up to access the employer portal</CardDescription>
         </CardHeader>
         <CardContent className="pt-4">
           <form className="space-y-4" onSubmit={handleSubmit}>
+            <div className="space-y-2">
+              <label htmlFor="name" className="text-sm font-medium">Full Name</label>
+              <Input
+                id="name"
+                placeholder="John Doe"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                disabled={loading}
+              />
+            </div>
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium">Email</label>
               <Input
@@ -67,9 +76,18 @@ export function EmployLogin() {
               />
             </div>
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label htmlFor="password" className="text-sm font-medium">Password</label>
-              </div>
+              <label htmlFor="phone" className="text-sm font-medium">Phone</label>
+              <Input
+                id="phone"
+                type="tel"
+                placeholder="+1 234 567 890"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="password" className="text-sm font-medium">Password</label>
               <div className="relative">
                 <Input
                   id="password"
@@ -93,20 +111,17 @@ export function EmployLogin() {
             {error && <p className="text-sm text-red-500 text-center">{error}</p>}
             <Button type="submit" className="w-full" disabled={loading}>
               {loading && <Loader2 size={14} className="animate-spin mr-2" />}
-              {loading ? 'Signing in...' : 'Sign In'}
+              {loading ? 'Creating account...' : 'Create Account'}
             </Button>
           </form>
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">Or</span>
-            </div>
+          <div className="text-center mt-4">
+            <p className="text-sm text-muted-foreground">
+              Already have an account?{' '}
+              <Link to="/employ/login" className="text-primary underline underline-offset-4 hover:text-primary/80">
+                Sign in
+              </Link>
+            </p>
           </div>
-          <Button variant="outline" className="w-full" onClick={handleSignup} disabled={loading}>
-            Sign Up
-          </Button>
         </CardContent>
       </Card>
     </div>

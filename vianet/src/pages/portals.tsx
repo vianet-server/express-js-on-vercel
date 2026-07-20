@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Search, Loader2, Package } from 'lucide-react'
+import { Search, Loader2, Package, Handshake, Boxes, Settings, AlertCircle } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { api } from '@/lib/api'
-import { Placeholder } from '@/components/Placeholder'
 
 interface StockItem {
   id: number
@@ -15,16 +14,25 @@ interface StockItem {
   price: number
 }
 
-// App portal pages
 export function AppStocks() {
   const [items, setItems] = useState<StockItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [noAccess, setNoAccess] = useState(false)
   const [search, setSearch] = useState('')
 
   useEffect(() => {
     let active = true
-    api.get<{ data: StockItem[] }>('/api/tally/stock-item')
-      .then(res => { if (active) setItems(res.data ?? []) })
+    api.get<{ data: StockItem[]; noAccess?: boolean; message?: string }>('/api/tally/stock-item')
+      .then(res => {
+        if (!active) return
+        if (res.noAccess) {
+          setNoAccess(true)
+          setItems([])
+        } else {
+          setNoAccess(false)
+          setItems(res.data ?? [])
+        }
+      })
       .catch(console.error)
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
@@ -42,6 +50,18 @@ export function AppStocks() {
 
   const totalValue = useMemo(() =>
     items.reduce((s, i) => s + i.quantity * i.price, 0), [items])
+
+  if (noAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 p-16">
+        <AlertCircle className="size-12 text-muted-foreground" />
+        <h2 className="text-xl font-semibold">No Stock Access</h2>
+        <p className="text-sm text-muted-foreground text-center max-w-md">
+          Your account does not have access to any stock items. Please contact the team to request access.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -114,15 +134,57 @@ export function AppStocks() {
 }
 
 export function AppDeals() {
-  return <Placeholder title="Deals" />
+  return (
+    <div className="flex flex-col gap-6 p-6">
+      <h1 className="text-3xl font-bold tracking-tight">Deals</h1>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Handshake size={16} /> Active Deals
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">No deals available at the moment.</p>
+        </CardContent>
+      </Card>
+    </div>
+  )
 }
 
 export function AppInventory() {
-  return <Placeholder title="Inventory" />
+  return (
+    <div className="flex flex-col gap-6 p-6">
+      <h1 className="text-3xl font-bold tracking-tight">Inventory</h1>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Boxes size={16} /> Inventory Overview
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">No inventory data available.</p>
+        </CardContent>
+      </Card>
+    </div>
+  )
 }
 
 export function AppSetting() {
-  return <Placeholder title="Setting" />
+  return (
+    <div className="flex flex-col gap-6 p-6">
+      <h1 className="text-3xl font-bold tracking-tight">Setting</h1>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings size={16} /> Account Settings
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">Settings page coming soon.</p>
+        </CardContent>
+      </Card>
+    </div>
+  )
 }
 
 // Employ portal pages - Basic group

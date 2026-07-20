@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Search, Plus, Users, Tag, Edit3, Eye, ShieldCheck, ShieldOff, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { setSkuData, updateSkuItem, type SkuRow } from '@/store/slices/inventorySlice';
+import { setSkuData, updateSkuItem, setAllAccessGroups, type SkuRow } from '@/store/slices/inventorySlice';
 
 const PAGE_SIZE = 8;
 
@@ -28,8 +28,6 @@ export function InventorySku() {
 
   const [editTarget, setEditTarget] = useState<{ sku: string; group: string; field: string; value: number } | null>(null);
   const [addAccess, setAddAccess] = useState<{ selectedSkus: string[]; group: string; qty: number; price: number } | null>(null);
-  const [allStocks, setAllStocks] = useState<SkuRow[]>([]);
-  const [stocksLoading, setStocksLoading] = useState(false);
   const [detailGroup, setDetailGroup] = useState<SkuRow | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; row: SkuRow } | null>(null);
   const [stockFilter, setStockFilter] = useState('');
@@ -37,11 +35,11 @@ export function InventorySku() {
   const STOCK_PAGE_SIZE = 10;
 
   const filteredStocks = useMemo(() =>
-    allStocks.filter(s => {
+    (skuData ?? []).filter(s => {
       const q = stockFilter.toLowerCase();
       return !q || s.sku.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || s.brand.toLowerCase().includes(q) || s.model?.toLowerCase().includes(q);
     }),
-    [allStocks, stockFilter]
+    [skuData, stockFilter]
   );
 
   const pagedStocks = useMemo(() =>
@@ -55,13 +53,6 @@ export function InventorySku() {
     setAddAccess({ selectedSkus: preselectSku ? [preselectSku] : [], group: '', qty: 0, price: 0 });
     setStockFilter('');
     setStockPage(1);
-    if (allStocks.length === 0) {
-      setStocksLoading(true);
-      api.get<SkuRow[]>('/api/admin/inventory/sku').then(res => {
-        setAllStocks(res || []);
-        setStocksLoading(false);
-      }).catch(() => setStocksLoading(false));
-    }
   };
 
   useEffect(() => {
@@ -69,9 +60,10 @@ export function InventorySku() {
       api.get<SkuRow[]>('/api/admin/inventory/sku'),
       api.get<any>('/api/admin/inventory/control').then((r: any) => r?.accessGroups || []).catch(() => []),
     ]).then(([skus, groups]: [SkuRow[], any[]]) => {
-      dispatch(setSkuData(skus));
-      setSelectedGroups((groups ?? []).map((g: any) => g.name));
-      setLoading(false);
+  dispatch(setSkuData(skus));
+  dispatch(setAllAccessGroups(groups ?? []));
+  setSelectedGroups((groups ?? []).map((g: any) => g.name));
+  setLoading(false);
     }).catch(() => setLoading(false));
   }, [dispatch]);
 
@@ -335,7 +327,7 @@ export function InventorySku() {
       </Dialog>
 
       <Dialog open={!!addAccess} onOpenChange={open => !open && setAddAccess(null)}>
-        <DialogContent className="max-w-5xl">
+        <DialogContent className="!max-w-[70vw] max-h-[90vh]">
           <DialogHeader><DialogTitle>Add Stock Access</DialogTitle></DialogHeader>
           <div className="flex flex-col gap-4 py-2">
             <div className="grid grid-cols-4 gap-4">
@@ -357,14 +349,12 @@ export function InventorySku() {
               </div>
               <Input placeholder="Search by SKU, name, brand or model..." className="h-9 text-xs" value={stockFilter} onChange={e => { setStockFilter(e.target.value); setStockPage(1); }} />
             </div>
-            <div>
+            <div className="flex flex-col flex-1 overflow-hidden">
               <div className="flex items-center justify-between mb-2">
                 <label className="text-sm font-medium">{filteredStocks.length} stocks · {addAccess?.selectedSkus.length ?? 0} selected</label>
               </div>
-              <div className="border rounded-lg max-h-80 overflow-y-auto">
-                {stocksLoading ? (
-                  <div className="flex items-center justify-center py-12"><Loader2 className="size-6 animate-spin text-muted-foreground" /></div>
-                ) : filteredStocks.length === 0 ? (
+              <div className="border rounded-lg flex-1 overflow-y-auto min-h-[300px]">
+                {filteredStocks.length === 0 ? (
                   <div className="px-3 py-8 text-center text-sm text-muted-foreground">No stocks found</div>
                 ) : (
                   <>
@@ -418,7 +408,7 @@ export function InventorySku() {
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>Access Group Details &mdash; {detailGroup?.name}</DialogTitle></DialogHeader>
           {detailGroup && (
-            <div className="flex flex-col gap-4 py-2">
+          <div className="flex flex-col gap-4 py-2">
               <div className="grid grid-cols-2 gap-4">
                 <div><span className="text-xs text-muted-foreground">SKU</span><div className="font-mono text-sm">{detailGroup.sku}</div></div>
                 <div><span className="text-xs text-muted-foreground">Product</span><div className="font-medium text-sm">{detailGroup.name}</div></div>

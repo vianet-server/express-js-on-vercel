@@ -1,15 +1,12 @@
 import { useState } from 'react';
-import { Eye, EyeOff, Loader2, Building2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Briefcase } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { Link, useNavigate } from 'react-router-dom';
 
-export function EmployLogin() {
+export function AppSignup() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -21,25 +18,19 @@ export function EmployLogin() {
     setError('');
     setLoading(true);
     try {
-      const res = await fetch('/employee/auth/login', {
+      const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || data.error || 'Login failed');
-      login(data.token, { username: data.email || email, role: data.user_type || 'employee' });
-      const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname;
-      navigate(from && from.startsWith('/employ') ? from : '/employ/home', { replace: true });
+      if (!res.ok) throw new Error(data.message || data.error || 'Signup failed');
+      navigate('/app/login', { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed');
+      setError(err instanceof Error ? err.message : 'Signup failed');
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleSignup = () => {
-    navigate('/employ/signup');
   };
 
   return (
@@ -47,10 +38,10 @@ export function EmployLogin() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center pb-2">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Building2 className="h-6 w-6" />
+            <Briefcase className="h-6 w-6" />
           </div>
-          <CardTitle className="text-2xl mt-4">Employ Portal</CardTitle>
-          <CardDescription>Sign in to access your employer dashboard</CardDescription>
+          <CardTitle className="text-2xl mt-4">Create App Account</CardTitle>
+          <CardDescription>Sign up to get started</CardDescription>
         </CardHeader>
         <CardContent className="pt-4">
           <form className="space-y-4" onSubmit={handleSubmit}>
@@ -59,7 +50,7 @@ export function EmployLogin() {
               <Input
                 id="email"
                 type="email"
-                placeholder="employer@company.com"
+                placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -67,9 +58,7 @@ export function EmployLogin() {
               />
             </div>
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label htmlFor="password" className="text-sm font-medium">Password</label>
-              </div>
+              <label htmlFor="password" className="text-sm font-medium">Password</label>
               <div className="relative">
                 <Input
                   id="password"
@@ -93,20 +82,17 @@ export function EmployLogin() {
             {error && <p className="text-sm text-red-500 text-center">{error}</p>}
             <Button type="submit" className="w-full" disabled={loading}>
               {loading && <Loader2 size={14} className="animate-spin mr-2" />}
-              {loading ? 'Signing in...' : 'Sign In'}
+              {loading ? 'Creating account...' : 'Create Account'}
             </Button>
           </form>
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">Or</span>
-            </div>
+          <div className="text-center mt-4">
+            <p className="text-sm text-muted-foreground">
+              Already have an account?{' '}
+              <Link to="/app/login" className="text-primary underline underline-offset-4 hover:text-primary/80">
+                Sign in
+              </Link>
+            </p>
           </div>
-          <Button variant="outline" className="w-full" onClick={handleSignup} disabled={loading}>
-            Sign Up
-          </Button>
         </CardContent>
       </Card>
     </div>

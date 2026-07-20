@@ -1,5 +1,6 @@
-import { Home, Package, Handshake, Boxes, Settings, FileUp } from "lucide-react"
+import { Home, Package, Handshake, Boxes, Settings, FileUp, LogOut } from "lucide-react"
 import { Link, useLocation } from "react-router-dom"
+import { useAuth } from "@/contexts/AuthContext"
 
 import {
   Sidebar,
@@ -49,6 +50,7 @@ const items = [
 
 export function AppSidebar() {
   const location = useLocation()
+  const { user, logout } = useAuth()
 
   return (
     <Sidebar collapsible="icon">
@@ -91,9 +93,13 @@ export function AppSidebar() {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton render={<Link to="/" />} tooltip="Landing">
-              <Settings />
-              <span>Back to Site</span>
+            <SidebarMenuButton
+              render={<Link to="/" />}
+              tooltip="Logout"
+              onClick={(e) => { e.preventDefault(); logout(); }}
+            >
+              <LogOut />
+              <span className="truncate">{user?.username || user?.role || 'Account'}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

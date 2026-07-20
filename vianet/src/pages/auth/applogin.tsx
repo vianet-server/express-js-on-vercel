@@ -28,7 +28,7 @@ export function AppLogin() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || data.error || 'Login failed');
-      login(data.token, { username: data.email || email, role: data.usertype || 'user' });
+      login(data.token, { username: data.email || email, role: data.user_type || 'user' });
       const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname;
       navigate(from && from.startsWith('/app') ? from : '/app/home', { replace: true });
     } catch (err) {
@@ -38,9 +38,8 @@ export function AppLogin() {
     }
   };
 
-  const handleDevBypass = () => {
-    login('dev-token', { username: 'dev-user', role: 'user' });
-    navigate('/app/home');
+  const handleSignup = () => {
+    navigate('/app/signup');
   };
 
   return (
@@ -105,8 +104,8 @@ export function AppLogin() {
               <span className="bg-background px-2 text-muted-foreground">Or</span>
             </div>
           </div>
-          <Button variant="outline" className="w-full" onClick={handleDevBypass} disabled={loading}>
-            Dev Bypass Login
+          <Button variant="outline" className="w-full" onClick={handleSignup} disabled={loading}>
+            Sign Up
           </Button>
         </CardContent>
       </Card>

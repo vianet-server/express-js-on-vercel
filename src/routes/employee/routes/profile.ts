@@ -1,10 +1,3 @@
-/**
- * employee/routes/profile.js
- *
- * Employee profile routes.
- * Requires authentication.
- */
-
 const express = require('express');
 const { neonDb } = require('../../../config/db');
 const auth = require('../../../middleware/auth');
@@ -16,7 +9,7 @@ router.use(auth('employee'));
 router.get('/', async (req, res) => {
   try {
     const user_id = req.user.id;
-    const userResult = await neonDb.query('SELECT userid, email, usertype, is_active FROM app.users WHERE userid = $1', [user_id]);
+    const userResult = await neonDb.query('SELECT id, email, user_type FROM app.users WHERE id = $1', [user_id]);
     const profileResult = await neonDb.query('SELECT * FROM employee_profiles WHERE user_id = $1', [user_id]);
     res.status(200).json({ message: 'Employee profile fetched', data: { ...userResult.rows[0], profile: profileResult.rows[0] || null } });
   } catch (err) {

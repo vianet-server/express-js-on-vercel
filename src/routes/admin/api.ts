@@ -158,11 +158,10 @@ router.post('/access-group', async (req, res) => {
       [name.trim()]
     );
     const signupToken = jwt.sign(
-      { access_group_id: result.rows[0].id, group_name: name.trim() },
-      process.env.JWT_SECRET,
-      { expiresIn: '30d' }
+      { usertype: 'user', accessgroup: result.rows[0].id },
+      process.env.JWT_SECRET
     );
-    const link = `/app/signup?token=${signupToken}`;
+    const link = `/app/signup?Token=${signupToken}`;
     res.status(201).json({ message: 'Access group created', data: result.rows[0], link });
   } catch (err) {
     console.error('[api] POST /access-group error:', err);

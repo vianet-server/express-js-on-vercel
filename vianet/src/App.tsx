@@ -9,7 +9,9 @@ import {
   Login,
   Signup,
   AppLogin,
+  AppSignup,
   EmployLogin,
+  EmploySignup,
   Home,
   Inbox,
   UserProfile,
@@ -109,6 +111,7 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <Navigate to="/employ/home" replace /> },
       { path: 'login', element: <EmployLogin /> },
+      { path: 'signup', element: <EmploySignup /> },
       {
         element: (
           <ProtectedRoute loginPath="/employ/login" allowedRoles={['employee']}>

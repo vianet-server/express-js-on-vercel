@@ -3,8 +3,6 @@
  * Admin Login Route
  *
  * Handles admin authentication.
- * Fetches the first user from app.users, verifies credentials,
- * and returns the full user record along with a JWT token.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 const express = require('express');
@@ -23,12 +21,11 @@ router.post('/', async (req, res) => {
         if (!user) {
             return res.status(401).json({ message: 'Invalid credentials', token: null });
         }
-        const hash = user.password_hash || user.password;
-        const validPassword = bcrypt.compare(password, hash);
+        const validPassword = await bcrypt.compare(password, user.password);
         if (!validPassword) {
             return res.status(401).json({ message: 'Invalid credentials', token: null });
         }
-        const token = jwt.sign({ id: user.userid, email: user.email, usertype: 'admin' }, process.env.JWT_SECRET, { expiresIn: '24h' });
+        const token = jwt.sign({ id: user.id, email: user.email, user_type: user.user_type }, process.env.JWT_SECRET, { expiresIn: '24h' });
         res.json({ token, message: 'login successful', user });
     }
     catch (err) {

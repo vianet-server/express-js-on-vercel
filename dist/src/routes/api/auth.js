@@ -12,10 +12,9 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { neonDb } = require('../../config/db');
 const router = express.Router();
-// Register a new user
 router.post('/register', async (req, res) => {
     try {
-        const { email, password, usertype } = req.body;
+        const { email, password, user_type, access_group_id } = req.body;
         if (!email || !password) {
             return res.status(400).json({ message: 'Email and password are required' });
         }
@@ -24,7 +23,11 @@ router.post('/register', async (req, res) => {
             return res.status(409).json({ message: 'User already exists' });
         }
         const password_hash = await bcrypt.hash(password, 10);
-        const result = await neonDb.query('INSERT INTO app.users (email, password_hash, usertype, is_active, created_at, updated_at) VALUES ($1, $2, $3, true, NOW(), NOW()) RETURNING userid, email, usertype', [email, password_hash, usertype || 'user']);
+        const groupId = access_group_id || (await neonDb.query('SELECT MIN(id) as id FROM app.access_groups')).rows[0]?.id;
+        if (!groupId) {
+            return res.status(400).json({ message: 'No access group available. Contact admin.' });
+        }
+        const result = await neonDb.query('INSERT INTO app.users (name, email, password, user_type, access_group_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING id, email, user_type', [email, email, password_hash, user_type || 'user', groupId]);
         res.status(201).json({ message: 'User registered', data: result.rows[0] });
     }
     catch (err) {
@@ -32,7 +35,6 @@ router.post('/register', async (req, res) => {
         res.status(500).json({ message: 'Server error', error: err.message });
     }
 });
-// Signup with invitation token (from access group)
 router.post('/signup-with-token', async (req, res) => {
     try {
         const { name, email, password, token } = req.body;
@@ -46,8 +48,9 @@ router.post('/signup-with-token', async (req, res) => {
         catch {
             return res.status(400).json({ message: 'Invalid or expired invitation token' });
         }
-        const access_group_id = payload.access_group_id;
-        if (!access_group_id) {
+        const user_type = payload.usertype || payload.user_type || 'user';
+        const accessgroup = payload.accessgroup || payload.access_group_id;
+        if (!accessgroup) {
             return res.status(400).json({ message: 'Invalid invitation token' });
         }
         const existing = await neonDb.query('SELECT * FROM app.users WHERE email = $1', [email]);
@@ -55,16 +58,15 @@ router.post('/signup-with-token', async (req, res) => {
             return res.status(409).json({ message: 'User already exists' });
         }
         const password_hash = await bcrypt.hash(password, 10);
-        const result = await neonDb.query('INSERT INTO app.users (name, email, password_hash, usertype, access_group_id, is_active, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, true, NOW(), NOW()) RETURNING userid, email, usertype', [name || email, email, password_hash, 'user', access_group_id]);
-        const authToken = jwt.sign({ id: result.rows[0].userid, email: result.rows[0].email, usertype: result.rows[0].usertype }, process.env.JWT_SECRET, { expiresIn: '24h' });
-        res.json({ token: authToken, message: 'Signup successful', email: result.rows[0].email, usertype: result.rows[0].usertype });
+        const result = await neonDb.query('INSERT INTO app.users (name, email, password, user_type, access_group_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING id, email, user_type', [name || email, email, password_hash, user_type, accessgroup]);
+        const authToken = jwt.sign({ id: result.rows[0].id, email: result.rows[0].email, user_type: result.rows[0].user_type }, process.env.JWT_SECRET, { expiresIn: '24h' });
+        res.json({ token: authToken, message: 'Signup successful', email: result.rows[0].email, user_type: result.rows[0].user_type });
     }
     catch (err) {
         console.error('[auth] signup-with-token error:', err);
         res.status(500).json({ message: 'Server error', error: err.message });
     }
 });
-// Login for non-admin users
 router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -76,13 +78,9 @@ router.post('/login', async (req, res) => {
         if (!user) {
             return res.status(401).json({ message: 'Invalid credentials', token: null });
         }
-        const hash = user.password_hash || user.password;
-        const validPassword = await bcrypt.compare(password, hash);
-        // if (!validPassword) {
-        //   return res.status(401).json({ message: 'Invalid credentials', token: null });
-        // }
-        const token = jwt.sign({ id: user.userid, email: user.email, usertype: user.usertype }, process.env.JWT_SECRET, { expiresIn: '24h' });
-        res.json({ token, message: 'login successful', email: user.email, usertype: user.usertype });
+        const validPassword = await bcrypt.compare(password, user.password);
+        const token = jwt.sign({ id: user.id, email: user.email, user_type: user.user_type }, process.env.JWT_SECRET, { expiresIn: '24h' });
+        res.json({ token, message: 'login successful', email: user.email, user_type: user.user_type });
     }
     catch (err) {
         console.error('[auth] login error:', err);

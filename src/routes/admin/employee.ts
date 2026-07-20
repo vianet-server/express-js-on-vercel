@@ -1,10 +1,3 @@
-/**
- * Admin Employee Routes
- *
- * Handles employee profile and related operations.
- * All routes require admin authentication via adminAuth middleware.
- */
-
 const express = require('express');
 const { neonDb } = require('../../config/db');
 const adminAuth = require('../../middleware/adminAuth');
@@ -13,11 +6,10 @@ const router = express.Router();
 
 router.use(adminAuth);
 
-// Get all employees (users with usertype = 'employee')
 router.get('/', async (req, res) => {
   try {
     const result = await neonDb.query(
-      'SELECT userid, email, usertype, is_active, created_at, updated_at FROM app.users WHERE usertype = $1',
+      'SELECT id, email, user_type, created_at, updated_at FROM app.users WHERE user_type = $1',
       ['employee']
     );
     res.status(200).json({ message: 'Employees fetched', data: result.rows });
@@ -27,20 +19,26 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Create a new employee
 router.post('/', async (req, res) => {
   try {
-    const { email, password, employee_id, first_name, last_name, phone, designation, is_active } = req.body;
+    const { email, password, employee_id, first_name, last_name, phone, designation } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required' });
+    }
     const bcrypt = require('bcryptjs');
     const password_hash = await bcrypt.hash(password, 10);
+    const groupId = (await neonDb.query('SELECT MIN(id) as id FROM app.access_groups')).rows[0]?.id;
+    if (!groupId) {
+      return res.status(400).json({ message: 'No access group available.' });
+    }
     const result = await neonDb.query(
-      'INSERT INTO app.users (email, password_hash, usertype, is_active, created_at, updated_at) VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING userid, email, usertype, is_active',
-      [email, password_hash, 'employee', is_active ?? true]
+      'INSERT INTO app.users (email, password, user_type, access_group_id, created_at, updated_at) VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING id, email, user_type',
+      [email, password_hash, 'employee', groupId]
     );
     if (employee_id || first_name || last_name || phone || designation) {
       await neonDb.query(
         'INSERT INTO employee_profiles (user_id, employee_id, first_name, last_name, phone, designation, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())',
-        [result.rows[0].userid, employee_id, first_name, last_name, phone, designation]
+        [result.rows[0].id, employee_id, first_name, last_name, phone, designation]
       );
     }
     res.status(201).json({ message: 'Employee created', data: result.rows[0] });
@@ -50,12 +48,11 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Get a single employee by ID
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const result = await neonDb.query(
-      'SELECT userid, email, usertype, is_active, created_at, updated_at FROM app.users WHERE userid = $1 AND usertype = $2',
+      'SELECT id, email, user_type, created_at, updated_at FROM app.users WHERE id = $1 AND user_type = $2',
       [id, 'employee']
     );
     if (result.rows.length === 0) {
@@ -69,14 +66,13 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Update an employee by ID
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { email, employee_id, first_name, last_name, phone, designation, is_active } = req.body;
+    const { email, employee_id, first_name, last_name, phone, designation } = req.body;
     const userResult = await neonDb.query(
-      'UPDATE app.users SET email = $1, is_active = $2, updated_at = NOW() WHERE userid = $3 AND usertype = $4 RETURNING userid, email, usertype, is_active',
-      [email, is_active, id, 'employee']
+      'UPDATE app.users SET email = $1, updated_at = NOW() WHERE id = $2 AND user_type = $3 RETURNING id, email, user_type',
+      [email, id, 'employee']
     );
     if (userResult.rows.length === 0) {
       return res.status(404).json({ message: 'Employee not found' });
@@ -100,11 +96,10 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// Delete an employee by ID
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await neonDb.query('DELETE FROM app.users WHERE userid = $1 AND usertype = $2 RETURNING userid', [id, 'employee']);
+    const result = await neonDb.query('DELETE FROM app.users WHERE id = $1 AND user_type = $2 RETURNING id', [id, 'employee']);
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Employee not found' });
     }

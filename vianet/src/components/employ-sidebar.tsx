@@ -13,6 +13,7 @@ import {
   LogOut,
 } from "lucide-react"
 import { Link, useLocation } from "react-router-dom"
+import { useAuth } from "@/contexts/AuthContext"
 
 import {
   Sidebar,
@@ -52,6 +53,7 @@ const settingItems = [
 
 export function EmploySidebar() {
   const location = useLocation()
+  const { user, logout } = useAuth()
 
   const renderItems = (items: { title: string; url: string; icon: any }[]) =>
     items.map((item) => (
@@ -121,9 +123,13 @@ export function EmploySidebar() {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton render={<Link to="/" />} tooltip="Landing">
+            <SidebarMenuButton
+              render={<Link to="/" />}
+              tooltip="Logout"
+              onClick={(e) => { e.preventDefault(); logout(); }}
+            >
               <LogOut />
-              <span>Back to Site</span>
+              <span className="truncate">{user?.username || user?.role || 'Account'}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
