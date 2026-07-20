@@ -1,9 +1,4 @@
 "use strict";
-/**
- * Admin Login Route
- *
- * Handles admin authentication.
- */
 Object.defineProperty(exports, "__esModule", { value: true });
 const express = require('express');
 const bcrypt = require('bcryptjs');

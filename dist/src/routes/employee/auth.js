@@ -1,10 +1,4 @@
 "use strict";
-/**
- * employee/auth.js
- *
- * Public authentication routes for employees.
- * Handles employee registration and login.
- */
 Object.defineProperty(exports, "__esModule", { value: true });
 const express = require('express');
 const bcrypt = require('bcryptjs');

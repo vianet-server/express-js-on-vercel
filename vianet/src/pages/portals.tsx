@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Search, Loader2, Package, Handshake, Boxes, Settings, AlertCircle } from 'lucide-react'
+import { useCallback } from 'react'
+import { Search, Loader2, Package, Handshake, Boxes, Settings, AlertCircle, Download } from 'lucide-react'
+import * as XLSX from 'xlsx'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { api } from '@/lib/api'
@@ -12,6 +15,12 @@ interface StockItem {
   description: string
   quantity: number
   price: number
+  gst: number
+  sgst: number
+  cgst: number
+  hsn: string
+  brand: string
+  model: string
 }
 
 export function AppStocks() {
@@ -22,7 +31,7 @@ export function AppStocks() {
 
   useEffect(() => {
     let active = true
-    api.get<{ data: StockItem[]; noAccess?: boolean; message?: string }>('/api/tally/stock-item')
+    api.get<{ data: StockItem[]; noAccess?: boolean; message?: string }>('/api/stock/stock-item')
       .then(res => {
         if (!active) return
         if (res.noAccess) {
@@ -51,6 +60,25 @@ export function AppStocks() {
   const totalValue = useMemo(() =>
     items.reduce((s, i) => s + i.quantity * i.price, 0), [items])
 
+  const handleExport = useCallback(() => {
+    const data = filtered.map(i => ({
+      Name: i.name,
+      Brand: i.brand || '',
+      Model: i.model || '',
+      SKU: i.sku || '',
+      'HSN Code': i.hsn || '',
+      Price: i.price,
+      Quantity: i.quantity,
+      GST: i.gst || 0,
+      SGST: i.sgst || 0,
+      CGST: i.cgst || 0,
+    }))
+    const ws = XLSX.utils.json_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Stocks')
+    XLSX.writeFile(wb, 'stocks.xlsx')
+  }, [filtered])
+
   if (noAccess) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 p-16">
@@ -71,6 +99,9 @@ export function AppStocks() {
           <p className="text-sm text-muted-foreground">
             <span className="font-semibold">{items.length}</span> items · ₹{totalValue.toLocaleString()}
           </p>
+          <Button variant="secondary" size="sm" onClick={handleExport}>
+            <Download size={14} /> Export
+          </Button>
           <div className="flex items-center gap-2 border rounded-lg px-3 py-1.5">
             <Search size={14} className="text-muted-foreground" />
             <Input
@@ -98,8 +129,13 @@ export function AppStocks() {
                 <thead>
                   <tr className="border-b text-left text-muted-foreground">
                     <th className="pb-3 font-medium">Name</th>
+                    <th className="pb-3 font-medium">Brand</th>
+                    <th className="pb-3 font-medium">Model</th>
                     <th className="pb-3 font-medium">SKU</th>
-                    <th className="pb-3 font-medium">Description</th>
+                    <th className="pb-3 font-medium">HSN</th>
+                    <th className="pb-3 font-medium text-right">GST</th>
+                    <th className="pb-3 font-medium text-right">SGST</th>
+                    <th className="pb-3 font-medium text-right">CGST</th>
                     <th className="pb-3 font-medium text-right">Price</th>
                     <th className="pb-3 font-medium text-right">Quantity</th>
                   </tr>
@@ -108,8 +144,13 @@ export function AppStocks() {
                   {filtered.map(i => (
                     <tr key={i.id} className="border-b last:border-0 hover:bg-muted/30">
                       <td className="py-3 font-medium">{i.name}</td>
-                      <td className="py-3 text-muted-foreground font-mono text-xs">{i.sku}</td>
-                      <td className="py-3 text-muted-foreground max-w-xs truncate">{i.description}</td>
+                      <td className="py-3 text-muted-foreground">{i.brand || '-'}</td>
+                      <td className="py-3 text-muted-foreground">{i.model || '-'}</td>
+                      <td className="py-3 text-muted-foreground font-mono text-xs">{i.sku || '-'}</td>
+                      <td className="py-3 text-muted-foreground font-mono text-xs">{i.hsn || '-'}</td>
+                      <td className="py-3 text-right">{i.gst || 0}%</td>
+                      <td className="py-3 text-right">{i.sgst || 0}%</td>
+                      <td className="py-3 text-right">{i.cgst || 0}%</td>
                       <td className="py-3 text-right">₹{i.price.toLocaleString()}</td>
                       <td className="py-3 text-right">
                         {i.quantity === 0 ? (
@@ -121,7 +162,7 @@ export function AppStocks() {
                     </tr>
                   ))}
                   {filtered.length === 0 && (
-                    <tr><td colSpan={5} className="py-8 text-center text-muted-foreground">No stock items found.</td></tr>
+                    <tr><td colSpan={10} className="py-8 text-center text-muted-foreground">No stock items found.</td></tr>
                   )}
                 </tbody>
               </table>

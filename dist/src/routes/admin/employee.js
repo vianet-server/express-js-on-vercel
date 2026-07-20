@@ -1,10 +1,4 @@
 "use strict";
-/**
- * Admin Employee Routes
- *
- * Handles employee profile and related operations.
- * All routes require admin authentication via adminAuth middleware.
- */
 Object.defineProperty(exports, "__esModule", { value: true });
 const express = require('express');
 const { neonDb } = require('../../config/db');
@@ -24,6 +18,9 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
     try {
         const { email, password, employee_id, first_name, last_name, phone, designation } = req.body;
+        if (!email || !password) {
+            return res.status(400).json({ message: 'Email and password are required' });
+        }
         const bcrypt = require('bcryptjs');
         const password_hash = await bcrypt.hash(password, 10);
         const groupId = (await neonDb.query('SELECT MIN(id) as id FROM app.access_groups')).rows[0]?.id;

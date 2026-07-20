@@ -1,9 +1,4 @@
 "use strict";
-/**
- * Admin Access Control Routes
- *
- * Handles CRUD operations for user access control / role management.
- */
 Object.defineProperty(exports, "__esModule", { value: true });
 const express = require('express');
 const bcrypt = require('bcryptjs');
@@ -14,6 +9,9 @@ router.use(adminAuth);
 router.post('/accesscontrol', async (req, res) => {
     try {
         const { email, password, user_type, access_group_id } = req.body;
+        if (!email || !password) {
+            return res.status(400).json({ message: 'Email and password are required' });
+        }
         const password_hash = await bcrypt.hash(password, 10);
         const result = await neonDb.query('INSERT INTO app.users (email, password, user_type, access_group_id, created_at, updated_at) VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING id, email, user_type, access_group_id', [email, password_hash, user_type || 'user', access_group_id || null]);
         res.status(201).json({ message: 'User created', data: result.rows[0] });
@@ -55,7 +53,8 @@ router.get('/accesscontrol', async (req, res) => {
 router.put('/accesscontrol', async (req, res) => {
     try {
         const { id, email, user_type, access_group_id } = req.body;
-        if (!id) return res.status(400).json({ message: 'id is required' });
+        if (!id)
+            return res.status(400).json({ message: 'id is required' });
         const result = await neonDb.query('UPDATE app.users SET email = $1, user_type = $2, access_group_id = $3, updated_at = NOW() WHERE id = $4 RETURNING id, email, user_type, access_group_id', [email, user_type, access_group_id || null, id]);
         if (result.rows.length === 0) {
             return res.status(404).json({ message: 'User not found' });
@@ -70,7 +69,8 @@ router.put('/accesscontrol', async (req, res) => {
 router.delete('/accesscontrol', async (req, res) => {
     try {
         const { id } = req.body;
-        if (!id) return res.status(400).json({ message: 'id is required' });
+        if (!id)
+            return res.status(400).json({ message: 'id is required' });
         const result = await neonDb.query('DELETE FROM app.users WHERE id = $1 RETURNING id', [id]);
         if (result.rows.length === 0) {
             return res.status(404).json({ message: 'User not found' });

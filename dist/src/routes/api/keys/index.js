@@ -7,6 +7,7 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 const express = require('express');
+const crypto = require('crypto');
 const { neonDb } = require('../../../config/db');
 const auth = require('../../../middleware/auth');
 const router = express.Router();
@@ -14,9 +15,11 @@ const router = express.Router();
 router.post('/', auth('user'), async (req, res) => {
     try {
         const { key_name } = req.body;
-        const api_key = require('crypto').randomBytes(32).toString('hex');
+        const keyid = crypto.randomUUID();
+        const key = 'via.' + crypto.randomBytes(32).toString('hex');
         const user_id = req.user?.id;
-        const result = await neonDb.query('INSERT INTO app.api (key_name, api_key, user_id, created_at) VALUES ($1, $2, $3, NOW()) RETURNING *', [key_name, api_key, user_id]);
+        const result = await neonDb.query(`INSERT INTO app.api (keyid, key_name, key, user_id, is_active, created_at)
+       VALUES ($1, $2, $3, $4, true, NOW()) RETURNING keyid, key_name, key, is_active, created_at`, [keyid, key_name, key, user_id]);
         res.status(201).json({ message: 'API key created', data: result.rows[0] });
     }
     catch (err) {
@@ -28,7 +31,7 @@ router.post('/', auth('user'), async (req, res) => {
 router.get('/', auth('user'), async (req, res) => {
     try {
         const user_id = req.user?.id;
-        const result = await neonDb.query('SELECT * FROM app.api WHERE user_id = $1', [user_id]);
+        const result = await neonDb.query(`SELECT keyid, key_name, key, is_active, created_at, last_used FROM app.api WHERE user_id = $1`, [user_id]);
         res.status(200).json({ message: 'API keys fetched', data: result.rows });
     }
     catch (err) {
@@ -40,7 +43,7 @@ router.get('/', auth('user'), async (req, res) => {
 router.put('/', auth('user'), async (req, res) => {
     try {
         const { id, key_name, is_active } = req.body;
-        const result = await neonDb.query('UPDATE app.api SET key_name = $1, is_active = $2, updated_at = NOW() WHERE id = $3 RETURNING *', [key_name, is_active, id]);
+        const result = await neonDb.query('UPDATE app.api SET key_name = COALESCE($1, key_name), is_active = COALESCE($2, is_active), updated_at = NOW() WHERE keyid = $3 RETURNING keyid, key_name, key, is_active', [key_name ?? null, is_active ?? null, id]);
         if (result.rows.length === 0) {
             return res.status(404).json({ message: 'API key not found' });
         }
@@ -55,7 +58,7 @@ router.put('/', auth('user'), async (req, res) => {
 router.delete('/', auth('user'), async (req, res) => {
     try {
         const { id } = req.body;
-        const result = await neonDb.query('DELETE FROM app.api WHERE id = $1 RETURNING id', [id]);
+        const result = await neonDb.query('DELETE FROM app.api WHERE keyid = $1 RETURNING keyid', [id]);
         if (result.rows.length === 0) {
             return res.status(404).json({ message: 'API key not found' });
         }

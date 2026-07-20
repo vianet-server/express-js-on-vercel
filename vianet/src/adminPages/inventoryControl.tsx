@@ -67,6 +67,9 @@ export function InventoryControl() {
     try {
       const res = await api.post('/api/admin/access-group', { name: form.name });
       setCreatedLink(res.link || '');
+      const control = await api.get('/api/admin/inventory/control');
+      if (control.accessGroups) dispatch(setAllAccessGroups(control.accessGroups));
+      setGrpSettings(control.groupSettings || []);
     } catch (e) {
       setCreatedLink('');
       alert(e instanceof Error ? e.message : 'Failed to create access group');

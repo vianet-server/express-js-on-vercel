@@ -19,7 +19,7 @@ router.post('/stock-item', async (req, res) => {
     );
     res.status(201).json({ message: 'Stock item created', data: result.rows[0] });
   } catch (err) {
-    console.error('[tally] stock-item POST error:', err);
+    console.error('[stock] stock-item POST error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -59,7 +59,7 @@ router.get('/stock-item', async (req, res) => {
     }));
     res.json({ rows, total, limit, offset });
   } catch (err) {
-    console.error('[tally] stock-item GET error:', err);
+    console.error('[stock] stock-item GET error:', err);
     res.json({ rows: [], total: 0, limit: 50, offset: 0 });
   }
 });
@@ -74,7 +74,7 @@ router.put('/stock-item', async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ message: 'Stock item not found' });
     res.status(200).json({ message: 'Stock item updated', data: result.rows[0] });
   } catch (err) {
-    console.error('[tally] stock-item PUT error:', err);
+    console.error('[stock] stock-item PUT error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -86,7 +86,7 @@ router.delete('/stock-item', async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ message: 'Stock item not found' });
     res.status(200).json({ message: 'Stock item deleted' });
   } catch (err) {
-    console.error('[tally] stock-item DELETE error:', err);
+    console.error('[stock] stock-item DELETE error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -102,7 +102,7 @@ router.post('/ledger', async (req, res) => {
     );
     res.status(201).json({ message: 'Ledger created', data: result.rows[0] });
   } catch (err) {
-    console.error('[tally] ledger POST error:', err);
+    console.error('[stock] ledger POST error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -118,7 +118,7 @@ router.get('/ledger', async (req, res) => {
     const result = await neonDb.query(query, params);
     res.status(200).json({ message: 'Ledgers fetched', data: result.rows });
   } catch (err) {
-    console.error('[tally] ledger GET error:', err);
+    console.error('[stock] ledger GET error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -133,7 +133,7 @@ router.put('/ledger', async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ message: 'Ledger not found' });
     res.status(200).json({ message: 'Ledger updated', data: result.rows[0] });
   } catch (err) {
-    console.error('[tally] ledger PUT error:', err);
+    console.error('[stock] ledger PUT error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -145,7 +145,7 @@ router.delete('/ledger', async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ message: 'Ledger not found' });
     res.status(200).json({ message: 'Ledger deleted' });
   } catch (err) {
-    console.error('[tally] ledger DELETE error:', err);
+    console.error('[stock] ledger DELETE error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -162,7 +162,7 @@ router.post('/voucher', async (req, res) => {
     );
     res.status(201).json({ message: 'Voucher created', data: result.rows[0] });
   } catch (err) {
-    console.error('[tally] voucher POST error:', err);
+    console.error('[stock] voucher POST error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -189,7 +189,7 @@ router.get('/voucher', async (req, res) => {
     }));
     res.status(200).json(rows);
   } catch (err) {
-    console.error('[tally] voucher GET error:', err);
+    console.error('[stock] voucher GET error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -205,7 +205,7 @@ router.put('/voucher', async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ message: 'Voucher not found' });
     res.status(200).json({ message: 'Voucher updated', data: result.rows[0] });
   } catch (err) {
-    console.error('[tally] voucher PUT error:', err);
+    console.error('[stock] voucher PUT error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -217,7 +217,7 @@ router.delete('/voucher', async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ message: 'Voucher not found' });
     res.status(200).json({ message: 'Voucher deleted' });
   } catch (err) {
-    console.error('[tally] voucher DELETE error:', err);
+    console.error('[stock] voucher DELETE error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -233,7 +233,7 @@ router.post('/godown', async (req, res) => {
     );
     res.status(201).json({ message: 'Godown created', data: result.rows[0] });
   } catch (err) {
-    console.error('[tally] godown POST error:', err);
+    console.error('[stock] godown POST error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -248,7 +248,7 @@ router.get('/godown', async (req, res) => {
     const result = await neonDb.query(query, params);
     res.status(200).json({ message: 'Godowns fetched', data: result.rows });
   } catch (err) {
-    console.error('[tally] godown GET error:', err);
+    console.error('[stock] godown GET error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -263,7 +263,7 @@ router.put('/godown', async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ message: 'Godown not found' });
     res.status(200).json({ message: 'Godown updated', data: result.rows[0] });
   } catch (err) {
-    console.error('[tally] godown PUT error:', err);
+    console.error('[stock] godown PUT error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -275,7 +275,7 @@ router.delete('/godown', async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ message: 'Godown not found' });
     res.status(200).json({ message: 'Godown deleted' });
   } catch (err) {
-    console.error('[tally] godown DELETE error:', err);
+    console.error('[stock] godown DELETE error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -297,7 +297,7 @@ router.get('/masters', async (req, res) => {
       { id: 'godown', name: 'Godowns', records: parseInt(godown.rows[0].count), lastUpdated: '', status: 'Active' },
     ]);
   } catch (err) {
-    console.error('[tally] GET /masters error:', err);
+    console.error('[stock] GET /masters error:', err);
     res.json([]);
   }
 });
@@ -307,7 +307,7 @@ router.get('/salesman', async (req, res) => {
     const result = await neonDb.query("SELECT id, name FROM godowns ORDER BY name");
     res.json(result.rows.map((r: any) => ({ ...r, target: 0, achieved: 0, commission: 0 })));
   } catch (err) {
-    console.error('[tally] GET /salesman error:', err);
+    console.error('[stock] GET /salesman error:', err);
     res.json([]);
   }
 });

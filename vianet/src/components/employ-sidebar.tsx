@@ -35,10 +35,10 @@ const basicItems = [
 ]
 
 const tallyItems = [
-  { title: "Stock", url: "/employ/tally/stock", icon: Package },
-  { title: "Ledger", url: "/employ/tally/ledger", icon: BookOpen },
-  { title: "Voucher", url: "/employ/tally/voucher", icon: Receipt },
-  { title: "Godown", url: "/employ/tally/godown", icon: Warehouse },
+  { title: "Stock", url: "/employ/stock/stock", icon: Package },
+  { title: "Ledger", url: "/employ/stock/ledger", icon: BookOpen },
+  { title: "Voucher", url: "/employ/stock/voucher", icon: Receipt },
+  { title: "Godown", url: "/employ/stock/godown", icon: Warehouse },
 ]
 
 const socialItems = [

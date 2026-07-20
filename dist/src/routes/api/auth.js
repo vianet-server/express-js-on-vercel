@@ -1,11 +1,4 @@
 "use strict";
-/**
- * api/auth.js
- *
- * Public authentication routes for the API.
- * Does not require admin authentication.
- * Handles user registration and login.
- */
 Object.defineProperty(exports, "__esModule", { value: true });
 const express = require('express');
 const bcrypt = require('bcryptjs');
@@ -79,6 +72,9 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ message: 'Invalid credentials', token: null });
         }
         const validPassword = await bcrypt.compare(password, user.password);
+        if (!validPassword) {
+            return res.status(401).json({ message: 'Invalid credentials', token: null });
+        }
         const token = jwt.sign({ id: user.id, email: user.email, user_type: user.user_type }, process.env.JWT_SECRET, { expiresIn: '24h' });
         res.json({ token, message: 'login successful', email: user.email, user_type: user.user_type });
     }

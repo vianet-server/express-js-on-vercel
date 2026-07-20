@@ -32,14 +32,16 @@ export function InventorySku() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; row: SkuRow } | null>(null);
   const [stockFilter, setStockFilter] = useState('');
   const [stockPage, setStockPage] = useState(1);
+  const [allStocks, setAllStocks] = useState<SkuRow[]>([]);
+  const [stocksLoading, setStocksLoading] = useState(false);
   const STOCK_PAGE_SIZE = 10;
 
   const filteredStocks = useMemo(() =>
-    (skuData ?? []).filter(s => {
+    allStocks.filter(s => {
       const q = stockFilter.toLowerCase();
       return !q || s.sku.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || s.brand.toLowerCase().includes(q) || s.model?.toLowerCase().includes(q);
     }),
-    [skuData, stockFilter]
+    [allStocks, stockFilter]
   );
 
   const pagedStocks = useMemo(() =>
@@ -53,11 +55,17 @@ export function InventorySku() {
     setAddAccess({ selectedSkus: preselectSku ? [preselectSku] : [], group: '', qty: 0, price: 0 });
     setStockFilter('');
     setStockPage(1);
+    setStocksLoading(true);
+    api.get<SkuRow[]>('/api/admin/inventory/sku').then(res => {
+      setAllStocks(res || []);
+      dispatch(setSkuData(res || []));
+      setStocksLoading(false);
+    }).catch(() => setStocksLoading(false));
   };
 
   useEffect(() => {
     Promise.all([
-      api.get<SkuRow[]>('/api/admin/inventory/sku'),
+      api.get<SkuRow[]>('/api/admin/inventory/sku').catch(() => [] as SkuRow[]),
       api.get<any>('/api/admin/inventory/control').then((r: any) => r?.accessGroups || []).catch(() => []),
     ]).then(([skus, groups]: [SkuRow[], any[]]) => {
   dispatch(setSkuData(skus));
@@ -354,7 +362,9 @@ export function InventorySku() {
                 <label className="text-sm font-medium">{filteredStocks.length} stocks · {addAccess?.selectedSkus.length ?? 0} selected</label>
               </div>
               <div className="border rounded-lg flex-1 overflow-y-auto min-h-[300px]">
-                {filteredStocks.length === 0 ? (
+                {stocksLoading ? (
+                  <div className="flex items-center justify-center py-12"><Loader2 className="size-6 animate-spin text-muted-foreground" /></div>
+                ) : filteredStocks.length === 0 ? (
                   <div className="px-3 py-8 text-center text-sm text-muted-foreground">No stocks found</div>
                 ) : (
                   <>

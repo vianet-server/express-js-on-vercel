@@ -15,7 +15,7 @@ const auth = (...allowedRoles) => {
         }
         try {
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            const usertype = decoded.usertype;
+            const usertype = decoded.user_type || decoded.usertype;
             if (allowedRoles.length > 0 && usertype !== 'admin' && !allowedRoles.includes(usertype)) {
                 return res.status(403).json({ message: 'Access denied. Insufficient permissions.' });
             }

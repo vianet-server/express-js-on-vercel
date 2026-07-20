@@ -18,7 +18,7 @@ router.post('/stock-item', auth('user'), async (req, res) => {
     );
     res.status(201).json({ message: 'Stock item created', data: result.rows[0] });
   } catch (err) {
-    console.error('[api/tally] stock-item POST error:', err);
+    console.error('[api/stock] stock-item POST error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -33,7 +33,7 @@ router.get('/stock-item', auth('user'), async (req, res) => {
     if (req.user.user_type === 'admin') {
       query = 'SELECT s.* FROM app.stock s WHERE 1=1';
     } else {
-      query = `SELECT s.* FROM app.stock s INNER JOIN app.inventory_access_group iag ON iag.inventoryid = s.id INNER JOIN app.users u ON u.id = $${idx++} AND u.access_group_id = iag.accessgroupid`;
+      query = `SELECT s.id, s.guid, s.stockname, s.data, s.costing_meth, s.unit, s.masterid, COALESCE(inv.fullname, s.stockname) AS name, inv.brand, inv.model, inv.varient, inv.color, inv.gst, iag.oprice AS price, (COALESCE(inv.quantity, 0) + COALESCE(inv.vquantity, 0) + COALESCE(iag.quantity, 0)) AS quantity FROM app.stock s INNER JOIN app.inventory_access_group iag ON iag.inventoryid = s.id INNER JOIN app.users u ON u.id = $${idx++} AND u.access_group_id = iag.accessgroupid INNER JOIN app.inventory inv ON inv.id = iag.inventoryid`;
       params.push(req.user.id);
     }
 
@@ -42,9 +42,10 @@ router.get('/stock-item', auth('user'), async (req, res) => {
     if (req.user.user_type !== 'admin' && result.rows.length === 0) {
       return res.status(200).json({ message: 'No stock access. Contact the team.', data: [], noAccess: true });
     }
-    res.status(200).json({ message: 'Stock items fetched', data: result.rows });
+    const rows = result.rows.map((r: any) => { const g = parseFloat(r.gst) || 0; return { ...r, sgst: g / 2, cgst: g / 2, hsn: r.hsn || '' }; });
+    res.status(200).json({ message: 'Stock items fetched', data: rows });
   } catch (err) {
-    console.error('[api/tally] stock-item GET error:', err);
+    console.error('[api/stock] stock-item GET error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -59,7 +60,7 @@ router.put('/stock-item', auth('user'), async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ message: 'Stock item not found' });
     res.status(200).json({ message: 'Stock item updated', data: result.rows[0] });
   } catch (err) {
-    console.error('[api/tally] stock-item PUT error:', err);
+    console.error('[api/stock] stock-item PUT error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -71,7 +72,7 @@ router.delete('/stock-item', auth('user'), async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ message: 'Stock item not found' });
     res.status(200).json({ message: 'Stock item deleted' });
   } catch (err) {
-    console.error('[api/tally] stock-item DELETE error:', err);
+    console.error('[api/stock] stock-item DELETE error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -87,7 +88,7 @@ router.post('/ledger', auth('user'), async (req, res) => {
     );
     res.status(201).json({ message: 'Ledger created', data: result.rows[0] });
   } catch (err) {
-    console.error('[api/tally] ledger POST error:', err);
+    console.error('[api/stock] ledger POST error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -103,7 +104,7 @@ router.get('/ledger', auth('user'), async (req, res) => {
     const result = await neonDb.query(query, params);
     res.status(200).json({ message: 'Ledgers fetched', data: result.rows });
   } catch (err) {
-    console.error('[api/tally] ledger GET error:', err);
+    console.error('[api/stock] ledger GET error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -118,7 +119,7 @@ router.put('/ledger', auth('user'), async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ message: 'Ledger not found' });
     res.status(200).json({ message: 'Ledger updated', data: result.rows[0] });
   } catch (err) {
-    console.error('[api/tally] ledger PUT error:', err);
+    console.error('[api/stock] ledger PUT error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -130,7 +131,7 @@ router.delete('/ledger', auth('user'), async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ message: 'Ledger not found' });
     res.status(200).json({ message: 'Ledger deleted' });
   } catch (err) {
-    console.error('[api/tally] ledger DELETE error:', err);
+    console.error('[api/stock] ledger DELETE error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -147,7 +148,7 @@ router.post('/voucher', auth('user'), async (req, res) => {
     );
     res.status(201).json({ message: 'Voucher created', data: result.rows[0] });
   } catch (err) {
-    console.error('[api/tally] voucher POST error:', err);
+    console.error('[api/stock] voucher POST error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -174,7 +175,7 @@ router.get('/voucher', auth('user'), async (req, res) => {
     }));
     res.status(200).json({ message: 'Vouchers fetched', data: rows });
   } catch (err) {
-    console.error('[api/tally] voucher GET error:', err);
+    console.error('[api/stock] voucher GET error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -190,7 +191,7 @@ router.put('/voucher', auth('user'), async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ message: 'Voucher not found' });
     res.status(200).json({ message: 'Voucher updated', data: result.rows[0] });
   } catch (err) {
-    console.error('[api/tally] voucher PUT error:', err);
+    console.error('[api/stock] voucher PUT error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -202,7 +203,7 @@ router.delete('/voucher', auth('user'), async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ message: 'Voucher not found' });
     res.status(200).json({ message: 'Voucher deleted' });
   } catch (err) {
-    console.error('[api/tally] voucher DELETE error:', err);
+    console.error('[api/stock] voucher DELETE error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -218,7 +219,7 @@ router.post('/godown', auth('user'), async (req, res) => {
     );
     res.status(201).json({ message: 'Godown created', data: result.rows[0] });
   } catch (err) {
-    console.error('[api/tally] godown POST error:', err);
+    console.error('[api/stock] godown POST error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -233,7 +234,7 @@ router.get('/godown', auth('user'), async (req, res) => {
     const result = await neonDb.query(query, params);
     res.status(200).json({ message: 'Godowns fetched', data: result.rows });
   } catch (err) {
-    console.error('[api/tally] godown GET error:', err);
+    console.error('[api/stock] godown GET error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -248,7 +249,7 @@ router.put('/godown', auth('user'), async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ message: 'Godown not found' });
     res.status(200).json({ message: 'Godown updated', data: result.rows[0] });
   } catch (err) {
-    console.error('[api/tally] godown PUT error:', err);
+    console.error('[api/stock] godown PUT error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -260,7 +261,7 @@ router.delete('/godown', auth('user'), async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ message: 'Godown not found' });
     res.status(200).json({ message: 'Godown deleted' });
   } catch (err) {
-    console.error('[api/tally] godown DELETE error:', err);
+    console.error('[api/stock] godown DELETE error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });

@@ -11,7 +11,7 @@ const pool = new Pool({
 });
 pool.connect()
     .then((c) => {
-    return c.query('SELECT * FROM app.users WHERE usertype=$1 LIMIT 2', ['admin']);
+    return c.query('SELECT * FROM app.users WHERE user_type=$1 LIMIT 2', ['admin']);
 })
     .then(({ rows }) => {
     console.log('Admins:', JSON.stringify(rows, null, 2));

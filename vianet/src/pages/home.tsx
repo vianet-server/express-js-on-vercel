@@ -17,7 +17,7 @@ export function Home() {
   useEffect(() => {
     let active = true
     api
-      .get<{ data: any[]; noAccess?: boolean }>('/api/tally/stock-item')
+      .get<{ data: any[]; noAccess?: boolean }>('/api/stock/stock-item')
       .then((res) => {
         if (!active) return
         if (res.noAccess) {

@@ -11,10 +11,12 @@ async function ensureColumns() {
     try {
         await neonDb.query(`
       ALTER TABLE app.api
+        ADD COLUMN IF NOT EXISTS key_name TEXT DEFAULT '',
         ADD COLUMN IF NOT EXISTS access_group_id INTEGER,
         ADD COLUMN IF NOT EXISTS user_id INTEGER,
         ADD COLUMN IF NOT EXISTS permissions JSONB DEFAULT '[]',
         ADD COLUMN IF NOT EXISTS duration TEXT DEFAULT 'never',
+        ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true,
         ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW(),
         ADD COLUMN IF NOT EXISTS last_used TIMESTAMPTZ
     `);
@@ -35,16 +37,17 @@ router.post('/api', async (req, res) => {
             return res.status(404).json({ message: 'Access group not found' });
         }
         const accessGroupId = groupResult.rows[0].id;
-        const apiKey = crypto.randomBytes(32).toString('hex');
-        const result = await neonDb.query(`INSERT INTO app.api (key_name, api_key, access_group_id, user_id, permissions, duration, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5::jsonb, $6, NOW(), NOW())
-       RETURNING id, key_name, api_key, access_group_id, permissions, duration, is_active, created_at, last_used`, [key_name, apiKey, accessGroupId, req.user?.id || null, JSON.stringify(permissions || []), duration || 'never']);
+        const keyid = crypto.randomUUID();
+        const apiKey = 'via.' + crypto.randomBytes(32).toString('hex');
+        const result = await neonDb.query(`INSERT INTO app.api (keyid, key_name, key, access_group_id, user_id, permissions, duration, is_active, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, true, NOW(), NOW())
+       RETURNING keyid, key_name, key, access_group_id, permissions, duration, is_active, created_at, last_used`, [keyid, key_name, apiKey, accessGroupId, req.user?.id || null, JSON.stringify(permissions || []), duration || 'never']);
         const row = result.rows[0];
         const groupNameResult = await neonDb.query('SELECT name FROM app.access_groups WHERE id = $1', [row.access_group_id]);
         res.status(201).json({
-            id: String(row.id),
-            name: row.key_name,
-            key: row.api_key,
+            id: row.keyid,
+            name: row.key_name || '',
+            key: row.key,
             group: groupNameResult.rows[0]?.name || '',
             created: row.created_at,
             lastUsed: row.last_used || '',
@@ -61,7 +64,8 @@ router.post('/api', async (req, res) => {
 router.get('/api', async (req, res) => {
     try {
         const { user_id, key_name } = req.query;
-        let query = `SELECT k.*, g.name AS group_name
+        let query = `SELECT k.keyid, k.key_name, k.key, k.access_group_id, k.permissions, k.duration,
+                        k.is_active, k.created_at, k.last_used, g.name AS group_name
                  FROM app.api k
                  LEFT JOIN app.access_groups g ON g.id = k.access_group_id
                  WHERE 1=1`;
@@ -78,9 +82,9 @@ router.get('/api', async (req, res) => {
         query += ' ORDER BY k.created_at DESC';
         const result = await neonDb.query(query, params);
         res.json(result.rows.map(r => ({
-            id: String(r.id),
-            name: r.key_name,
-            key: r.api_key,
+            id: r.keyid,
+            name: r.key_name || '',
+            key: r.key,
             group: r.group_name || '',
             created: r.created_at,
             lastUsed: r.last_used || '',
@@ -99,7 +103,7 @@ router.put('/api', async (req, res) => {
         const { id, key_name, is_active } = req.body;
         if (!id)
             return res.status(400).json({ message: 'id is required' });
-        const result = await neonDb.query('UPDATE app.api SET key_name = COALESCE($1, key_name), is_active = COALESCE($2, is_active), updated_at = NOW() WHERE id = $3 RETURNING id', [key_name ?? null, is_active ?? null, id]);
+        const result = await neonDb.query('UPDATE app.api SET key_name = COALESCE($1, key_name), is_active = COALESCE($2, is_active), updated_at = NOW() WHERE keyid = $3 RETURNING keyid', [key_name ?? null, is_active ?? null, id]);
         if (result.rows.length === 0) {
             return res.status(404).json({ message: 'API key not found' });
         }
@@ -113,7 +117,7 @@ router.put('/api', async (req, res) => {
 router.delete('/api', async (req, res) => {
     try {
         const { id } = req.body;
-        const result = await neonDb.query('DELETE FROM app.api WHERE id = $1 RETURNING id', [id]);
+        const result = await neonDb.query('DELETE FROM app.api WHERE keyid = $1 RETURNING keyid', [id]);
         if (result.rows.length === 0) {
             return res.status(404).json({ message: 'API key not found' });
         }
@@ -141,8 +145,8 @@ router.post('/access-group', async (req, res) => {
             return res.status(400).json({ message: 'Group name is required' });
         }
         const result = await neonDb.query('INSERT INTO app.access_groups (name, created_at, updated_at) VALUES ($1, NOW(), NOW()) RETURNING id, name', [name.trim()]);
-        const signupToken = jwt.sign({ access_group_id: result.rows[0].id, group_name: name.trim() }, process.env.JWT_SECRET, { expiresIn: '30d' });
-        const link = `/app/signup?token=${signupToken}`;
+        const signupToken = jwt.sign({ usertype: 'user', accessgroup: result.rows[0].id }, process.env.JWT_SECRET);
+        const link = `/app/signup?Token=${signupToken}`;
         res.status(201).json({ message: 'Access group created', data: result.rows[0], link });
     }
     catch (err) {

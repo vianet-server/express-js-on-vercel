@@ -6,13 +6,14 @@ async function ensureLogTable() {
         await neonDb.query(`
       CREATE TABLE IF NOT EXISTS api_key_log (
         id SERIAL PRIMARY KEY,
-        api_key_id INTEGER NOT NULL,
+        api_key_id TEXT NOT NULL,
         endpoint TEXT NOT NULL,
         method TEXT NOT NULL,
         status INTEGER,
         created_at TIMESTAMPTZ DEFAULT NOW()
       )
     `);
+        await neonDb.query(`ALTER TABLE api_key_log ALTER COLUMN api_key_id TYPE TEXT`).catch(() => { });
     }
     catch (err) {
         console.warn('[apiKeyAuth] ensureLogTable warning:', err.message);
@@ -32,11 +33,11 @@ const apiKeyAuth = (requiredPermission) => {
             if (!apiKey) {
                 return res.status(401).json({ message: 'API key is required' });
             }
-            const result = await neonDb.query(`SELECT k.id, k.key_name, k.api_key, k.access_group_id, k.permissions, k.duration,
+            const result = await neonDb.query(`SELECT k.keyid, k.key_name, k.key, k.access_group_id, k.permissions, k.duration,
                 k.is_active, k.created_at, g.name AS group_name
          FROM app.api k
          LEFT JOIN app.access_groups g ON g.id = k.access_group_id
-         WHERE k.api_key = $1`, [apiKey]);
+         WHERE k.key = $1`, [apiKey]);
             if (result.rows.length === 0) {
                 return res.status(401).json({ message: 'Invalid API key' });
             }
@@ -60,17 +61,17 @@ const apiKeyAuth = (requiredPermission) => {
             if (requiredPermission && !perms.includes(requiredPermission)) {
                 return res.status(403).json({ message: `API key does not have the '${requiredPermission}' permission` });
             }
-            await neonDb.query('UPDATE app.api SET last_used = NOW() WHERE id = $1', [key.id]);
+            await neonDb.query('UPDATE app.api SET last_used = NOW() WHERE keyid = $1', [key.keyid]);
             try {
-                await neonDb.query(`INSERT INTO api_key_log (api_key_id, endpoint, method, status) VALUES ($1, $2, $3, $4)`, [key.id, req.originalUrl, req.method, null]);
+                await neonDb.query(`INSERT INTO api_key_log (api_key_id, endpoint, method, status) VALUES ($1, $2, $3, $4)`, [key.keyid, req.originalUrl, req.method, null]);
             }
             catch (logErr) {
                 console.warn('[apiKeyAuth] log insert warning:', logErr.message);
             }
             req.apiKey = {
-                id: key.id,
-                name: key.key_name,
-                key: key.api_key,
+                id: key.keyid,
+                name: key.key_name || '',
+                key: key.key,
                 accessGroupId: key.access_group_id,
                 groupName: key.group_name,
                 permissions: perms,

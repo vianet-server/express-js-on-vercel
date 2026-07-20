@@ -1,10 +1,4 @@
 "use strict";
-/**
- * partner/auth.js
- *
- * Public authentication routes for partners.
- * Handles partner registration and login.
- */
 Object.defineProperty(exports, "__esModule", { value: true });
 const express = require('express');
 const bcrypt = require('bcryptjs');

@@ -14,7 +14,7 @@ const adminAuth = (req, res, next) => {
     }
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        if (decoded.usertype !== 'admin') {
+        if ((decoded.user_type || decoded.usertype) !== 'admin') {
             return res.status(403).json({ message: 'User is not an admin' });
         }
         req.user = decoded;

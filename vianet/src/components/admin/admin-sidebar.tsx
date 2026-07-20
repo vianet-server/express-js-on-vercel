@@ -42,11 +42,11 @@ const settingItems = [
 ]
 
 const tallyItems = [
-  { title: "Voucher", url: "/admin/tally/voucher", icon: Receipt },
-  { title: "Ledger", url: "/admin/tally/ledger", icon: BookOpen },
-  { title: "Stock Item", url: "/admin/tally/stock-item", icon: Package },
-  { title: "Masters", url: "/admin/tally/masters", icon: Users },
-  { title: "Salesman", url: "/admin/tally/salesman", icon: UserCheck },
+  { title: "Voucher", url: "/admin/stock/voucher", icon: Receipt },
+  { title: "Ledger", url: "/admin/stock/ledger", icon: BookOpen },
+  { title: "Stock Item", url: "/admin/stock/stock-item", icon: Package },
+  { title: "Masters", url: "/admin/stock/masters", icon: Users },
+  { title: "Salesman", url: "/admin/stock/salesman", icon: UserCheck },
   { title: "Sync", url: "/admin/sync", icon: RefreshCw },
 ]
 
