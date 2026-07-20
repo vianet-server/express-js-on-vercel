@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Download, Loader2, Plus, Trash2, Save, Search, X } from 'lucide-react';
+import { ArrowLeft, Download, Loader2, Plus, Trash2, Save, Search } from 'lucide-react';
 import { api } from '@/lib/api';
 
 interface StockItem {
