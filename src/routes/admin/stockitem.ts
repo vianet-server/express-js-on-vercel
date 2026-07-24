@@ -85,23 +85,27 @@ router.get('/inventory/stock', async (req, res) => {
     const offset = parseInt(req.query.offset) || 0;
     const search = req.query.search || '';
 
-    let countQuery = 'SELECT COUNT(*) FROM app.stock WHERE 1=1';
-    let dataQuery = 'SELECT * FROM app.stock WHERE 1=1';
+    const joinClause = 'LEFT JOIN app.inventory inv ON inv.id = s.id';
+
+    let countQuery = 'SELECT COUNT(*) FROM app.stock s';
+    let dataQuery = 'SELECT s.*, inv.fullname, inv.brand, inv.model, inv.varient, inv.color, inv.gst FROM app.stock s';
     const params: any[] = [];
     let idx = 1;
 
     if (search) {
-      const clause = ` AND (stockname ILIKE $${idx})`;
-      countQuery += clause;
-      dataQuery += clause;
+      const clause = ` WHERE (s.stockname ILIKE $${idx} OR inv.brand ILIKE $${idx} OR inv.model ILIKE $${idx} OR inv.fullname ILIKE $${idx})`;
+      countQuery += ` ${joinClause}` + clause;
+      dataQuery += ` ${joinClause}` + clause;
       params.push(`%${search}%`);
       idx++;
+    } else {
+      dataQuery += ` ${joinClause} WHERE 1=1`;
     }
 
     const countResult = await neonDb.query(countQuery, params);
     const total = parseInt(countResult.rows[0].count);
 
-    dataQuery += ` ORDER BY id DESC LIMIT $${idx} OFFSET $${idx + 1}`;
+    dataQuery += ` ORDER BY s.id DESC LIMIT $${idx} OFFSET $${idx + 1}`;
 
     params.push(limit, offset);
 
@@ -109,16 +113,16 @@ router.get('/inventory/stock', async (req, res) => {
 
     const rows = dataResult.rows.map(r => ({
       id: r.id,
-      name: r.stockname,
-      brand: '',
-      model: '',
-      variant: '',
-      color: '',
+      name: r.fullname || r.stockname,
+      brand: r.brand || '',
+      model: r.model || '',
+      variant: r.varient || '',
+      color: r.color || '',
       qty: r.quantity || 0,
       price: parseFloat(r.price) || 0,
-      gst: 0,
-      min: 0,
-      max: 0,
+      gst: r.gst || 0,
+      min: r.min_stock || r.min || 0,
+      max: r.max_stock || r.max || 0,
     }));
 
     res.json({ rows, total, limit, offset });

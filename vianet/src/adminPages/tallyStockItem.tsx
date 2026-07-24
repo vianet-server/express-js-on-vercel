@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Plus, Search, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Search, Loader2, ChevronLeft, ChevronRight, Package } from 'lucide-react';
 import { api } from '@/lib/api';
 
 const LIMIT = 50;
@@ -57,16 +56,14 @@ export function StockItem() {
           ) : (
           <table className="w-full text-sm">
             <thead><tr className="border-b text-left text-muted-foreground">
-              <th className="pb-2 font-medium">ID</th><th className="pb-2 font-medium">Name</th><th className="pb-2 font-medium">Category</th><th className="pb-2 font-medium text-right">Qty</th><th className="pb-2 font-medium text-right">Value</th><th className="pb-2 font-medium">Status</th>
+              <th className="pb-2 font-medium">ID</th><th className="pb-2 font-medium">Stock Name</th><th className="pb-2 font-medium text-right">Quantity</th><th className="pb-2 font-medium text-right">Price</th>
             </tr></thead>
-            <tbody>{rows.map((s) => (
+            <tbody>{rows.map((s: any) => (
               <tr key={s.id} className="border-b last:border-0">
                 <td className="py-2.5 font-mono text-xs text-muted-foreground">{s.id}</td>
                 <td className="py-2.5 font-medium">{s.name}</td>
-                <td className="py-2.5 text-muted-foreground">{s.category}</td>
                 <td className="py-2.5 text-right">{s.qty}</td>
-                <td className="py-2.5 text-right">₹{s.value?.toLocaleString()}</td>
-                <td className="py-2.5"><Badge variant={s.status === 'Active' ? 'default' : 'secondary'} className="text-[10px]">{s.status}</Badge></td>
+                <td className="py-2.5 text-right font-medium">₹{s.value?.toLocaleString()}</td>
               </tr>
             ))}</tbody>
           </table>

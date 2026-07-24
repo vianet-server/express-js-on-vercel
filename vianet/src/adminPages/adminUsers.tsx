@@ -3,7 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ChevronLeft, ChevronRight, Plus, Search, UserCog, X, Users } from 'lucide-react';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Loader2, ChevronLeft, ChevronRight, Plus, Search, UserCog, X, Users, Shield } from 'lucide-react';
 import { api } from '@/lib/api';
 
 const LIMIT = 50;
@@ -19,6 +20,10 @@ export function AdminUsers() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ email: '', password: '', usertype: 'admin', is_active: true, access_group_id: '' });
   const [submitting, setSubmitting] = useState(false);
+
+  const [editUser, setEditUser] = useState<any | null>(null);
+  const [editForm, setEditForm] = useState({ user_type: '', access_group_id: '', is_active: true });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     api.get<any>('/api/admin/access-groups').then(res => {
@@ -54,6 +59,35 @@ export function AdminUsers() {
       alert('Failed to create user. Check console.');
     }
     setSubmitting(false);
+  };
+
+  const openPermissions = (user: any) => {
+    setEditUser(user);
+    setEditForm({
+      user_type: user.user_type || 'user',
+      access_group_id: user.access_group_id ? String(user.access_group_id) : '',
+      is_active: user.is_active ?? true,
+    });
+  };
+
+  const savePermissions = async () => {
+    if (!editUser) return;
+    setSaving(true);
+    try {
+      await api.put('/api/admin/accesscontrol', {
+        id: editUser.id,
+        email: editUser.email,
+        user_type: editForm.user_type,
+        access_group_id: editForm.access_group_id ? Number(editForm.access_group_id) : null,
+        is_active: editForm.is_active,
+      });
+      setEditUser(null);
+      fetchData(search, offset);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save permissions.');
+    }
+    setSaving(false);
   };
 
   const totalPages = Math.max(1, Math.ceil(total / LIMIT));
@@ -136,9 +170,9 @@ export function AdminUsers() {
               <th className="pb-2 font-medium">Created</th>
             </tr></thead>
             <tbody>{rows.map((u: any) => (
-              <tr key={u.userid} className="border-b last:border-0">
+              <tr key={u.id || u.userid} className="border-b last:border-0 cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => openPermissions(u)}>
                 <td className="py-2.5 font-medium">{u.email}</td>
-                <td className="py-2.5"><Badge variant="outline" className="text-[10px] uppercase">{u.usertype}</Badge></td>
+                <td className="py-2.5"><Badge variant="outline" className="text-[10px] uppercase">{u.user_type}</Badge></td>
                 <td className="py-2.5">{u.access_group_name ? <Badge variant="outline" className="text-[10px] gap-1"><Users size={10} />{u.access_group_name}</Badge> : <span className="text-xs text-muted-foreground">—</span>}</td>
                 <td className="py-2.5"><Badge variant={u.is_active ? 'default' : 'secondary'} className="text-[10px]">{u.is_active ? 'Active' : 'Inactive'}</Badge></td>
                 <td className="py-2.5 text-muted-foreground text-xs">{new Date(u.created_at).toLocaleDateString()}</td>
@@ -160,6 +194,44 @@ export function AdminUsers() {
           </Button>
         </div>
       )}
+
+      <Dialog open={!!editUser} onOpenChange={(open) => { if (!open) setEditUser(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Shield size={18} /> Permissions — {editUser?.email}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-4 py-3">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-muted-foreground">User Type</label>
+              <select value={editForm.user_type} onChange={e => setEditForm(p => ({ ...p, user_type: e.target.value }))} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm">
+                <option value="admin">Admin</option>
+                <option value="user">User</option>
+                <option value="viewer">Viewer</option>
+              </select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Access Group</label>
+              <select value={editForm.access_group_id} onChange={e => setEditForm(p => ({ ...p, access_group_id: e.target.value }))} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm">
+                <option value="">None</option>
+                {accessGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+              </select>
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={editForm.is_active} onChange={e => setEditForm(p => ({ ...p, is_active: e.target.checked }))} />
+              Active
+            </label>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" size="sm" onClick={() => setEditUser(null)}><X size={14} /> Cancel</Button>
+            <Button size="sm" onClick={savePermissions} disabled={saving}>
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <Shield size={14} />}
+              {saving ? 'Saving...' : 'Save Permissions'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
