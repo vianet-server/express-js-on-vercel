@@ -185,7 +185,11 @@ router.get('/voucher', async (req, res) => {
       ...r,
       type: r.voucher_type,
       number: r.voucher_number,
-      amount: r.ledgerentries ? r.ledgerentries.reduce((s: number, e: any) => s + (parseFloat(e.amount) || 0), 0) : 0,
+      amount: r.ledgerentries
+        ? r.ledgerentries
+            .filter((e: any) => e.isDeemedPositive === 'No')
+            .reduce((s: number, e: any) => s + (parseFloat(e.amount) || 0), 0)
+        : 0,
     }));
     res.status(200).json(rows);
   } catch (err) {
