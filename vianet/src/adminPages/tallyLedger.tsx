@@ -11,7 +11,7 @@ export function Ledger() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   useEffect(() => {
-    api.get('/api/admin/ledger').then(r => setData(Array.isArray(r) ? r : r?.data ?? [])).catch(() => setLoading(false));
+    api.get('/api/admin/ledger').then(r => { console.log('[LEDGER] response:', r); setData(Array.isArray(r) ? r : r?.data ?? []); setLoading(false); }).catch(e => { console.error('[LEDGER] error:', e); setLoading(false); });
   }, []);
   const filtered = data.filter(l => l.name?.toLowerCase().includes(search.toLowerCase()));
   return (

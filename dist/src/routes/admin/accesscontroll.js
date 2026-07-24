@@ -6,6 +6,17 @@ const { neonDb } = require('../../config/db');
 const adminAuth = require('../../middleware/adminAuth');
 const router = express.Router();
 router.use(adminAuth);
+async function ensureUserColumns() {
+    try {
+        await neonDb.query(`
+      ALTER TABLE app.users
+        ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true
+    `);
+    }
+    catch (err) {
+        console.warn('[accesscontroll] ensureUserColumns warning:', err.message);
+    }
+}
 router.post('/accesscontrol', async (req, res) => {
     try {
         const { email, password, user_type, access_group_id } = req.body;
@@ -23,6 +34,7 @@ router.post('/accesscontrol', async (req, res) => {
 });
 router.get('/accesscontrol', async (req, res) => {
     try {
+        await ensureUserColumns();
         const { email, user_type } = req.query;
         const limit = Math.min(parseInt(req.query.limit) || 50, 500);
         const offset = parseInt(req.query.offset) || 0;
@@ -40,7 +52,7 @@ router.get('/accesscontrol', async (req, res) => {
         const where = filters.length ? ' WHERE ' + filters.join(' AND ') : '';
         const countResult = await neonDb.query('SELECT COUNT(*) FROM app.users u' + where, params);
         const total = parseInt(countResult.rows[0].count);
-        const dataQuery = `SELECT u.id, u.email, u.user_type, u.created_at, u.updated_at, u.access_group_id, g.name AS access_group_name FROM app.users u LEFT JOIN app.access_groups g ON g.id = u.access_group_id${where} ORDER BY u.created_at DESC LIMIT $${idx} OFFSET $${idx + 1}`;
+        const dataQuery = `SELECT u.id, u.email, u.user_type, u.is_active, u.created_at, u.updated_at, u.access_group_id, g.name AS access_group_name FROM app.users u LEFT JOIN app.access_groups g ON g.id = u.access_group_id${where} ORDER BY u.created_at DESC LIMIT $${idx} OFFSET $${idx + 1}`;
         params.push(limit, offset);
         const result = await neonDb.query(dataQuery, params);
         res.json({ rows: result.rows, total, limit, offset });
@@ -52,10 +64,11 @@ router.get('/accesscontrol', async (req, res) => {
 });
 router.put('/accesscontrol', async (req, res) => {
     try {
-        const { id, email, user_type, access_group_id } = req.body;
+        await ensureUserColumns();
+        const { id, email, user_type, access_group_id, is_active } = req.body;
         if (!id)
             return res.status(400).json({ message: 'id is required' });
-        const result = await neonDb.query('UPDATE app.users SET email = $1, user_type = $2, access_group_id = $3, updated_at = NOW() WHERE id = $4 RETURNING id, email, user_type, access_group_id', [email, user_type, access_group_id || null, id]);
+        const result = await neonDb.query('UPDATE app.users SET email = $1, user_type = $2, access_group_id = $3, is_active = $4, updated_at = NOW() WHERE id = $5 RETURNING id, email, user_type, access_group_id, is_active', [email, user_type, access_group_id || null, is_active, id]);
         if (result.rows.length === 0) {
             return res.status(404).json({ message: 'User not found' });
         }

@@ -82,34 +82,38 @@ router.get('/inventory/stock', async (req, res) => {
         const limit = Math.min(parseInt(req.query.limit) || 50, 500);
         const offset = parseInt(req.query.offset) || 0;
         const search = req.query.search || '';
-        let countQuery = 'SELECT COUNT(*) FROM app.stock WHERE 1=1';
-        let dataQuery = 'SELECT * FROM app.stock WHERE 1=1';
+        const joinClause = 'LEFT JOIN app.inventory inv ON inv.id = s.id';
+        let countQuery = 'SELECT COUNT(*) FROM app.stock s';
+        let dataQuery = 'SELECT s.*, inv.fullname, inv.brand, inv.model, inv.varient, inv.color, inv.gst FROM app.stock s';
         const params = [];
         let idx = 1;
         if (search) {
-            const clause = ` AND (stockname ILIKE $${idx})`;
-            countQuery += clause;
-            dataQuery += clause;
+            const clause = ` WHERE (s.stockname ILIKE $${idx} OR inv.brand ILIKE $${idx} OR inv.model ILIKE $${idx} OR inv.fullname ILIKE $${idx})`;
+            countQuery += ` ${joinClause}` + clause;
+            dataQuery += ` ${joinClause}` + clause;
             params.push(`%${search}%`);
             idx++;
         }
+        else {
+            dataQuery += ` ${joinClause} WHERE 1=1`;
+        }
         const countResult = await neonDb.query(countQuery, params);
         const total = parseInt(countResult.rows[0].count);
-        dataQuery += ` ORDER BY id DESC LIMIT $${idx} OFFSET $${idx + 1}`;
+        dataQuery += ` ORDER BY s.id DESC LIMIT $${idx} OFFSET $${idx + 1}`;
         params.push(limit, offset);
         const dataResult = await neonDb.query(dataQuery, params);
         const rows = dataResult.rows.map(r => ({
             id: r.id,
-            name: r.stockname,
-            brand: '',
-            model: '',
-            variant: '',
-            color: '',
+            name: r.fullname || r.stockname,
+            brand: r.brand || '',
+            model: r.model || '',
+            variant: r.varient || '',
+            color: r.color || '',
             qty: r.quantity || 0,
             price: parseFloat(r.price) || 0,
-            gst: 0,
-            min: 0,
-            max: 0,
+            gst: r.gst || 0,
+            min: r.min_stock || r.min || 0,
+            max: r.max_stock || r.max || 0,
         }));
         res.json({ rows, total, limit, offset });
     }
@@ -222,11 +226,12 @@ router.get('/inventory/stock/:id', async (req, res) => {
         res.status(500).json({ message: 'Server error', error: err.message });
     }
 });
-// Access group detail
+// Access group detail — returns stock info, group pricing, all group stocks, all stock groups
 router.get('/inventory/sku/:sku/access-group/:group', async (req, res) => {
     try {
         const { sku, group } = req.params;
-        const item = await neonDb.query("SELECT id, stockname AS name, CAST(id AS TEXT) AS sku, quantity AS qty, price FROM app.stock WHERE id = $1", [isNaN(Number(sku)) ? sku : Number(sku)]);
+        const stockId = isNaN(Number(sku)) ? sku : Number(sku);
+        const item = await neonDb.query("SELECT id, stockname AS name, CAST(id AS TEXT) AS sku, quantity AS qty, price FROM app.stock WHERE id = $1", [stockId]);
         if (item.rows.length === 0)
             return res.status(404).json({ message: 'SKU not found' });
         const r = item.rows[0];
@@ -243,17 +248,34 @@ router.get('/inventory/sku/:sku/access-group/:group', async (req, res) => {
                 };
             }
         }
+        // All access groups for this stock
+        const allAg = await neonDb.query(`
+      SELECT g.name AS group, iag.quantity AS qty, iag.oprice AS price
+      FROM app.inventory_access_group iag
+      JOIN app.access_groups g ON g.id = iag.accessgroupid
+      WHERE iag.inventoryid = $1 ORDER BY g.name
+    `, [r.id]);
+        // All stocks this access group sees
+        const groupStocks = await neonDb.query(`
+      SELECT s.id, s.stockname AS name, COALESCE(inv.brand,'') AS brand, COALESCE(inv.model,'') AS model,
+             iag.quantity AS qty, iag.oprice AS price
+      FROM app.stock s
+      JOIN app.inventory_access_group iag ON iag.inventoryid = s.id
+      LEFT JOIN app.inventory inv ON inv.id = iag.inventoryid
+      WHERE iag.accessgroupid = $1
+      ORDER BY s.stockname
+    `, [groupRow.rows.length > 0 ? groupRow.rows[0].id : 0]);
         res.json({
             item: {
                 sku: r.sku || String(r.id),
                 name: r.name,
                 brand: '',
                 status: 'active',
-                accessGroups: [{ group, qty: accessGroupData.qty, price: accessGroupData.price }],
+                accessGroups: allAg.rows.map(a => ({ group: a.group, qty: parseInt(a.qty) || 0, price: parseFloat(a.price) || 0 })),
             },
             accessGroup: accessGroupData,
             privileges: ['view', 'order'],
-            groupStocks: [{ sku: r.sku || String(r.id), name: r.name, brand: '', qty: r.qty || 0, price: parseFloat(r.price) || 0 }],
+            groupStocks: groupStocks.rows.map(s => ({ sku: String(s.id), name: s.name, brand: s.brand, qty: parseInt(s.qty) || 0, price: parseFloat(s.price) || 0 })),
             stockConfig: { maxQty: 100, allowDiscount: true, autoApprove: false, notes: '' },
         });
     }
@@ -332,6 +354,38 @@ router.delete('/inventory/sku/:sku/access-group/:group', async (req, res) => {
     }
     catch (err) {
         console.error('[stockitem] DELETE access-group error:', err);
+        res.status(500).json({ message: 'Server error', error: err.message });
+    }
+});
+// GET /inventory/access-group/:name — All stocks with group-specific price/qty
+router.get('/inventory/access-group/:name', async (req, res) => {
+    try {
+        const { name } = req.params;
+        const groupRow = await neonDb.query('SELECT id, name FROM app.access_groups WHERE TRIM(name) ILIKE TRIM($1)', [name]);
+        if (groupRow.rows.length === 0) {
+            console.warn('[stockitem] access-group not found for:', JSON.stringify(name));
+            return res.status(404).json({ message: `Access group "${name}" not found` });
+        }
+        const group = groupRow.rows[0];
+        const rows = await neonDb.query(`
+      SELECT
+        s.id,
+        s.stockname AS name,
+        COALESCE(inv.brand, '') AS brand,
+        COALESCE(inv.model, '') AS model,
+        COALESCE(inv.quantity, 0) + COALESCE(inv.vquantity, 0) + COALESCE(iag.quantity, 0) AS qty,
+        iag.oprice AS price,
+        inv.gst
+      FROM app.stock s
+      JOIN app.inventory_access_group iag ON iag.inventoryid = s.id
+      LEFT JOIN app.inventory inv ON inv.id = iag.inventoryid
+      WHERE iag.accessgroupid = $1
+      ORDER BY s.stockname
+    `, [group.id]);
+        res.json({ group, items: rows.rows });
+    }
+    catch (err) {
+        console.error('[stockitem] GET access-group stocks error:', err);
         res.status(500).json({ message: 'Server error', error: err.message });
     }
 });

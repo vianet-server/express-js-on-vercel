@@ -8,7 +8,7 @@
  * - /accesscontrol    -> accesscontroll.js
  * - /inventory        -> inventory.js
  * - /stockitem        -> stockitem.js
- * - /tally            -> tally.js (covers stock-item, ledger, voucher, godown, masters, salesman)
+ * - /stock            -> stock.js (covers stock-item, ledger, voucher, godown, masters, salesman)
  * - /api              -> api.js (API key management)
  * - /partner          -> partner.js (partner management)
  * - /employee         -> employee.js (employee management)
@@ -23,7 +23,7 @@ const loginRouter = require('./login');
 const accesscontrolRouter = require('./accesscontroll');
 const inventoryRouter = require('./inventory');
 const stockitemRouter = require('./stockitem');
-const tallyRouter = require('./tally');
+const stockRouter = require('./stock');
 const apiRouter = require('./api');
 const partnerRouter = require('./partner');
 const employeeRouter = require('./employee');
@@ -36,7 +36,7 @@ router.use('/login', loginRouter);
 router.use(accesscontrolRouter);
 router.use(inventoryRouter);
 router.use(stockitemRouter);
-router.use(tallyRouter);
+router.use(stockRouter);
 router.use(apiRouter);
 router.use('/partner', partnerRouter);
 router.use('/employee', employeeRouter);

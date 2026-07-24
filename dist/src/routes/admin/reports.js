@@ -30,8 +30,8 @@ router.get('/outstanding', async (req, res) => {
     try {
         const vouchers = await neonDb.query(`SELECT id, date, voucher_type, voucher_number, narration, party_ledger_name,
               COALESCE((SELECT SUM((e->>'amount')::numeric) FROM jsonb_array_elements(ledgerentries) e
-                        WHERE (e->>'isdeemedpositive') = 'No'), 0) AS amount
-       FROM app.vouchers ORDER BY date DESC LIMIT 200`);
+WHERE (e->>'isDeemedPositive') = 'No'), 0) AS amount
+        FROM app.vouchers ORDER BY date DESC LIMIT 200`);
         const rows = vouchers.rows.map((r) => {
             const days = r.date ? Math.floor((Date.now() - new Date(r.date).getTime()) / 86400000) : 0;
             let status = 'due';
@@ -86,25 +86,34 @@ router.get('/balance-sheet', async (req, res) => {
         res.json([]);
     }
 });
-// === Daybook — use app.vouchers with correct column names ===
+// === Daybook — use app.vouchers with date range ===
 router.get('/daybook', async (req, res) => {
     try {
+        const now = new Date();
+        const from_date = req.query.from_date ||
+            new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+        const to_date = req.query.to_date ||
+            now.toISOString().split('T')[0];
         const vouchers = await neonDb.query(`SELECT id, date, voucher_type, voucher_number, narration, party_ledger_name,
               billagentname,
               COALESCE((SELECT SUM((e->>'amount')::numeric) FROM jsonb_array_elements(ledgerentries) e
-                        WHERE (e->>'isdeemedpositive') = 'No'), 0) AS amount
-       FROM app.vouchers ORDER BY date DESC LIMIT 100`);
+                        WHERE (e->>'isDeemedPositive') = 'No'), 0) AS amount
+       FROM app.vouchers
+       WHERE date >= $1 AND date <= $2
+       ORDER BY date DESC`, [from_date, to_date]);
         const rows = vouchers.rows.map((r) => {
             const raw = r.voucher_type || '';
-            let displayType = 'Sale';
-            if (/payment/i.test(raw))
+            let displayType;
+            if (/sales|credit note/i.test(raw) && !/return/i.test(raw))
+                displayType = 'Sale';
+            else if (/payment|receipt/i.test(raw))
                 displayType = 'Payment';
-            else if (/purchase/i.test(raw))
+            else if (/purchase|debit note/i.test(raw))
                 displayType = 'Purchase';
-            else if (/expense|cost/i.test(raw))
+            else if (/expense|cost|manufacturing|overhead/i.test(raw))
                 displayType = 'Expense';
-            else if (/receipt/i.test(raw))
-                displayType = 'Payment';
+            else
+                displayType = 'Other';
             return {
                 id: r.id,
                 date: r.date ? new Date(r.date).toISOString().split('T')[0] : '',

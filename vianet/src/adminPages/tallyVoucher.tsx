@@ -11,7 +11,7 @@ export function Voucher() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   useEffect(() => {
-    api.get('/api/admin/voucher').then(r => setData(Array.isArray(r) ? r : r?.data ?? [])).catch(() => setLoading(false));
+    api.get('/api/admin/voucher').then(r => { console.log('[VOUCHER] response:', r); setData(Array.isArray(r) ? r : r?.data ?? []); setLoading(false); }).catch(e => { console.error('[VOUCHER] error:', e); setLoading(false); });
   }, []);
   const filtered = data.filter(v =>
     (v.party_ledger_name || '')?.toLowerCase().includes(search.toLowerCase()) ||
