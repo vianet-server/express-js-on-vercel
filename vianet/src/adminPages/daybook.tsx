@@ -14,6 +14,7 @@ const typeColors: Record<string, string> = {
   Payment: 'bg-blue-100 text-blue-700',
   Expense: 'bg-red-100 text-red-700',
   Purchase: 'bg-purple-100 text-purple-700',
+  Other: 'bg-gray-100 text-gray-700',
 };
 
 const chartConfig = {
@@ -27,11 +28,15 @@ export function Daybook() {
   const [dailyTotals, setDailyTotals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const today = new Date().toISOString().split('T')[0];
+  const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+  const [fromDate, setFromDate] = useState(firstOfMonth);
+  const [toDate, setToDate] = useState(today);
   const [openIds, setOpenIds] = useState<number[]>([]);
   const toggle = (id: number) => setOpenIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
 
   useEffect(() => {
-    api.get('/api/admin/reports/daybook')
+    api.get(`/api/admin/reports/daybook?from_date=${fromDate}&to_date=${toDate}`)
       .then(res => {
         const txns = Array.isArray(res) ? res : [];
         setTransactionsData(txns);
@@ -46,7 +51,7 @@ export function Daybook() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [fromDate, toDate]);
 
   const filtered = transactionsData.filter((t: any) =>
     (t.customer ?? '').toLowerCase().includes(search.toLowerCase()) ||
@@ -76,6 +81,8 @@ export function Daybook() {
             <Search size={14} className="text-muted-foreground" />
             <Input placeholder="Search ref, customer or salesman..." value={search} onChange={e => setSearch(e.target.value)} className="border-0 p-0 h-auto text-sm focus-visible:ring-0" />
           </div>
+          <Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="w-36 text-sm" />
+          <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="w-36 text-sm" />
           <Button variant="outline" size="sm"><Filter size={14} /> Filter</Button>
         </div>
       </div>
