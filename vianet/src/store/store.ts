@@ -11,6 +11,7 @@ import {
 } from 'redux-persist'
 import authReducer from './slices/authSlice'
 import inventoryReducer from './slices/inventorySlice'
+import adminCacheReducer from './slices/adminCacheSlice'
 
 const storage = {
   getItem: (key: string) => {
@@ -41,12 +42,13 @@ const storage = {
 const persistConfig = {
   key: 'root',
   storage,
-  whitelist: ['auth', 'inventory'],
+  whitelist: ['auth', 'inventory', 'adminCache'],
 }
 
 const rootReducer = combineReducers({
   auth: authReducer,
   inventory: inventoryReducer,
+  adminCache: adminCacheReducer,
 })
 
 const persistedReducer = persistReducer(persistConfig, rootReducer)

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@/components/ui/context-menu';
@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { ArrowUpRight, ArrowDownRight, FileDown, FileSpreadsheet, Settings, Eye, Calendar, Loader2 } from 'lucide-react';
 import { Bar, BarChart, XAxis, YAxis, CartesianGrid, Pie, PieChart, Cell } from 'recharts';
-import { api } from '@/lib/api';
+import { useAdminQuery } from '@/hooks/useAdminQuery';
 
 const pieColors = ['#2563eb', '#16a34a', '#f59e0b', '#ef4444', '#8b5cf6'];
 
@@ -17,26 +17,18 @@ const chartConfig = {
   profit: { label: 'Profit', color: '#16a34a' },
 };
 
+const defaultStats = { todaySale: 0, saleChangePercent: 0, totalProfit: 0, profitChangePercent: 0, totalSpend: 0, spendChangePercent: 0, topSalesman: null as { name: string; amount: number } | null, totalOrders: 0 };
+
 function StatCard({ children }: { children: React.ReactNode }) {
   return (
     <ContextMenu>
-      <ContextMenuTrigger className="block h-full">
-        {children}
-      </ContextMenuTrigger>
+      <ContextMenuTrigger className="block h-full">{children}</ContextMenuTrigger>
       <ContextMenuContent>
-        <ContextMenuItem onClick={() => {}}>
-          <FileDown size={14} /> Export to PDF
-        </ContextMenuItem>
-        <ContextMenuItem onClick={() => {}}>
-          <FileSpreadsheet size={14} /> Export to Excel
-        </ContextMenuItem>
+        <ContextMenuItem onClick={() => {}}><FileDown size={14} /> Export to PDF</ContextMenuItem>
+        <ContextMenuItem onClick={() => {}}><FileSpreadsheet size={14} /> Export to Excel</ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem onClick={() => {}}>
-          <Eye size={14} /> Detail
-        </ContextMenuItem>
-        <ContextMenuItem onClick={() => {}}>
-          <Settings size={14} /> Settings
-        </ContextMenuItem>
+        <ContextMenuItem onClick={() => {}}><Eye size={14} /> Detail</ContextMenuItem>
+        <ContextMenuItem onClick={() => {}}><Settings size={14} /> Settings</ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
   );
@@ -47,26 +39,18 @@ export function Dashboard() {
   const [showDateRange, setShowDateRange] = useState(false);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({ todaySale: 0, saleChangePercent: 0, totalProfit: 0, profitChangePercent: 0, totalSpend: 0, spendChangePercent: 0, topSalesman: null as { name: string, amount: number } | null, totalOrders: 0 });
-  const [topSalesmen, setTopSalesmen] = useState<{ name: string, sales: number }[]>([]);
-  const [chartData, setChartData] = useState<{ month: string, sales: number, profit: number }[]>([]);
-  const [pieData, setPieData] = useState<{ name: string, value: number }[]>([]);
-  const pieTotal = pieData.reduce((s, i) => s + i.value, 0);
 
-  useEffect(() => {
-    Promise.all([
-      api.get<typeof stats>('/api/admin/dashboard/stats'),
-      api.get<{ name: string, sales: number }[]>('/api/admin/dashboard/top-salesmen'),
-      api.get<{ month: string, sales: number, profit: number }[]>('/api/admin/dashboard/monthly-trend'),
-      api.get<{ name: string, value: number }[]>('/api/admin/dashboard/product-share'),
-    ]).then(([s, sm, ct, pd]) => {
-      setStats(s);
-      setTopSalesmen(sm);
-      setChartData(ct);
-      setPieData(pd);
-    }).catch(console.error).finally(() => setLoading(false));
-  }, []);
+  const { data: statsRaw } = useAdminQuery<typeof defaultStats>('dashboard-stats', '/api/admin/dashboard/stats');
+  const { data: topSalesmenRaw } = useAdminQuery<{ name: string; sales: number }[]>('dashboard-top-salesmen', '/api/admin/dashboard/top-salesmen');
+  const { data: chartDataRaw } = useAdminQuery<{ month: string; sales: number; profit: number }[]>('dashboard-monthly-trend', '/api/admin/dashboard/monthly-trend');
+  const { data: pieDataRaw } = useAdminQuery<{ name: string; value: number }[]>('dashboard-product-share', '/api/admin/dashboard/product-share');
+
+  const stats = statsRaw ?? defaultStats;
+  const topSalesmen = topSalesmenRaw ?? [];
+  const chartData = chartDataRaw ?? [];
+  const pieData = pieDataRaw ?? [];
+  const pieTotal = useMemo(() => pieData.reduce((s, i) => s + i.value, 0), [pieData]);
+  const loading = !statsRaw;
 
   const handleCustomApply = useCallback(() => {
     if (dateFrom && dateTo) {
@@ -100,9 +84,7 @@ export function Dashboard() {
 
         <Dialog open={showDateRange} onOpenChange={setShowDateRange}>
           <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Select Date Range</DialogTitle>
-            </DialogHeader>
+            <DialogHeader><DialogTitle>Select Date Range</DialogTitle></DialogHeader>
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-medium">From</label>
@@ -190,9 +172,7 @@ export function Dashboard() {
 
       <div className="flex flex-col lg:flex-row gap-4">
         <Card className="flex-1 lg:w-3/4">
-          <CardHeader>
-            <CardTitle>Sales & Profit Overview</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle>Sales & Profit Overview</CardTitle></CardHeader>
           <CardContent>
             <ChartContainer config={chartConfig} className="h-80 w-full">
               <BarChart data={chartData}>
@@ -208,9 +188,7 @@ export function Dashboard() {
         </Card>
 
         <Card className="lg:w-1/4">
-          <CardHeader>
-            <CardTitle>Product Share</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle>Product Share</CardTitle></CardHeader>
           <CardContent>
             <ChartContainer config={{}} className="h-80 w-full">
               <PieChart>

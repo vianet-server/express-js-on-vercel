@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,21 +6,19 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Plus, Search, UserCheck, Loader2 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
-import { api } from '@/lib/api';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, Legend } from 'recharts';
+import { useAdminQuery } from '@/hooks/useAdminQuery';
 
 const COLORS = ['#2563eb', '#16a34a', '#dc2626', '#ca8a04', '#9333ea', '#0891b2', '#db2777', '#ea580c', '#65a30d', '#4f46e5', '#94a3b8'];
 
 export function Salesman() {
-  const [data, setData] = useState<any[]>([]);
-  const [chartData, setChartData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
-  useEffect(() => {
-    api.get('/api/admin/salesman').then(setData).catch(console.error).finally(() => setLoading(false));
-    api.get('/api/admin/salesman-chart').then(setChartData).catch(console.error);
-  }, []);
+  const { data: dataRaw, loading } = useAdminQuery<any[]>('salesman', '/api/admin/salesman');
+  const { data: chartRaw } = useAdminQuery<any[]>('salesman-chart', '/api/admin/salesman-chart');
+
+  const data = dataRaw ?? [];
+  const chartData = chartRaw ?? [];
 
   const barData = useMemo(() => {
     const top10 = [...data].sort((a, b) => b.sales - a.sales).slice(0, 10).map(s => s.name);

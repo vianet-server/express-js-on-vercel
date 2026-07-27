@@ -1,30 +1,21 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, Search, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
-import { api } from '@/lib/api';
+import { useAdminQuery } from '@/hooks/useAdminQuery';
 
 const LIMIT = 50;
 
 export function StockItem() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [offset, setOffset] = useState(0);
-  const [total, setTotal] = useState(0);
 
-  const fetchData = useCallback(async (q: string, off: number) => {
-    setLoading(true);
-    try {
-      const res = await api.get<any>(`/api/admin/stock-item?limit=${LIMIT}&offset=${off}${q ? `&name=${encodeURIComponent(q)}` : ''}`);
-      setRows(Array.isArray(res) ? res : res.rows ?? []);
-      setTotal(res.total ?? 0);
-    } catch { setRows([]); setTotal(0); }
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { fetchData(search, offset); }, [fetchData, search, offset]);
+  const path = `/api/admin/stock-item?limit=${LIMIT}&offset=${offset}${search ? `&name=${encodeURIComponent(search)}` : ''}`;
+  const key = `stock-item-${offset}-${search}`;
+  const { data: raw, loading } = useAdminQuery<any>(key, path);
+  const rows = raw ? (Array.isArray(raw) ? raw : raw.rows ?? []) : [];
+  const total = raw?.total ?? 0;
 
   const handleSearch = (val: string) => { setSearch(val); setOffset(0); };
 

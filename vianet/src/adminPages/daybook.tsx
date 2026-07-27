@@ -1,13 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Filter, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, Receipt, ArrowUpDown, Loader2 } from 'lucide-react';
+import { Search, Filter, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, Receipt, FileText, Loader2, BookOpen, PackageOpen, ArrowUpDown } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Bar, BarChart, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { api } from '@/lib/api';
+import { useAdminQuery } from '@/hooks/useAdminQuery';
 
 const typeColors: Record<string, string> = {
   Sale: 'bg-green-100 text-green-700',
@@ -23,10 +23,15 @@ const chartConfig = {
   net: { label: 'Net', color: '#2563eb' },
 };
 
+function fmtDate(d: string) {
+  if (!d) return '';
+  const parts = d.split('T')[0].split('-');
+  if (parts.length !== 3) return d;
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${parseInt(parts[2])} ${months[parseInt(parts[1]) - 1]} ${parts[0]}`;
+}
+
 export function Daybook() {
-  const [transactionsData, setTransactionsData] = useState<any[]>([]);
-  const [dailyTotals, setDailyTotals] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const today = new Date().toISOString().split('T')[0];
   const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
@@ -35,34 +40,32 @@ export function Daybook() {
   const [openIds, setOpenIds] = useState<number[]>([]);
   const toggle = (id: number) => setOpenIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
 
-  useEffect(() => {
-    api.get(`/api/admin/reports/daybook?from_date=${fromDate}&to_date=${toDate}`)
-      .then(res => {
-        const txns = Array.isArray(res) ? res : [];
-        setTransactionsData(txns);
-        const daily: Record<string, { income: number; expense: number }> = {};
-        for (const t of txns) {
-          const day = t.date ? t.date.split('T')[0] : 'Unknown';
-          if (!daily[day]) daily[day] = { income: 0, expense: 0 };
-          if (t.type === 'Sale' || t.type === 'Payment') daily[day].income += t.amount ?? 0;
-          else daily[day].expense += t.amount ?? 0;
-        }
-        setDailyTotals(Object.entries(daily).map(([day, v]) => ({ day, income: v.income, expense: v.expense })));
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, [fromDate, toDate]);
+  const daybookKey = `daybook-${fromDate}-${toDate}`;
+  const { data: daybookRaw, loading } = useAdminQuery<any[]>(daybookKey, `/api/admin/reports/daybook?from_date=${fromDate}&to_date=${toDate}`);
+  const transactionsData = Array.isArray(daybookRaw) ? daybookRaw : [];
+  const dailyTotals = (() => {
+    const daily: Record<string, { income: number; expense: number }> = {};
+    for (const t of transactionsData) {
+      const day = t.date ? t.date.split('T')[0] : 'Unknown';
+      if (!daily[day]) daily[day] = { income: 0, expense: 0 };
+      if (t.type === 'Sale') daily[day].income += t.amount ?? 0;
+      else daily[day].expense += t.amount ?? 0;
+    }
+    return Object.entries(daily).map(([day, v]) => ({ day, income: v.income, expense: v.expense }));
+  })();
 
   const filtered = transactionsData.filter((t: any) =>
     (t.customer ?? '').toLowerCase().includes(search.toLowerCase()) ||
     (t.ref ?? '').toLowerCase().includes(search.toLowerCase()) ||
-    (t.salesman ?? '').toLowerCase().includes(search.toLowerCase())
+    (t.salesman ?? '').toLowerCase().includes(search.toLowerCase()) ||
+    (t.narration ?? '').toLowerCase().includes(search.toLowerCase())
   );
 
   const totalSales = transactionsData.filter((t: any) => t.type === 'Sale').reduce((s: number, t: any) => s + (t.amount ?? 0), 0);
   const totalPayments = transactionsData.filter((t: any) => t.type === 'Payment').reduce((s: number, t: any) => s + (t.amount ?? 0), 0);
   const totalExpenses = transactionsData.filter((t: any) => t.type === 'Expense').reduce((s: number, t: any) => s + (t.amount ?? 0), 0);
-  const netCash = totalSales + totalPayments - totalExpenses;
+  const totalPurchases = transactionsData.filter((t: any) => t.type === 'Purchase').reduce((s: number, t: any) => s + (t.amount ?? 0), 0);
+  const netCash = totalSales - totalPayments - totalExpenses - totalPurchases;
 
   if (loading) {
     return (
@@ -74,12 +77,12 @@ export function Daybook() {
 
   return (
     <div className="flex flex-col gap-6 p-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-3xl font-bold tracking-tight">Daybook</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-2 border rounded-lg px-3 py-1.5">
             <Search size={14} className="text-muted-foreground" />
-            <Input placeholder="Search ref, customer or salesman..." value={search} onChange={e => setSearch(e.target.value)} className="border-0 p-0 h-auto text-sm focus-visible:ring-0" />
+            <Input placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} className="border-0 p-0 h-auto text-sm focus-visible:ring-0 w-32" />
           </div>
           <Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="w-36 text-sm" />
           <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="w-36 text-sm" />
@@ -97,19 +100,19 @@ export function Daybook() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1"><TrendingUp size={14} /> Total Sales</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-bold text-green-600">\u20b9{totalSales.toLocaleString()}</div></CardContent>
+              <CardContent><div className="text-2xl font-bold text-green-600">₹{totalSales.toLocaleString()}</div></CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1"><Receipt size={14} /> Total Payments</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-bold text-blue-600">\u20b9{totalPayments.toLocaleString()}</div></CardContent>
+              <CardContent><div className="text-2xl font-bold text-blue-600">₹{totalPayments.toLocaleString()}</div></CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1"><TrendingDown size={14} /> Total Expenses</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-bold text-red-600">\u20b9{totalExpenses.toLocaleString()}</div></CardContent>
+              <CardContent><div className="text-2xl font-bold text-red-600">₹{totalExpenses.toLocaleString()}</div></CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1"><DollarSign size={14} /> Net Cash Flow</CardTitle></CardHeader>
-              <CardContent><div className={`text-2xl font-bold ${netCash >= 0 ? 'text-green-600' : 'text-red-600'}`}>\u20b9{netCash.toLocaleString()}</div></CardContent>
+              <CardContent><div className={`text-2xl font-bold ${netCash >= 0 ? 'text-green-600' : 'text-red-600'}`}>₹{netCash.toLocaleString()}</div></CardContent>
             </Card>
           </div>
 
@@ -153,7 +156,7 @@ export function Daybook() {
                           <div className="w-24 h-2 rounded-full bg-muted overflow-hidden">
                             <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color.match(/text-\w+-\d+/)?.[0]?.replace('text', 'bg') ? undefined : '#888' }} />
                           </div>
-                          <span className="text-sm font-medium w-24 text-right">\u20b9{total.toLocaleString()}</span>
+                          <span className="text-sm font-medium w-24 text-right">₹{total.toLocaleString()}</span>
                         </div>
                       </div>
                     );
@@ -172,7 +175,7 @@ export function Daybook() {
                     <th className="pb-2 font-medium">Salesman</th>
                     <th className="pb-2 font-medium text-right">Transactions</th>
                     <th className="pb-2 font-medium text-right">Total Sales</th>
-                    <th className="pb-2 font-medium text-right">Avg per Transaction</th>
+                    <th className="pb-2 font-medium text-right">Avg/Trans</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -185,10 +188,10 @@ export function Daybook() {
                     }, {} as Record<string, { count: number; total: number }>)
                   ).map(([name, data]: [string, any], i: number) => (
                     <tr key={i} className="border-b last:border-0">
-                      <td className="py-2.5 font-medium">{name}</td>
+                      <td className="py-2.5 font-medium">{name || '-'}</td>
                       <td className="py-2.5 text-right">{data.count}</td>
-                      <td className="py-2.5 text-right">\u20b9{data.total.toLocaleString()}</td>
-                      <td className="py-2.5 text-right">\u20b9{Math.round(data.total / data.count).toLocaleString()}</td>
+                      <td className="py-2.5 text-right">₹{data.total.toLocaleString()}</td>
+                      <td className="py-2.5 text-right">₹{Math.round(data.total / data.count).toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -201,52 +204,107 @@ export function Daybook() {
           <div className="flex flex-col gap-3">
             {filtered.map((t: any) => {
               const open = openIds.includes(t.id);
+              const hasInventory = (t.inventoryEntries ?? []).length > 0;
+              const hasLedger = (t.ledgerEntries ?? []).length > 0;
+              const hasNarration = t.narration && t.narration !== t.customer;
+              const hasDetail = hasInventory || hasLedger || hasNarration;
               return (
                 <Collapsible key={t.id} open={open} onOpenChange={() => toggle(t.id)}>
                   <div className="flex items-center justify-between border rounded-lg px-4 py-3 hover:bg-muted/30 cursor-pointer">
-                    <CollapsibleTrigger className="flex items-center gap-3 flex-1 text-left">
-                      {open ? <ChevronDown size={14} className="shrink-0" /> : <ChevronRight size={14} className="shrink-0" />}
-                      <span className="text-xs text-muted-foreground w-22">{t.date}</span>
-                      <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${typeColors[t.type] || ''}`}>{t.type}</span>
-                      <span className="text-sm font-medium">{t.customer}</span>
-                      <span className="text-xs text-muted-foreground">{t.ref}</span>
-                      <span className="text-xs text-muted-foreground ml-1 flex items-center gap-1">
-                        <ArrowUpDown size={10} /> {t.salesman}
-                      </span>
+                    <CollapsibleTrigger className="flex items-center gap-3 flex-1 text-left min-w-0">
+                      {hasDetail ? (
+                        open ? <ChevronDown size={14} className="shrink-0" /> : <ChevronRight size={14} className="shrink-0" />
+                      ) : (
+                        <span className="w-3.5 shrink-0" />
+                      )}
+                      <span className="text-xs text-muted-foreground w-20 shrink-0">{fmtDate(t.date)}</span>
+                      <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium shrink-0 ${typeColors[t.type] || ''}`}>{t.type}</span>
+                      <span className="text-xs font-mono text-muted-foreground shrink-0">{t.ref}</span>
+                      <span className="text-sm font-medium truncate min-w-0">{t.customer}</span>
                     </CollapsibleTrigger>
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm font-medium">\u20b9{(t.amount ?? 0).toLocaleString()}</span>
-                      <span className="text-xs text-muted-foreground">{t.mode}</span>
+                    <div className="flex items-center gap-4 shrink-0">
+                      {t.salesman ? <span className="text-xs text-muted-foreground hidden sm:inline">{t.salesman}</span> : null}
+                      <span className="text-sm font-medium tabular-nums">₹{(t.amount ?? 0).toLocaleString()}</span>
                     </div>
                   </div>
-                  <CollapsibleContent>
-                    <div className="ml-10 pl-4 border-l-2 border-muted">
-                      {(t.subs ?? []).length === 0 ? (
-                        <p className="py-2 text-xs text-muted-foreground">No line items</p>
-                      ) : (
-                        <div className="py-2">
-                          <div className="flex items-center justify-between text-xs text-muted-foreground font-medium pb-1">
-                            <span>Item</span>
-                            <div className="flex gap-4">
-                              <span className="w-12 text-right">Qty</span>
-                              <span className="w-16 text-right">Rate</span>
-                              <span className="w-20 text-right">Amount</span>
+                  {hasDetail && (
+                    <CollapsibleContent>
+                      <div className="ml-10 pl-4 border-l-2 border-muted space-y-4 py-3">
+                        {hasNarration && (
+                          <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                            <FileText size={14} className="mt-0.5 shrink-0" />
+                            <span>{t.narration}</span>
+                          </div>
+                        )}
+
+                        {hasLedger && (
+                          <div>
+                            <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground mb-1.5">
+                              <BookOpen size={13} /> Ledger Entries
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                              {(t.ledgerEntries ?? []).map((s: any, i: number) => {
+                                const amt = parseFloat(s.amount) || 0;
+                                const isDr = s.isDeemedPositive === 'Yes';
+                                const hasDesc = s.description && s.description !== s.ledgerName;
+                                return (
+                                  <div key={i} className={`rounded border px-3 py-2 ${isDr ? 'border-red-200 bg-red-50/30' : 'border-green-200 bg-green-50/30'}`}>
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="font-medium">{s.ledgerName}</span>
+                                      <span className={`font-semibold tabular-nums ${isDr ? 'text-red-600' : 'text-green-600'}`}>
+                                        {isDr ? 'Dr' : 'Cr'} ₹{Math.abs(amt).toLocaleString()}
+                                      </span>
+                                    </div>
+                                    {hasDesc && <div className="text-[11px] text-muted-foreground mt-0.5">{s.description}</div>}
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
-                          {(t.subs ?? []).map((s: any, i: number) => (
-                            <div key={i} className="flex items-center justify-between py-1 text-sm text-muted-foreground border-b last:border-0">
-                              <span>{s.item}</span>
-                              <div className="flex gap-4">
-                                <span className="w-12 text-right">{s.qty}</span>
-                                <span className="w-16 text-right">\u20b9{s.rate}</span>
-                                <span className="w-20 text-right">\u20b9{(s.amount ?? 0).toLocaleString()}</span>
-                              </div>
+                        )}
+
+                        {hasInventory && (
+                          <div>
+                            <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground mb-1.5">
+                              <PackageOpen size={13} /> Inventory Entries
                             </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </CollapsibleContent>
+                            <div className="flex flex-col gap-1.5">
+                              {(t.inventoryEntries ?? []).map((s: any, i: number) => {
+                                const qty = parseFloat(s.qty) || 0;
+                                const rate = parseFloat(s.rate) || 0;
+                                const amt = parseFloat(s.amount) || 0;
+                                let serials: string[] = [];
+                                try {
+                                  const p = typeof s.serialNo === 'string' ? JSON.parse(s.serialNo) : s.serialNo;
+                                  if (Array.isArray(p)) serials = p;
+                                } catch {}
+                                return (
+                                  <div key={i} className="rounded border px-3 py-2">
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="font-medium">{s.item}</span>
+                                      <span className="font-semibold tabular-nums">₹{amt.toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex gap-4 mt-1 text-[11px] text-muted-foreground">
+                                      <span>Qty: <b>{qty > 0 ? qty.toLocaleString() : '-'}</b>{s.unit ? ` ${s.unit}` : ''}</span>
+                                      <span>Rate: <b>₹{rate.toLocaleString()}</b></span>
+                                    </div>
+                                    {s.description ? (
+                                      <div className="text-[11px] text-muted-foreground mt-0.5">{s.description}</div>
+                                    ) : null}
+                                    {serials.length > 0 ? (
+                                      <div className="text-[11px] text-muted-foreground mt-0.5">
+                                        Serial: {serials.join(', ')}
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </CollapsibleContent>
+                  )}
                 </Collapsible>
               );
             })}

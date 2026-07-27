@@ -1,18 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
 import { Plus, Search, Loader2 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { useAdminQuery } from '@/hooks/useAdminQuery';
 
 export function Ledger() {
-  const [data, setData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  useEffect(() => {
-    api.get('/api/admin/ledger').then(r => { console.log('[LEDGER] response:', r); setData(Array.isArray(r) ? r : r?.data ?? []); setLoading(false); }).catch(e => { console.error('[LEDGER] error:', e); setLoading(false); });
-  }, []);
+  const { data: raw, loading } = useAdminQuery<any>('ledger', '/api/admin/ledger');
+  const data = Array.isArray(raw) ? raw : raw?.data ?? [];
   const filtered = data.filter(l => l.name?.toLowerCase().includes(search.toLowerCase()));
   return (
     <div className="flex flex-col gap-6 p-6">

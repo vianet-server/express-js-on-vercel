@@ -102,11 +102,60 @@ router.get('/daybook', async (req, res) => {
        ORDER BY date DESC`,
       [from_date, to_date]
     );
+    const invQuery = await neonDb.query(
+      `SELECT v.id::int AS vid,
+              COALESCE(
+                jsonb_agg(
+                  jsonb_build_object(
+                    'item', e->>'stockItemName',
+                    'qty', CAST(SPLIT_PART(COALESCE(e->>'billedQty', '0'), ' ', 1) AS numeric),
+                    'unit', COALESCE(NULLIF(SPLIT_PART(COALESCE(e->>'billedQty', ''), ' ', 2), ''), ''),
+                    'rate', CAST(SPLIT_PART(COALESCE(e->>'rate', '0'), '/', 1) AS numeric),
+                    'amount', CAST(COALESCE(e->>'amount', '0') AS numeric),
+                    'description', e->>'description',
+                    'serialNo', COALESCE(e->>'serialNo', '[]')
+                  )
+                ) FILTER (WHERE e->>'stockItemName' IS NOT NULL), '[]'::jsonb
+              ) AS invEntries
+       FROM app.vouchers v
+       LEFT JOIN LATERAL jsonb_array_elements(v.inventoryentries) e ON true
+       WHERE v.date >= $1 AND v.date <= $2
+       GROUP BY v.id`,
+      [from_date, to_date]
+    );
+    const invMap: Record<string, any[]> = {};
+    for (const row of invQuery.rows) {
+      invMap[String(row.vid)] = row.inventries || [];
+    }
+
+    const ledQuery = await neonDb.query(
+      `SELECT v.id::int AS vid,
+              COALESCE(
+                jsonb_agg(
+                  jsonb_build_object(
+                    'ledgerName', e->>'ledgerName',
+                    'amount', CAST(COALESCE(e->>'amount', '0') AS numeric),
+                    'isDeemedPositive', e->>'isDeemedPositive',
+                    'description', e->>'description'
+                  )
+                ), '[]'::jsonb
+              ) AS ledEntries
+       FROM app.vouchers v
+       LEFT JOIN LATERAL jsonb_array_elements(v.ledgerentries) e ON true
+       WHERE v.date >= $1 AND v.date <= $2
+       GROUP BY v.id`,
+      [from_date, to_date]
+    );
+    const ledMap: Record<string, any[]> = {};
+    for (const row of ledQuery.rows) {
+      ledMap[String(row.vid)] = row.ledentries || [];
+    }
+
     const rows = vouchers.rows.map((r: any) => {
       const raw = r.voucher_type || '';
       let displayType;
-      if (/sales|credit note/i.test(raw) && !/return/i.test(raw)) displayType = 'Sale';
-      else if (/payment|receipt/i.test(raw)) displayType = 'Payment';
+      if (/receipt|sales|credit note/i.test(raw) && !/return/i.test(raw)) displayType = 'Sale';
+      else if (/payment/i.test(raw) && !/receipt/i.test(raw)) displayType = 'Payment';
       else if (/purchase|debit note/i.test(raw)) displayType = 'Purchase';
       else if (/expense|cost|manufacturing|overhead/i.test(raw)) displayType = 'Expense';
       else displayType = 'Other';
@@ -114,12 +163,14 @@ router.get('/daybook', async (req, res) => {
         id: r.id,
         date: r.date ? new Date(r.date).toISOString().split('T')[0] : '',
         type: displayType,
-        customer: r.party_ledger_name || r.narration || '',
+        voucherType: raw,
+        customer: r.party_ledger_name || '',
         ref: r.voucher_number || '',
+        narration: r.narration || '',
         salesman: r.billagentname || '',
         amount: Math.abs(parseFloat(r.amount) || 0),
-        mode: 'Cash',
-        subs: [],
+        inventoryEntries: invMap[String(r.id)] || [],
+        ledgerEntries: ledMap[String(r.id)] || [],
       };
     });
     res.json(rows);

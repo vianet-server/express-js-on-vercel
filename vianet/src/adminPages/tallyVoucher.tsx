@@ -1,18 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Search, Loader2 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { useAdminQuery } from '@/hooks/useAdminQuery';
 
 export function Voucher() {
-  const [data, setData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  useEffect(() => {
-    api.get('/api/admin/voucher').then(r => { console.log('[VOUCHER] response:', r); setData(Array.isArray(r) ? r : r?.data ?? []); setLoading(false); }).catch(e => { console.error('[VOUCHER] error:', e); setLoading(false); });
-  }, []);
+  const { data: raw, loading } = useAdminQuery<any>('voucher', '/api/admin/voucher');
+  const data = Array.isArray(raw) ? raw : raw?.data ?? [];
   const filtered = data.filter(v =>
     (v.party_ledger_name || '')?.toLowerCase().includes(search.toLowerCase()) ||
     (v.voucher_type || v.type || '')?.toLowerCase().includes(search.toLowerCase()) ||
