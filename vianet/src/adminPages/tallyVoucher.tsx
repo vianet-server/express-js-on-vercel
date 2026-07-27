@@ -10,7 +10,7 @@ export function Voucher() {
   const [search, setSearch] = useState('');
   const { data: raw, loading } = useAdminQuery<any>('voucher', '/api/admin/voucher');
   const data = Array.isArray(raw) ? raw : raw?.data ?? [];
-  const filtered = data.filter(v =>
+  const filtered = data.filter((v: any) =>
     (v.party_ledger_name || '')?.toLowerCase().includes(search.toLowerCase()) ||
     (v.voucher_type || v.type || '')?.toLowerCase().includes(search.toLowerCase()) ||
     (v.voucher_number || '')?.toLowerCase().includes(search.toLowerCase())
@@ -35,7 +35,7 @@ export function Voucher() {
             <thead><tr className="border-b text-left text-muted-foreground">
               <th className="pb-2 font-medium">ID</th><th className="pb-2 font-medium">Type</th><th className="pb-2 font-medium">Party</th><th className="pb-2 font-medium">Date</th><th className="pb-2 font-medium text-right">Amount</th>
             </tr></thead>
-            <tbody>{filtered.map((v) => (
+            <tbody>{filtered.map((v: any) => (
               <tr key={v.id} className="border-b last:border-0">
                 <td className="py-2.5 font-mono text-xs text-muted-foreground">{v.voucher_number || v.id}</td>
                 <td className="py-2.5"><Badge variant="outline" className="text-[10px]">{v.voucher_type || v.type}</Badge></td>

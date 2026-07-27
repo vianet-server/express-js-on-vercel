@@ -13,7 +13,7 @@ const adminCacheSlice = createSlice({
     setCache(state, action: PayloadAction<{ key: string; data: unknown }>) {
       state[action.payload.key] = action.payload.data
     },
-    clearCache(state) {
+    clearCache(_state) {
       return {}
     },
     removeCache(state, action: PayloadAction<string>) {

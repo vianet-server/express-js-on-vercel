@@ -10,7 +10,7 @@ export function Ledger() {
   const [search, setSearch] = useState('');
   const { data: raw, loading } = useAdminQuery<any>('ledger', '/api/admin/ledger');
   const data = Array.isArray(raw) ? raw : raw?.data ?? [];
-  const filtered = data.filter(l => l.name?.toLowerCase().includes(search.toLowerCase()));
+  const filtered = data.filter((l: any) => l.name?.toLowerCase().includes(search.toLowerCase()));
   return (
     <div className="flex flex-col gap-6 p-6">
       <div className="flex items-center justify-between">
@@ -31,7 +31,7 @@ export function Ledger() {
             <thead><tr className="border-b text-left text-muted-foreground">
               <th className="pb-2 font-medium">Name</th><th className="pb-2 font-medium">Mobile</th><th className="pb-2 font-medium">Address</th><th className="pb-2 font-medium">Ledger Name</th>
             </tr></thead>
-            <tbody>{filtered.map((l) => (
+            <tbody>{filtered.map((l: any) => (
               <tr key={l.id || l.name} className="border-b last:border-0">
                 <td className="py-2.5 font-medium">{l.name}</td>
                 <td className="py-2.5 text-muted-foreground">{(l.mobile || []).join(', ') || '-'}</td>

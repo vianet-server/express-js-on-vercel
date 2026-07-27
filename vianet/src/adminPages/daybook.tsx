@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Filter, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, Receipt, FileText, Loader2, BookOpen, PackageOpen, ArrowUpDown } from 'lucide-react';
+import { Search, Filter, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, Receipt, FileText, Loader2, BookOpen, PackageOpen } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Bar, BarChart, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
