@@ -308,10 +308,36 @@ router.get('/masters', async (req, res) => {
 
 router.get('/salesman', async (req, res) => {
   try {
-    const result = await neonDb.query("SELECT id, name FROM godowns ORDER BY name");
-    res.json(result.rows.map((r: any) => ({ ...r, target: 0, achieved: 0, commission: 0 })));
+    const result = await neonDb.query(`
+      SELECT
+        ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) AS id,
+        salesman AS name,
+        COUNT(*)::integer AS orders,
+        COALESCE(SUM(bill_amt), 0) AS sales
+      FROM app.sales_records
+      WHERE salesman IS NOT NULL AND salesman != ''
+      GROUP BY salesman
+      ORDER BY COUNT(*) DESC
+    `);
+    res.json(result.rows.map((r: any) => ({ id: r.id, name: r.name, orders: r.orders, sales: parseFloat(r.sales) || 0, region: '', status: 'Active', target: 0, achieved: 0, commission: 0 })));
   } catch (err) {
     console.error('[stock] GET /salesman error:', err);
+    res.json([]);
+  }
+});
+
+router.get('/salesman-chart', async (req, res) => {
+  try {
+    const result = await neonDb.query(`
+      SELECT sales_date, salesman, SUM(bill_amt) AS sales
+      FROM app.sales_records
+      WHERE salesman IS NOT NULL AND salesman != ''
+      GROUP BY sales_date, salesman
+      ORDER BY sales_date
+    `);
+    res.json(result.rows.map((r: any) => ({ date: r.sales_date, name: r.salesman, sales: parseFloat(r.sales) || 0 })));
+  } catch (err) {
+    console.error('[stock] GET /salesman-chart error:', err);
     res.json([]);
   }
 });

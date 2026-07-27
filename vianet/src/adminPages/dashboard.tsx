@@ -52,6 +52,7 @@ export function Dashboard() {
   const [topSalesmen, setTopSalesmen] = useState<{ name: string, sales: number }[]>([]);
   const [chartData, setChartData] = useState<{ month: string, sales: number, profit: number }[]>([]);
   const [pieData, setPieData] = useState<{ name: string, value: number }[]>([]);
+  const pieTotal = pieData.reduce((s, i) => s + i.value, 0);
 
   useEffect(() => {
     Promise.all([
@@ -228,7 +229,7 @@ export function Dashboard() {
                     <span className="size-2.5 rounded-full inline-block" style={{ backgroundColor: pieColors[i % pieColors.length] }} />
                     {item.name}
                   </div>
-                  <span className="font-medium">{item.value}%</span>
+                  <span className="font-medium">{pieTotal > 0 ? ((item.value / pieTotal) * 100).toFixed(1) : '0'}%</span>
                 </div>
               ))}
             </div>
