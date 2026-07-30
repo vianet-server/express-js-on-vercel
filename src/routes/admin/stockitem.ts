@@ -337,11 +337,11 @@ router.post('/inventory/sku/:sku/access-group/:group', async (req, res) => {
   }
 });
 
-// PUT /inventory/sku/:sku/access-group/:group — Update stock access qty/price/gst/hsn
+// PUT /inventory/sku/:sku/access-group/:group — Update stock access qty/price/gst
 router.put('/inventory/sku/:sku/access-group/:group', async (req, res) => {
   try {
     const { sku, group } = req.params;
-    const { qty, price, gst, hsn } = req.body;
+    const { qty, price, gst } = req.body;
 
     const stock = await neonDb.query('SELECT id FROM app.stock WHERE id = $1', [isNaN(Number(sku)) ? sku : Number(sku)]);
     if (stock.rows.length === 0) return res.status(404).json({ message: 'Stock item not found' });
@@ -357,11 +357,8 @@ router.put('/inventory/sku/:sku/access-group/:group', async (req, res) => {
     );
     if (result.rows.length === 0) return res.status(404).json({ message: 'Mapping not found' });
 
-    if (gst !== undefined || hsn !== undefined) {
-      await neonDb.query(
-        'UPDATE app.inventory SET gst = COALESCE($1, gst), hsn = COALESCE($2, hsn) WHERE id = $3',
-        [gst, hsn, stockId]
-      );
+    if (gst !== undefined) {
+      await neonDb.query('UPDATE app.inventory SET gst = $1 WHERE id = $2', [gst, stockId]);
     }
 
     res.json({ message: 'Stock access updated' });
@@ -416,7 +413,7 @@ router.get('/inventory/access-group/:name', async (req, res) => {
         COALESCE(inv.quantity, 0) + COALESCE(inv.vquantity, 0) + COALESCE(iag.quantity, 0) AS qty,
         iag.oprice AS price,
         inv.gst,
-        COALESCE(inv.hsn, '') AS hsn
+        '' AS hsn
       FROM app.stock s
       JOIN app.inventory_access_group iag ON iag.inventoryid = s.id
       LEFT JOIN app.inventory inv ON inv.id = iag.inventoryid

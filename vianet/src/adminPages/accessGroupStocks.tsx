@@ -14,7 +14,6 @@ interface StockItem {
   qty: number;
   price: number;
   gst: number;
-  hsn: string;
 }
 
 export function AccessGroupStocks() {
@@ -25,7 +24,7 @@ export function AccessGroupStocks() {
   const [groupInfo, setGroupInfo] = useState<{ id: number; name: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const [editing, setEditing] = useState<Record<number, { qty: number; price: number; gst: number; hsn: string }>>({});
+  const [editing, setEditing] = useState<Record<number, { qty: number; price: number; gst: number }>>({});
   const [saving, setSaving] = useState<number | null>(null);
 
   const [addOpen, setAddOpen] = useState(false);
@@ -75,7 +74,7 @@ export function AccessGroupStocks() {
   }, [addOpen]);
 
   const startEdit = (item: StockItem) => {
-    setEditing(prev => ({ ...prev, [item.id]: { qty: Number(item.qty), price: Number(item.price), gst: Number(item.gst) || 0, hsn: String(item.hsn || '') } }));
+    setEditing(prev => ({ ...prev, [item.id]: { qty: Number(item.qty), price: Number(item.price), gst: Number(item.gst) || 0 } }));
   };
 
   const cancelEdit = (id: number) => {
@@ -87,8 +86,8 @@ export function AccessGroupStocks() {
     if (!e) return;
     setSaving(item.id);
     try {
-      await api.put(`/api/admin/inventory/sku/${item.id}/access-group/${encodeURIComponent(decodedName)}`, { qty: e.qty, price: e.price, gst: e.gst, hsn: e.hsn });
-      setItems(prev => prev.map(i => i.id === item.id ? { ...i, qty: e.qty, price: e.price, gst: e.gst, hsn: e.hsn } : i));
+      await api.put(`/api/admin/inventory/sku/${item.id}/access-group/${encodeURIComponent(decodedName)}`, { qty: e.qty, price: e.price, gst: e.gst });
+      setItems(prev => prev.map(i => i.id === item.id ? { ...i, qty: e.qty, price: e.price, gst: e.gst } : i));
       cancelEdit(item.id);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to update');
@@ -213,12 +212,11 @@ export function AccessGroupStocks() {
 
       <div className="border rounded-lg overflow-hidden">
         <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-muted/50 text-xs font-semibold text-muted-foreground border-b">
-          <div className="col-span-3">Stock Name</div>
+          <div className="col-span-4">Stock Name</div>
           <div className="col-span-2">Brand / Model</div>
           <div className="col-span-1 text-right">Qty</div>
           <div className="col-span-2 text-right">Price</div>
           <div className="col-span-1 text-right">GST</div>
-          <div className="col-span-1 text-right">HSN</div>
           <div className="col-span-2 text-center"></div>
         </div>
         {items.map((item) => {
@@ -226,7 +224,7 @@ export function AccessGroupStocks() {
           const edit = editing[item.id];
           return (
             <div key={item.id} className="grid grid-cols-12 gap-2 px-3 py-2.5 text-sm border-b last:border-0 items-center hover:bg-muted/30 transition-colors">
-              <div className="col-span-3 font-medium truncate cursor-pointer hover:underline" onClick={() => startEdit(item)}>{item.name}</div>
+              <div className="col-span-4 font-medium truncate cursor-pointer hover:underline" onClick={() => startEdit(item)}>{item.name}</div>
               <div className="col-span-2 text-muted-foreground truncate">{item.brand}{item.brand && item.model ? ' / ' : ''}{item.model}</div>
               <div className="col-span-1 text-right">
                 {isEditing ? (
@@ -255,13 +253,6 @@ export function AccessGroupStocks() {
                   <Input type="number" className="w-14 h-7 text-xs text-right" value={edit.gst} onChange={e => setEditing(prev => ({ ...prev, [item.id]: { ...prev[item.id], gst: parseFloat(e.target.value) || 0 } }))} />
                 ) : (
                   <span className="cursor-pointer hover:underline text-muted-foreground" onClick={() => startEdit(item)}>{item.gst != null ? `${item.gst}%` : '-'}</span>
-                )}
-              </div>
-              <div className="col-span-1 text-right">
-                {isEditing ? (
-                  <Input type="text" className="w-16 h-7 text-xs" value={edit.hsn} onChange={e => setEditing(prev => ({ ...prev, [item.id]: { ...prev[item.id], hsn: e.target.value } }))} />
-                ) : (
-                  <span className="cursor-pointer hover:underline text-muted-foreground" onClick={() => startEdit(item)}>{item.hsn || '-'}</span>
                 )}
               </div>
               <div className="col-span-2 flex items-center justify-center gap-1">
