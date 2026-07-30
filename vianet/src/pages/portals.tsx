@@ -103,7 +103,7 @@ export function AppStocks() {
           <Button variant="secondary" size="sm" onClick={handleExport}>
             <Download size={14} /> Export
           </Button>
-          <div className="flex items-center gap-2 border rounded-lg px-3 py-1.5">
+          {/* <div className="flex items-center gap-2 border rounded-lg px-3 py-1.5">
             <Search size={14} className="text-muted-foreground" />
             <Input
               placeholder="Search name or sku..."
@@ -111,7 +111,7 @@ export function AppStocks() {
               onChange={e => setSearch(e.target.value)}
               className="border-0 p-0 h-auto text-sm focus-visible:ring-0 w-48"
             />
-          </div>
+          </div> */}
         </div>
       </div>
 

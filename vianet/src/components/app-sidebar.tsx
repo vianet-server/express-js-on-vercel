@@ -18,34 +18,34 @@ import {
 const items = [
   {
     title: "Home",
-    url: "/app/home",
+    url: "/app/stocks",
     icon: Home,
   },
-  {
-    title: "Stocks",
-    url: "/app/stocks",
-    icon: Package,
-  },
-  {
-    title: "Deals",
-    url: "/app/deals",
-    icon: Handshake,
-  },
-  {
-    title: "Inventory",
-    url: "/app/inventory",
-    icon: Boxes,
-  },
-  {
-    title: "Import Product",
-    url: "/app/import-product",
-    icon: FileUp,
-  },
-  {
-    title: "Setting",
-    url: "/app/setting",
-    icon: Settings,
-  },
+  // {
+  //   title: "Stocks",
+  //   url: "/app/stocks",
+  //   icon: Package,
+  // },
+  // {
+  //   title: "Deals",
+  //   url: "/app/deals",
+  //   icon: Handshake,
+  // },
+  // {
+  //   title: "Inventory",
+  //   url: "/app/inventory",
+  //   icon: Boxes,
+  // },
+  // {
+  //   title: "Import Product",
+  //   url: "/app/import-product",
+  //   icon: FileUp,
+  // },
+  // {
+  //   title: "Setting",
+  //   url: "/app/setting",
+  //   icon: Settings,
+  // },
 ]
 
 export function AppSidebar() {
@@ -62,7 +62,7 @@ export function AppSidebar() {
                 <Home className="size-4" />
               </div>
               <div className="flex flex-col gap-0.5 leading-none">
-                <span className="font-semibold">CMT</span>
+                <span className="font-semibold">vianet</span>
                 <span className="text-xs">Web</span>
               </div>
             </SidebarMenuButton>

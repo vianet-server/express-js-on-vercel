@@ -30,6 +30,7 @@ const dashboardRouter = require('./dashboard');
 const analyticsRouter = require('./analytics');
 const reportsRouter = require('./reports');
 const settingsRouter = require('./settings');
+const marketRouter = require('./market');
 
 const router = express.Router();
 
@@ -45,5 +46,6 @@ router.use('/dashboard', dashboardRouter);
 router.use('/analytics', analyticsRouter);
 router.use('/reports', reportsRouter);
 router.use('/settings', settingsRouter);
+router.use('/market', marketRouter);
 
 module.exports = router;
