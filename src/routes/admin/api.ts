@@ -175,8 +175,20 @@ router.post('/access-group', async (req, res) => {
 router.delete('/access-group/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await neonDb.query('DELETE FROM app.access_groups WHERE id = $1 RETURNING id', [id]);
-    if (result.rows.length === 0) return res.status(404).json({ message: 'Access group not found' });
+    const numericId = parseInt(id, 10);
+    if (isNaN(numericId)) {
+      return res.status(400).json({ message: 'Invalid access group id' });
+    }
+    try { await neonDb.query('DELETE FROM app.inventory_access_group WHERE accessgroupid = $1', [numericId]); } catch (e) {
+      console.warn('[api] cleanup inventory_access_group:', e.message);
+    }
+    try { await neonDb.query('UPDATE app.api SET access_group_id = NULL WHERE access_group_id = $1', [numericId]); } catch (e) {
+      console.warn('[api] cleanup api:', e.message);
+    }
+    try { await neonDb.query('DELETE FROM app.users WHERE access_group_id = $1', [numericId]); } catch (e) {
+      console.warn('[api] cleanup users:', e.message);
+    }
+    await neonDb.query('DELETE FROM app.access_groups WHERE id = $1', [numericId]);
     res.json({ message: 'Access group deleted' });
   } catch (err) {
     console.error('[api] DELETE /access-group error:', err);
