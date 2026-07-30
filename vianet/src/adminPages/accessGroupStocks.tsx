@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -15,6 +14,7 @@ interface StockItem {
   qty: number;
   price: number;
   gst: number;
+  hsn: string;
 }
 
 export function AccessGroupStocks() {
@@ -25,7 +25,7 @@ export function AccessGroupStocks() {
   const [groupInfo, setGroupInfo] = useState<{ id: number; name: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const [editing, setEditing] = useState<Record<number, { qty: number; price: number }>>({});
+  const [editing, setEditing] = useState<Record<number, { qty: number; price: number; gst: number; hsn: string }>>({});
   const [saving, setSaving] = useState<number | null>(null);
 
   const [addOpen, setAddOpen] = useState(false);
@@ -75,7 +75,7 @@ export function AccessGroupStocks() {
   }, [addOpen]);
 
   const startEdit = (item: StockItem) => {
-    setEditing(prev => ({ ...prev, [item.id]: { qty: Number(item.qty), price: Number(item.price) } }));
+    setEditing(prev => ({ ...prev, [item.id]: { qty: Number(item.qty), price: Number(item.price), gst: Number(item.gst) || 0, hsn: String(item.hsn || '') } }));
   };
 
   const cancelEdit = (id: number) => {
@@ -87,8 +87,8 @@ export function AccessGroupStocks() {
     if (!e) return;
     setSaving(item.id);
     try {
-      await api.put(`/api/admin/inventory/sku/${item.id}/access-group/${encodeURIComponent(decodedName)}`, { qty: e.qty, price: e.price });
-      setItems(prev => prev.map(i => i.id === item.id ? { ...i, qty: e.qty, price: e.price } : i));
+      await api.put(`/api/admin/inventory/sku/${item.id}/access-group/${encodeURIComponent(decodedName)}`, { qty: e.qty, price: e.price, gst: e.gst, hsn: e.hsn });
+      setItems(prev => prev.map(i => i.id === item.id ? { ...i, qty: e.qty, price: e.price, gst: e.gst, hsn: e.hsn } : i));
       cancelEdit(item.id);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to update');
@@ -211,65 +211,71 @@ export function AccessGroupStocks() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="border rounded-lg overflow-hidden">
+        <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-muted/50 text-xs font-semibold text-muted-foreground border-b">
+          <div className="col-span-3">Stock Name</div>
+          <div className="col-span-2">Brand / Model</div>
+          <div className="col-span-1 text-right">Qty</div>
+          <div className="col-span-2 text-right">Price</div>
+          <div className="col-span-1 text-right">GST</div>
+          <div className="col-span-1 text-right">HSN</div>
+          <div className="col-span-2 text-center"></div>
+        </div>
         {items.map((item) => {
           const isEditing = editing[item.id] != null;
           const edit = editing[item.id];
           return (
-            <Card key={item.id} className="hover:shadow-md transition-shadow relative">
-              <CardHeader className="pb-2 pr-8">
-                <CardTitle className="text-base leading-tight">{item.name}</CardTitle>
-                <div className="text-xs text-muted-foreground">
-                  {item.brand}{item.brand && item.model ? ' / ' : ''}{item.model}
-                </div>
-              </CardHeader>
-              <Button variant="ghost" size="icon" className="absolute top-2 right-2 size-6 text-muted-foreground hover:text-red-600" onClick={() => removeItem(item)}>
-                <Trash2 size={13} />
-              </Button>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-y-3 text-sm">
-                  <div className="text-muted-foreground self-center">Qty</div>
-                  <div className="text-right">
-                    {isEditing ? (
-                      <div className="flex items-center justify-end gap-1">
-                        <Button variant="outline" size="icon" className="size-6" onClick={() => setEditing(prev => ({ ...prev, [item.id]: { ...prev[item.id], qty: Math.max(0, edit.qty - 1) } }))}>-</Button>
-                        <Input type="number" className="w-16 h-7 text-xs text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" value={edit.qty} onChange={e => setEditing(prev => ({ ...prev, [item.id]: { ...prev[item.id], qty: Math.max(0, parseInt(e.target.value) || 0) } }))} />
-                        <Button variant="outline" size="icon" className="size-6" onClick={() => setEditing(prev => ({ ...prev, [item.id]: { ...prev[item.id], qty: edit.qty + 1 } }))}>+</Button>
-                      </div>
-                    ) : (
-                      <span className="font-semibold cursor-pointer hover:underline" onClick={() => startEdit(item)}>{Number(item.qty).toLocaleString()}</span>
-                    )}
+            <div key={item.id} className="grid grid-cols-12 gap-2 px-3 py-2.5 text-sm border-b last:border-0 items-center hover:bg-muted/30 transition-colors">
+              <div className="col-span-3 font-medium truncate cursor-pointer hover:underline" onClick={() => startEdit(item)}>{item.name}</div>
+              <div className="col-span-2 text-muted-foreground truncate">{item.brand}{item.brand && item.model ? ' / ' : ''}{item.model}</div>
+              <div className="col-span-1 text-right">
+                {isEditing ? (
+                  <div className="flex items-center justify-end gap-1">
+                    <Button variant="outline" size="icon" className="size-5" onClick={() => setEditing(prev => ({ ...prev, [item.id]: { ...prev[item.id], qty: Math.max(0, edit.qty - 1) } }))}>-</Button>
+                    <Input type="number" className="w-12 h-7 text-xs text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" value={edit.qty} onChange={e => setEditing(prev => ({ ...prev, [item.id]: { ...prev[item.id], qty: Math.max(0, parseInt(e.target.value) || 0) } }))} />
+                    <Button variant="outline" size="icon" className="size-5" onClick={() => setEditing(prev => ({ ...prev, [item.id]: { ...prev[item.id], qty: edit.qty + 1 } }))}>+</Button>
                   </div>
-                  <div className="text-muted-foreground self-center">Price</div>
-                  <div className="text-right">
-                    {isEditing ? (
-                      <div className="flex items-center justify-end gap-1">
-                        <Button variant="outline" size="icon" className="size-6" onClick={() => setEditing(prev => ({ ...prev, [item.id]: { ...prev[item.id], price: Math.max(0, edit.price - 1) } }))}>-</Button>
-                        <Input type="number" className="w-20 h-7 text-xs text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" value={edit.price} onChange={e => setEditing(prev => ({ ...prev, [item.id]: { ...prev[item.id], price: Math.max(0, parseFloat(e.target.value) || 0) } }))} />
-                        <Button variant="outline" size="icon" className="size-6" onClick={() => setEditing(prev => ({ ...prev, [item.id]: { ...prev[item.id], price: edit.price + 1 } }))}>+</Button>
-                      </div>
-                    ) : (
-                      <span className="font-semibold cursor-pointer hover:underline" onClick={() => startEdit(item)}>{Number(item.price).toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</span>
-                    )}
-                  </div>
-                  {item.gst != null && (
-                    <>
-                      <div className="text-muted-foreground">GST</div>
-                      <div className="text-right">{item.gst}%</div>
-                    </>
-                  )}
-
-                </div>
-                {isEditing && (
-                  <div className="flex justify-end gap-2 mt-3 pt-3 border-t">
-                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => cancelEdit(item.id)}>Cancel</Button>
-                    <Button size="sm" className="h-7 text-xs" onClick={() => saveItem(item)} disabled={saving === item.id}>
-                      {saving === item.id ? <Loader2 className="animate-spin size-3" /> : <Save size={12} />} Save
-                    </Button>
-                  </div>
+                ) : (
+                  <span className="font-semibold cursor-pointer hover:underline" onClick={() => startEdit(item)}>{Number(item.qty).toLocaleString()}</span>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+              <div className="col-span-2 text-right">
+                {isEditing ? (
+                  <div className="flex items-center justify-end gap-1">
+                    <Button variant="outline" size="icon" className="size-5" onClick={() => setEditing(prev => ({ ...prev, [item.id]: { ...prev[item.id], price: Math.max(0, edit.price - 1) } }))}>-</Button>
+                    <Input type="number" className="w-16 h-7 text-xs text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" value={edit.price} onChange={e => setEditing(prev => ({ ...prev, [item.id]: { ...prev[item.id], price: Math.max(0, parseFloat(e.target.value) || 0) } }))} />
+                    <Button variant="outline" size="icon" className="size-5" onClick={() => setEditing(prev => ({ ...prev, [item.id]: { ...prev[item.id], price: edit.price + 1 } }))}>+</Button>
+                  </div>
+                ) : (
+                  <span className="font-semibold cursor-pointer hover:underline" onClick={() => startEdit(item)}>{Number(item.price).toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</span>
+                )}
+              </div>
+              <div className="col-span-1 text-right">
+                {isEditing ? (
+                  <Input type="number" className="w-14 h-7 text-xs text-right" value={edit.gst} onChange={e => setEditing(prev => ({ ...prev, [item.id]: { ...prev[item.id], gst: parseFloat(e.target.value) || 0 } }))} />
+                ) : (
+                  <span className="cursor-pointer hover:underline text-muted-foreground" onClick={() => startEdit(item)}>{item.gst != null ? `${item.gst}%` : '-'}</span>
+                )}
+              </div>
+              <div className="col-span-1 text-right">
+                {isEditing ? (
+                  <Input type="text" className="w-16 h-7 text-xs" value={edit.hsn} onChange={e => setEditing(prev => ({ ...prev, [item.id]: { ...prev[item.id], hsn: e.target.value } }))} />
+                ) : (
+                  <span className="cursor-pointer hover:underline text-muted-foreground" onClick={() => startEdit(item)}>{item.hsn || '-'}</span>
+                )}
+              </div>
+              <div className="col-span-2 flex items-center justify-center gap-1">
+                <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-red-600" onClick={() => removeItem(item)} title="Remove"><Trash2 size={13} /></Button>
+                {isEditing && (
+                  <>
+                    <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-foreground" onClick={() => cancelEdit(item.id)} title="Cancel">X</Button>
+                    <Button size="icon" className="size-7" onClick={() => saveItem(item)} disabled={saving === item.id} title="Save">
+                      {saving === item.id ? <Loader2 className="animate-spin size-3" /> : <Save size={12} />}
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
           );
         })}
       </div>

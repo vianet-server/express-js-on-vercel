@@ -30,7 +30,7 @@ export function AppLogin() {
       if (!res.ok) throw new Error(data.message || data.error || 'Login failed');
       login(data.token, { username: data.email || email, role: data.user_type || 'user' });
       const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname;
-      navigate(from && from.startsWith('/app') ? from : '/app/home', { replace: true });
+      navigate(from && from.startsWith('/app') ? from : '/app/stocks', { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {

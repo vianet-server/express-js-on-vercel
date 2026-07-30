@@ -185,7 +185,7 @@ router.delete('/access-group/:id', async (req, res) => {
     try { await neonDb.query('UPDATE app.api SET access_group_id = NULL WHERE access_group_id = $1', [numericId]); } catch (e) {
       console.warn('[api] cleanup api:', e.message);
     }
-    try { await neonDb.query('DELETE FROM app.users WHERE access_group_id = $1', [numericId]); } catch (e) {
+    try { await neonDb.query('UPDATE app.users SET access_group_id = NULL WHERE access_group_id = $1', [numericId]); } catch (e) {
       console.warn('[api] cleanup users:', e.message);
     }
     await neonDb.query('DELETE FROM app.access_groups WHERE id = $1', [numericId]);

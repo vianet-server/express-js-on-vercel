@@ -128,7 +128,7 @@ export function AppStocks() {
                     <th className="pb-3 font-medium text-right">GST</th>
                     <th className="pb-3 font-medium text-right">SGST</th>
                     <th className="pb-3 font-medium text-right">CGST</th>
-                    <th className="pb-3 font-medium text-right">Price</th>
+                    <th className="pb-3 font-medium text-right">Price of</th>
                     <th className="pb-3 font-medium text-right">Quantity</th>
                   </tr>
                 </thead>
@@ -143,9 +143,9 @@ export function AppStocks() {
                       <td className="py-3 text-right">{i.gst || 0}%</td>
                       <td className="py-3 text-right">{i.sgst || 0}%</td>
                       <td className="py-3 text-right">{i.cgst || 0}%</td>
-                      <td className="py-3 text-right">₹{i.price.toLocaleString()}</td>
+                      <td className="py-3 text-right">₹{i.price > 0 ? i.price.toLocaleString() : '0'}</td>
                       <td className="py-3 text-right">
-                        {i.quantity === 0 ? (
+                        {i.quantity <= 0 ? (
                           <Badge variant="destructive">0</Badge>
                         ) : (
                           <span className="font-medium">{i.quantity}</span>

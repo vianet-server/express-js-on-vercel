@@ -320,13 +320,13 @@ router.post('/inventory/sku/:sku/access-group/:group', async (req, res) => {
 
     if (existing.rows.length > 0) {
       await neonDb.query(
-        'UPDATE app.inventory_access_group SET quantity = $1, oprice = $2 WHERE inventoryid = $3 AND accessgroupid = $4',
+        'UPDATE app.inventory_access_group SET quantity = GREATEST(0, $1), oprice = $2 WHERE inventoryid = $3 AND accessgroupid = $4',
         [qty ?? 0, price ?? 0, stockId, groupId]
       );
       res.json({ message: 'Stock access updated' });
     } else {
       await neonDb.query(
-        'INSERT INTO app.inventory_access_group (inventoryid, accessgroupid, quantity, oprice) VALUES ($1, $2, $3, $4)',
+        'INSERT INTO app.inventory_access_group (inventoryid, accessgroupid, quantity, oprice) VALUES ($1, $2, GREATEST(0, $3), $4)',
         [stockId, groupId, qty ?? 0, price ?? 0]
       );
       res.status(201).json({ message: 'Stock assigned to access group' });
@@ -337,11 +337,11 @@ router.post('/inventory/sku/:sku/access-group/:group', async (req, res) => {
   }
 });
 
-// PUT /inventory/sku/:sku/access-group/:group — Update stock access qty/price
+// PUT /inventory/sku/:sku/access-group/:group — Update stock access qty/price/gst/hsn
 router.put('/inventory/sku/:sku/access-group/:group', async (req, res) => {
   try {
     const { sku, group } = req.params;
-    const { qty, price } = req.body;
+    const { qty, price, gst, hsn } = req.body;
 
     const stock = await neonDb.query('SELECT id FROM app.stock WHERE id = $1', [isNaN(Number(sku)) ? sku : Number(sku)]);
     if (stock.rows.length === 0) return res.status(404).json({ message: 'Stock item not found' });
@@ -352,10 +352,18 @@ router.put('/inventory/sku/:sku/access-group/:group', async (req, res) => {
     const groupId = groupRow.rows[0].id;
 
     const result = await neonDb.query(
-      'UPDATE app.inventory_access_group SET quantity = $1, oprice = $2 WHERE inventoryid = $3 AND accessgroupid = $4 RETURNING *',
+      'UPDATE app.inventory_access_group SET quantity = GREATEST(0, $1), oprice = $2 WHERE inventoryid = $3 AND accessgroupid = $4 RETURNING *',
       [qty ?? 0, price ?? 0, stockId, groupId]
     );
     if (result.rows.length === 0) return res.status(404).json({ message: 'Mapping not found' });
+
+    if (gst !== undefined || hsn !== undefined) {
+      await neonDb.query(
+        'UPDATE app.inventory SET gst = COALESCE($1, gst), hsn = COALESCE($2, hsn) WHERE id = $3',
+        [gst, hsn, stockId]
+      );
+    }
+
     res.json({ message: 'Stock access updated' });
   } catch (err) {
     console.error('[stockitem] PUT access-group error:', err);
@@ -407,7 +415,8 @@ router.get('/inventory/access-group/:name', async (req, res) => {
         COALESCE(inv.model, '') AS model,
         COALESCE(inv.quantity, 0) + COALESCE(inv.vquantity, 0) + COALESCE(iag.quantity, 0) AS qty,
         iag.oprice AS price,
-        inv.gst
+        inv.gst,
+        COALESCE(inv.hsn, '') AS hsn
       FROM app.stock s
       JOIN app.inventory_access_group iag ON iag.inventoryid = s.id
       LEFT JOIN app.inventory inv ON inv.id = iag.inventoryid
