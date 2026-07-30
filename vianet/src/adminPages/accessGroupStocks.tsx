@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Download, Loader2, Plus, Trash2, Save, Search } from 'lucide-react';
+import { ArrowLeft, Download, Loader2, Plus, Trash2, Save, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { api } from '@/lib/api';
 
 interface StockItem {
@@ -30,11 +30,21 @@ export function AccessGroupStocks() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [submittedQuery, setSubmittedQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
   const [adding, setAdding] = useState<number | null>(null);
   const [newPrice, setNewPrice] = useState('');
   const [newQty, setNewQty] = useState('');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 5;
+  const filtered = useMemo(() => {
+    if (!submittedQuery) return searchResults;
+    const q = submittedQuery.toLowerCase();
+    return searchResults.filter((r: any) => r.name?.toLowerCase().includes(q) || r.brand?.toLowerCase().includes(q));
+  }, [searchResults, submittedQuery]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const fetchItems = useCallback(() => {
     if (!decodedName) return;
@@ -55,10 +65,12 @@ export function AccessGroupStocks() {
   useEffect(() => {
     if (!addOpen) {
       setSearchQuery('');
+      setSubmittedQuery('');
       setSearchResults([]);
       setNewPrice('');
       setNewQty('');
       setAdding(null);
+      setPage(1);
     }
   }, [addOpen]);
 
@@ -96,7 +108,8 @@ export function AccessGroupStocks() {
   };
 
   const searchStocks = async (q: string) => {
-    setSearchQuery(q);
+    setSubmittedQuery(q);
+    setPage(1);
     if (!q.trim()) { setSearchResults([]); return; }
     setSearching(true);
     try {
@@ -106,6 +119,12 @@ export function AccessGroupStocks() {
       setSearchResults([]);
     } finally {
       setSearching(false);
+    }
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      searchStocks(searchQuery);
     }
   };
 
@@ -260,22 +279,22 @@ export function AccessGroupStocks() {
       )}
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent style={{ maxWidth: '70vw' }}>
           <DialogHeader>
             <DialogTitle>Add Stock to {decodedName}</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-4">
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input className="pl-9" placeholder="Search stock by name..." value={searchQuery} onChange={e => searchStocks(e.target.value)} autoFocus />
+              <Input className="pl-9" placeholder="Search stock by name, brand... (Enter to search)" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyDown={handleSearchKeyDown} autoFocus />
             </div>
             {searching && <div className="text-sm text-muted-foreground text-center py-2"><Loader2 className="animate-spin inline size-4 mr-1" />Searching...</div>}
-            {!searching && searchQuery && searchResults.length === 0 && (
+            {!searching && submittedQuery && filtered.length === 0 && (
               <div className="text-sm text-muted-foreground text-center py-4">No stocks found.</div>
             )}
-            {searchResults.map((stock) => (
-              <div key={stock.id} className="flex items-center gap-3 border rounded-lg p-3">
-                <div className="flex-1 min-w-0">
+            {paged.map((stock) => (
+              <div key={stock.id} className="flex flex-wrap items-center gap-2 border rounded-lg p-3">
+                <div className="flex-1 min-w-0 basis-full sm:basis-0">
                   <div className="text-sm font-medium truncate">{stock.name}</div>
                   {stock.brand && <div className="text-xs text-muted-foreground">{stock.brand}{stock.model ? ` / ${stock.model}` : ''}</div>}
                 </div>
@@ -286,6 +305,16 @@ export function AccessGroupStocks() {
                 </Button>
               </div>
             ))}
+            {filtered.length > PAGE_SIZE && (
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{filtered.length} result{filtered.length !== 1 ? 's' : ''}</span>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" className="h-7 w-7 p-0" disabled={page <= 1} onClick={() => setPage(p => p - 1)}><ChevronLeft size={14} /></Button>
+                  <span className="tabular-nums">{page}/{totalPages}</span>
+                  <Button size="sm" variant="outline" className="h-7 w-7 p-0" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}><ChevronRight size={14} /></Button>
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddOpen(false)}>Close</Button>

@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ShieldCheck, Package, Plus, Edit3, Trash2 } from 'lucide-react';
+import { ShieldCheck, Package, Plus, Edit3, Trash2, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface StockAccessItem {
   sku: string;
@@ -21,13 +21,40 @@ interface StockAccessListProps {
   onRemove: (sku: string) => void;
 }
 
+const PAGE_SIZE = 5;
+
 export function AccessGroupStockList({ stocks = [], groupName, onEdit, onAdd, onRemove }: StockAccessListProps) {
   const [editTarget, setEditTarget] = useState<{ sku: string; qty: number; price: number } | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [addTarget, setAddTarget] = useState<{ sku: string; qty: string; price: string } | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [submittedQuery, setSubmittedQuery] = useState('');
+  const [page, setPage] = useState(1);
 
   const allowed = stocks.filter(s => s.qty > 0);
   const blocked = stocks.filter(s => s.qty === 0);
+  const filtered = useMemo(() => {
+    if (!submittedQuery) return blocked;
+    const q = submittedQuery.toLowerCase();
+    return blocked.filter(s => s.name.toLowerCase().includes(q) || s.sku.toLowerCase().includes(q) || s.brand.toLowerCase().includes(q));
+  }, [blocked, submittedQuery]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const openAdd = () => {
+    setAddOpen(true);
+    setSearchQuery('');
+    setSubmittedQuery('');
+    setPage(1);
+    setAddTarget(null);
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      setSubmittedQuery(searchQuery);
+      setPage(1);
+    }
+  };
 
   const openEdit = (s: StockAccessItem) => setEditTarget({ sku: s.sku, qty: s.qty, price: s.price });
   const saveEdit = () => {
@@ -43,7 +70,7 @@ export function AccessGroupStockList({ stocks = [], groupName, onEdit, onAdd, on
       <div className="flex flex-col items-center gap-4 py-8 text-muted-foreground">
         <Package size={40} />
         <span className="text-sm">No stocks accessible to this group yet.</span>
-        <Button size="default" onClick={() => setAddOpen(true)}><Plus size={16} /> Add Access</Button>
+        <Button size="default" onClick={openAdd}><Plus size={16} /> Add Access</Button>
       </div>
     );
   }
@@ -52,7 +79,7 @@ export function AccessGroupStockList({ stocks = [], groupName, onEdit, onAdd, on
     <>
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm text-muted-foreground">{allowed.length} stock{allowed.length > 1 ? 's' : ''} accessible</p>
-        <Button size="default" onClick={() => setAddOpen(true)}><Plus size={16} /> Add</Button>
+        <Button size="default" onClick={openAdd}><Plus size={16} /> Add</Button>
       </div>
       <div className="border rounded-lg overflow-hidden">
         <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-muted/50 text-xs font-semibold text-muted-foreground border-b">
@@ -84,7 +111,7 @@ export function AccessGroupStockList({ stocks = [], groupName, onEdit, onAdd, on
       </div>
 
       <Dialog open={!!editTarget} onOpenChange={o => !o && setEditTarget(null)}>
-        <DialogContent>
+        <DialogContent style={{ maxWidth: '70vw' }}>
           <DialogHeader><DialogTitle>Edit Access — {editTarget?.sku}</DialogTitle></DialogHeader>
           <div className="flex flex-col gap-3 py-2">
             <div className="grid grid-cols-2 gap-3">
@@ -106,8 +133,8 @@ export function AccessGroupStockList({ stocks = [], groupName, onEdit, onAdd, on
         </DialogContent>
       </Dialog>
 
-      <Dialog open={addOpen} onOpenChange={o => { setAddOpen(o); if (!o) setAddTarget(null); }}>
-        <DialogContent>
+      <Dialog open={addOpen} onOpenChange={o => { setAddOpen(o); if (!o) { setAddTarget(null); setSearchQuery(''); setSubmittedQuery(''); setPage(1); } }}>
+        <DialogContent style={{ maxWidth: '70vw' }}>
           <DialogHeader><DialogTitle>Add Access — {groupName}</DialogTitle></DialogHeader>
           {blocked.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-6 text-muted-foreground">
@@ -115,36 +142,63 @@ export function AccessGroupStockList({ stocks = [], groupName, onEdit, onAdd, on
               <span className="text-sm">All stocks already have access to this group.</span>
             </div>
           ) : (
-            <>
-              <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto">
-                {blocked.map(s => (
-                  <label key={s.sku} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-all ${addTarget?.sku === s.sku ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 ring-1 ring-blue-400' : 'border-muted hover:bg-muted'}`} onClick={() => setAddTarget({ sku: s.sku, qty: '1', price: String(s.price || 0) })}>
-                    <input type="radio" name="add-stock" checked={addTarget?.sku === s.sku} onChange={() => {}} className="accent-blue-600" />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">{s.name}</div>
-                      <div className="text-xs text-muted-foreground">{s.sku} — {s.brand} — ₹{s.price.toLocaleString()}</div>
-                    </div>
-                  </label>
-                ))}
+            <div className="flex flex-col gap-3">
+              <div className="relative">
+                <Search size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search by name, SKU or brand... (Enter to search)"
+                  value={searchQuery}
+                  onChange={e => { setSearchQuery(e.target.value); }}
+                  onKeyDown={handleSearchKeyDown}
+                  className="pl-8 text-sm"
+                />
               </div>
-              {addTarget && (
-                <div className="grid grid-cols-2 gap-3 border-t pt-3">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-medium text-muted-foreground">Quantity</label>
-                    <Input type="number" value={addTarget.qty} onChange={e => setAddTarget(p => p ? { ...p, qty: e.target.value } : p)} className="text-sm" />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-medium text-muted-foreground">Price (₹)</label>
-                    <Input type="number" value={addTarget.price} onChange={e => setAddTarget(p => p ? { ...p, price: e.target.value } : p)} className="text-sm" />
-                  </div>
+              {filtered.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-6 text-muted-foreground">
+                  <Search size={24} />
+                  <span className="text-sm">No stocks match your search.</span>
                 </div>
+              ) : (
+                <>
+                  <div className="flex flex-col gap-1.5 max-h-60 overflow-y-auto">
+                    {paged.map(s => (
+                      <label key={s.sku} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-all ${addTarget?.sku === s.sku ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 ring-1 ring-blue-400' : 'border-muted hover:bg-muted'}`} onClick={() => setAddTarget({ sku: s.sku, qty: '1', price: String(s.price || 0) })}>
+                        <input type="radio" name="add-stock" checked={addTarget?.sku === s.sku} onChange={() => {}} className="accent-blue-600" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{s.name}</div>
+                          <div className="text-xs text-muted-foreground">{s.sku} — {s.brand} — ₹{s.price.toLocaleString()}</div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>{filtered.length} result{filtered.length !== 1 ? 's' : ''}</span>
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" variant="outline" className="h-7 w-7 p-0" disabled={page <= 1} onClick={() => setPage(p => p - 1)}><ChevronLeft size={14} /></Button>
+                      <span className="tabular-nums">{page}/{totalPages}</span>
+                      <Button size="sm" variant="outline" className="h-7 w-7 p-0" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}><ChevronRight size={14} /></Button>
+                    </div>
+                  </div>
+                  {addTarget && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t pt-3">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-medium text-muted-foreground">Quantity</label>
+                        <Input type="number" value={addTarget.qty} onChange={e => setAddTarget(p => p ? { ...p, qty: e.target.value } : p)} className="text-sm" />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-medium text-muted-foreground">Price (₹)</label>
+                        <Input type="number" value={addTarget.price} onChange={e => setAddTarget(p => p ? { ...p, price: e.target.value } : p)} className="text-sm" />
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
-            </>
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => { setAddOpen(false); setAddTarget(null); setSearchQuery(''); setSubmittedQuery(''); setPage(1); }}>Cancel</Button>
+                <Button onClick={saveAdd} disabled={!addTarget} className="gap-1.5"><Plus size={14} /> Add</Button>
+              </DialogFooter>
+            </div>
           )}
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => { setAddOpen(false); setAddTarget(null); }}>Cancel</Button>
-            <Button onClick={saveAdd} disabled={!addTarget} className="gap-1.5"><Plus size={14} /> Add</Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
