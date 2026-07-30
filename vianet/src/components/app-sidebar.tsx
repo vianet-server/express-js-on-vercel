@@ -1,4 +1,4 @@
-import { Home, Package, Handshake, Boxes, Settings, FileUp, LogOut } from "lucide-react"
+import { Home, LogOut } from "lucide-react"
 import { Link, useLocation } from "react-router-dom"
 import { useAuth } from "@/contexts/AuthContext"
 

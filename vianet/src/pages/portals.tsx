@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useCallback } from 'react'
-import { Search, Loader2, Package, Handshake, Boxes, Settings, AlertCircle, Download } from 'lucide-react'
+import { Loader2, Package, Handshake, Boxes, Settings, AlertCircle, Download } from 'lucide-react'
 import * as XLSX from 'xlsx'
-import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -28,8 +27,6 @@ export function AppStocks() {
   const [items, setItems] = useState<StockItem[]>([])
   const [loading, setLoading] = useState(true)
   const [noAccess, setNoAccess] = useState(false)
-  const [search, setSearch] = useState('')
-
   useEffect(() => {
     let active = true
     api.get<{ data: StockItem[]; noAccess?: boolean; message?: string }>('/api/stock/stock-item')
@@ -49,14 +46,8 @@ export function AppStocks() {
   }, [])
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    if (!q) return items
-    return items.filter(i =>
-      i.name.toLowerCase().includes(q) ||
-      i.sku.toLowerCase().includes(q) ||
-      i.description?.toLowerCase().includes(q)
-    )
-  }, [items, search])
+    return items
+  }, [items])
 
   const totalValue = useMemo(() =>
     items.reduce((s, i) => s + i.quantity * i.price, 0), [items])
