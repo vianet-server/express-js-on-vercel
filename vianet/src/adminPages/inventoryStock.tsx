@@ -8,12 +8,11 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Edit3, ExternalLink, Check, X, Loader2, ChevronDown } from 'lucide-react';
+import { Search, Edit3, ExternalLink, Check, X, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { appendStockItems, updateStockItem, resetStockPagination } from '@/store/slices/inventorySlice';
+import { setStockItems, updateStockItem } from '@/store/slices/inventorySlice';
 
 interface StockItem {
   id: number; name: string; brand: string; model: string; variant: string; color: string;
@@ -39,11 +38,11 @@ export function InventoryStock() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const items = useAppSelector((state) => state.inventory?.stockItems ?? []);
-  const pagination = useAppSelector((state) => state.inventory?.stockPagination ?? { offset: 0, limit: 50, total: 0 });
+  const pagination = useAppSelector((state) => state.inventory?.stockPagination ?? { offset: 0, limit: 10, total: 0 });
   const [search, setSearch] = useState('')
-  const [initialLoading, setInitialLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [pageLimit, setPageLimit] = useState(LIMIT_OPTIONS[2])
+  const [loading, setLoading] = useState(true)
+  const [pageLimit, setPageLimit] = useState(10)
+  const [currentPage, setCurrentPage] = useState(0)
   const [editAll, setEditAll] = useState<StockItem | null>(null);
   const [editForm, setEditForm] = useState<StockItem | null>(null);
 
@@ -55,36 +54,38 @@ export function InventoryStock() {
   }
 
   const didInit = useRef(false);
+  const totalPages = Math.max(1, Math.ceil(pagination.total / pageLimit));
 
-  const fetchPage = useCallback(async (offset: number, limit = pageLimit) => {
-    setLoadingMore(true)
+  const fetchPage = useCallback(async (page: number, limit = pageLimit) => {
+    setLoading(true)
     try {
+      const offset = page * limit
       const res = await api.get<StockPageResponse>(`/api/admin/inventory/stock?limit=${limit}&offset=${offset}`)
-      dispatch(appendStockItems({ items: res.rows, total: res.total, offset }))
+      dispatch(setStockItems(res.rows))
       return res
     } finally {
-      setLoadingMore(false)
+      setLoading(false)
     }
   }, [dispatch, pageLimit])
 
   useEffect(() => {
-    dispatch(resetStockPagination())
-    fetchPage(0).finally(() => setInitialLoading(false))
+    dispatch(setStockItems([]))
+    setCurrentPage(0)
     didInit.current = true
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageLimit, fetchPage])
+  }, [pageLimit, dispatch])
 
-  const handleLoadMore = useCallback(async () => {
-    setLoadingMore(true)
-    try {
-      await fetchPage(pagination.offset + pageLimit)
-    } finally {
-      setLoadingMore(false)
+  useEffect(() => {
+    if (didInit.current) {
+      fetchPage(currentPage)
     }
-  }, [fetchPage, pagination.offset, pageLimit])
+  }, [currentPage, pageLimit, fetchPage])
 
   const handleLimitChange = (value: string | null) => {
     if (value !== null) setPageLimit(Number(value));
+  };
+
+  const goToPage = (page: number) => {
+    if (page >= 0 && page < totalPages) setCurrentPage(page)
   };
 
   const filtered = items.filter(p =>
@@ -92,8 +93,6 @@ export function InventoryStock() {
     (p.brand ?? '').toLowerCase().includes(search.toLowerCase()) ||
     (p.model ?? '').toLowerCase().includes(search.toLowerCase())
   )
-
-  const hasMore = items.length < pagination.total
 
   const openEditAll = (item: StockItem) => {
     setEditAll(item);
@@ -107,7 +106,20 @@ export function InventoryStock() {
     setEditForm(null);
   };
 
-  if (initialLoading) {
+  const getPageNumbers = () => {
+    const pages: (number | string)[] = []
+    const range = 2
+    const start = Math.max(0, currentPage - range)
+    const end = Math.min(totalPages - 1, currentPage + range)
+    if (start > 0) pages.push(0)
+    if (start > 1) pages.push('...')
+    for (let i = start; i <= end; i++) pages.push(i)
+    if (end < totalPages - 2) pages.push('...')
+    if (end < totalPages - 1) pages.push(totalPages - 1)
+    return pages
+  }
+
+  if (loading && items.length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="animate-spin size-8 text-muted-foreground" />
@@ -127,7 +139,7 @@ export function InventoryStock() {
 
       <div className="flex items-center justify-between">
         <div className="text-sm text-muted-foreground">
-          {!initialLoading && `${Math.min(items.length, pagination.total)} of ${pagination.total} items loaded`}
+          Page {currentPage + 1} of {totalPages} ({pagination.total} total items)
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">Per page</span>
@@ -144,25 +156,6 @@ export function InventoryStock() {
         </div>
       </div>
 
-      {!initialLoading && (loadingMore || pagination.total > 0) && (
-        <div className="flex items-center gap-3">
-          <Progress value={Math.min(100, Math.round((items.length / Math.max(1, pagination.total)) * 100))} className="flex-1" />
-          <span className="text-xs font-medium tabular-nums w-10 text-right">
-            {Math.min(100, Math.round((items.length / Math.max(1, pagination.total)) * 100))}%
-          </span>
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {Math.min(items.length, pagination.total)} / {pagination.total}
-          </span>
-        </div>
-      )}
-
-      {loadingMore && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="animate-spin size-3" />
-          Loading more stocks...
-        </div>
-      )}
-
       <Tabs defaultValue="overview" orientation="vertical" className="flex gap-6">
         <TabsList className="h-fit min-w-36">
           <TabsTrigger value="overview" className="justify-start px-3 py-2 w-full">Overview</TabsTrigger>
@@ -172,11 +165,16 @@ export function InventoryStock() {
         <div className="flex-1 min-w-0">
           <TabsContent value="overview">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
-              <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Total Products</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{items.length}</div></CardContent></Card>
+              <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Total Products</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{pagination.total}</div></CardContent></Card>
               <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Total Stock</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{items.reduce((s, p) => s + p.qty, 0).toLocaleString()}</div></CardContent></Card>
               <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Low Stock Items</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-amber-600">{items.filter(p => p.qty <= p.min).length}</div></CardContent></Card>
               <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Stock Value</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">₹{items.reduce((s, p) => s + p.qty * (p.price ?? 0), 0).toLocaleString()}</div></CardContent></Card>
             </div>
+            {loading && (
+              <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
+                <Loader2 className="animate-spin size-4 mr-2" /> Loading...
+              </div>
+            )}
             <Card className="mt-4">
               <CardHeader><CardTitle>Stock Levels</CardTitle></CardHeader>
               <CardContent>
@@ -210,14 +208,6 @@ export function InventoryStock() {
                     ))}
                   </tbody>
                 </table>
-                {hasMore && (
-                  <div className="flex justify-center mt-4">
-                    <Button variant="outline" size="sm" onClick={handleLoadMore} disabled={loadingMore} className="gap-2">
-                      {loadingMore ? <Loader2 size={14} className="animate-spin" /> : <ChevronDown size={14} />}
-                      {loadingMore ? 'Loading...' : `Load More (${pagination.offset + pageLimit} / ${pagination.total})`}
-                    </Button>
-                  </div>
-                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -228,6 +218,11 @@ export function InventoryStock() {
                 <CardTitle>Detailed Stock View</CardTitle>
               </CardHeader>
               <CardContent className="overflow-x-auto">
+                {loading && (
+                  <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
+                    <Loader2 className="animate-spin size-4 mr-2" /> Loading...
+                  </div>
+                )}
                 <table className="w-full text-sm min-w-[1000px]">
                   <thead>
                     <tr className="border-b text-left text-muted-foreground">
@@ -268,24 +263,34 @@ export function InventoryStock() {
                     ))}
                   </tbody>
                 </table>
-                {hasMore && (
-                  <div className="flex justify-center mt-4">
-                    <Button variant="outline" size="sm" onClick={handleLoadMore} disabled={loadingMore} className="gap-2">
-                      {loadingMore ? <Loader2 size={14} className="animate-spin" /> : <ChevronDown size={14} />}
-                      {loadingMore ? 'Loading...' : `Load More (${pagination.offset + pageLimit} / ${pagination.total})`}
-                    </Button>
-                  </div>
-                )}
               </CardContent>
             </Card>
           </TabsContent>
+
+          <div className="flex items-center justify-center gap-1 pt-4 overflow-x-auto">
+            <Button variant="outline" size="icon" className="size-8" disabled={currentPage === 0} onClick={() => goToPage(currentPage - 1)}>
+              <ChevronLeft size={14} />
+            </Button>
+            {getPageNumbers().map((p, i) =>
+              typeof p === 'string' ? (
+                <span key={`e-${i}`} className="text-xs text-muted-foreground px-1">...</span>
+              ) : (
+                <Button key={p} variant={p === currentPage ? 'default' : 'outline'} size="icon" className="size-8 text-xs" onClick={() => goToPage(p)}>
+                  {p + 1}
+                </Button>
+              )
+            )}
+            <Button variant="outline" size="icon" className="size-8" disabled={currentPage >= totalPages - 1} onClick={() => goToPage(currentPage + 1)}>
+              <ChevronRight size={14} />
+            </Button>
+          </div>
         </div>
       </Tabs>
 
       <Dialog open={!!editAll} onOpenChange={(open) => { if (!open) { setEditAll(null); setEditForm(null); } }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Edit All — {editAll?.name}</DialogTitle></DialogHeader>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-2 max-h-96 overflow-y-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-2">
             {editFields.map(f => (
               <div key={f.key} className="flex flex-col gap-1">
                 <label className="text-xs font-medium text-muted-foreground">{f.label}</label>

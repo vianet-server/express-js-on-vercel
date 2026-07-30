@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Download, Loader2, Plus, Trash2, Save, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Download, Loader2, Plus, Trash2, Save, Search } from 'lucide-react';
 import { api } from '@/lib/api';
 
 interface StockItem {
@@ -35,15 +35,11 @@ export function AccessGroupStocks() {
   const [adding, setAdding] = useState<number | null>(null);
   const [newPrice, setNewPrice] = useState('');
   const [newQty, setNewQty] = useState('');
-  const [page, setPage] = useState(1);
-  const PAGE_SIZE = 5;
   const filtered = useMemo(() => {
     if (!submittedQuery) return searchResults;
     const q = submittedQuery.toLowerCase();
     return searchResults.filter((r: any) => r.name?.toLowerCase().includes(q) || r.brand?.toLowerCase().includes(q));
   }, [searchResults, submittedQuery]);
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const fetchItems = useCallback(() => {
     if (!decodedName) return;
@@ -69,7 +65,6 @@ export function AccessGroupStocks() {
       setNewPrice('');
       setNewQty('');
       setAdding(null);
-      setPage(1);
     }
   }, [addOpen]);
 
@@ -108,13 +103,13 @@ export function AccessGroupStocks() {
 
   const searchStocks = async (q: string) => {
     setSubmittedQuery(q);
-    setPage(1);
     if (!q.trim()) { setSearchResults([]); return; }
     setSearching(true);
     try {
-      const res = await api.get<any>(`/api/admin/inventory/stock?search=${encodeURIComponent(q)}&limit=20`);
+      const res = await api.get<any>(`/api/admin/inventory/stock?search=${encodeURIComponent(q)}&limit=500`);
       setSearchResults((res.rows || []).filter((r: any) => !items.find(i => i.id === r.id)));
-    } catch {
+    } catch (err) {
+      console.error('[add-stock search]', err);
       setSearchResults([]);
     } finally {
       setSearching(false);
@@ -276,7 +271,7 @@ export function AccessGroupStocks() {
       )}
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent style={{ maxWidth: '70vw' }}>
+        <DialogContent style={{ maxWidth: '70vw' }} className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Stock to {decodedName}</DialogTitle>
           </DialogHeader>
@@ -289,7 +284,10 @@ export function AccessGroupStocks() {
             {!searching && submittedQuery && filtered.length === 0 && (
               <div className="text-sm text-muted-foreground text-center py-4">No stocks found.</div>
             )}
-            {paged.map((stock) => (
+            {filtered.length > 0 && (
+              <div className="text-xs text-muted-foreground mb-1">{filtered.length} result{filtered.length !== 1 ? 's' : ''}</div>
+            )}
+            {filtered.map((stock) => (
               <div key={stock.id} className="flex flex-wrap items-center gap-2 border rounded-lg p-3">
                 <div className="flex-1 min-w-0 basis-full sm:basis-0">
                   <div className="text-sm font-medium truncate">{stock.name}</div>
@@ -302,16 +300,6 @@ export function AccessGroupStocks() {
                 </Button>
               </div>
             ))}
-            {filtered.length > PAGE_SIZE && (
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>{filtered.length} result{filtered.length !== 1 ? 's' : ''}</span>
-                <div className="flex items-center gap-2">
-                  <Button size="sm" variant="outline" className="h-7 w-7 p-0" disabled={page <= 1} onClick={() => setPage(p => p - 1)}><ChevronLeft size={14} /></Button>
-                  <span className="tabular-nums">{page}/{totalPages}</span>
-                  <Button size="sm" variant="outline" className="h-7 w-7 p-0" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}><ChevronRight size={14} /></Button>
-                </div>
-              </div>
-            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddOpen(false)}>Close</Button>

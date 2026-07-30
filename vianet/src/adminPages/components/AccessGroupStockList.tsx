@@ -111,7 +111,7 @@ export function AccessGroupStockList({ stocks = [], groupName, onEdit, onAdd, on
       </div>
 
       <Dialog open={!!editTarget} onOpenChange={o => !o && setEditTarget(null)}>
-        <DialogContent style={{ maxWidth: '70vw' }}>
+        <DialogContent style={{ maxWidth: '70vw' }} className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Edit Access — {editTarget?.sku}</DialogTitle></DialogHeader>
           <div className="flex flex-col gap-3 py-2">
             <div className="grid grid-cols-2 gap-3">
@@ -134,7 +134,7 @@ export function AccessGroupStockList({ stocks = [], groupName, onEdit, onAdd, on
       </Dialog>
 
       <Dialog open={addOpen} onOpenChange={o => { setAddOpen(o); if (!o) { setAddTarget(null); setSearchQuery(''); setSubmittedQuery(''); setPage(1); } }}>
-        <DialogContent style={{ maxWidth: '70vw' }}>
+        <DialogContent style={{ maxWidth: '70vw' }} className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Add Access — {groupName}</DialogTitle></DialogHeader>
           {blocked.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-6 text-muted-foreground">
