@@ -8,9 +8,12 @@ import { api } from '@/lib/api';
 
 interface StockItem {
   id: number;
+  sku: string;
   name: string;
   brand: string;
   model: string;
+  variant: string;
+  color: string;
   qty: number;
   price: number;
   gst: number;
@@ -207,7 +210,8 @@ export function AccessGroupStocks() {
 
       <div className="border rounded-lg overflow-hidden">
         <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-muted/50 text-xs font-semibold text-muted-foreground border-b">
-          <div className="col-span-4">Stock Name</div>
+          <div className="col-span-3">Stock Name</div>
+          <div className="col-span-1 font-mono">SKU</div>
           <div className="col-span-2">Brand / Model</div>
           <div className="col-span-1 text-right">Qty</div>
           <div className="col-span-2 text-right">Price</div>
@@ -219,7 +223,8 @@ export function AccessGroupStocks() {
           const edit = editing[item.id];
           return (
             <div key={item.id} className="grid grid-cols-12 gap-2 px-3 py-2.5 text-sm border-b last:border-0 items-center hover:bg-muted/30 transition-colors">
-              <div className="col-span-4 font-medium truncate cursor-pointer hover:underline" onClick={() => startEdit(item)}>{item.name}</div>
+              <div className="col-span-3 font-medium truncate cursor-pointer hover:underline" onClick={() => startEdit(item)}>{item.name}</div>
+              <div className="col-span-1 text-muted-foreground font-mono text-xs truncate">{item.sku || '-'}</div>
               <div className="col-span-2 text-muted-foreground truncate">{item.brand}{item.brand && item.model ? ' / ' : ''}{item.model}</div>
               <div className="col-span-1 text-right">
                 {isEditing ? (

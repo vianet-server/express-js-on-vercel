@@ -407,9 +407,12 @@ router.get('/inventory/access-group/:name', async (req, res) => {
     const rows = await neonDb.query(`
       SELECT
         s.id,
+        CAST(s.id AS TEXT) AS sku,
         s.stockname AS name,
         COALESCE(inv.brand, '') AS brand,
         COALESCE(inv.model, '') AS model,
+        COALESCE(inv.varient, '') AS variant,
+        COALESCE(inv.color, '') AS color,
         COALESCE(inv.quantity, 0) + COALESCE(inv.vquantity, 0) + COALESCE(iag.quantity, 0) AS qty,
         iag.oprice AS price,
         inv.gst,

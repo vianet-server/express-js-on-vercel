@@ -33,11 +33,15 @@ app.use('/partner', partnerRoutes);
 app.use('/employee', employeeRoutes);
 app.use('/api/admin', adminRoutes);
 
-// Serve React static files (Vite build)
-app.use(express.static(path.join(__dirname, '..', 'vianet', 'dist')));
+// Serve React static files (Vite build) — hashed filenames are immutable
+app.use(express.static(path.join(__dirname, '..', 'vianet', 'dist'), {
+  maxAge: '1y',
+  immutable: true,
+}));
 
-// SPA fallback (must be last)
+// SPA fallback — never cache index.html so it always picks up the latest JS chunks
 app.get('*', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, must-revalidate');
   res.sendFile(path.join(__dirname, '..', 'vianet', 'dist', 'index.html'));
 });
 
