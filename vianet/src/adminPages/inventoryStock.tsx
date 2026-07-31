@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/set-state-in-effect -- server data fetch is a valid effect use */
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Search, Edit3, ExternalLink, Check, X, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { setStockItems, updateStockItem } from '@/store/slices/inventorySlice';
+import { setStockPage, updateStockItem } from '@/store/slices/inventorySlice';
 
 interface StockItem {
   id: number; name: string; brand: string; model: string; variant: string; color: string;
@@ -53,7 +53,6 @@ export function InventoryStock() {
     offset: number;
   }
 
-  const didInit = useRef(false);
   const totalPages = Math.max(1, Math.ceil(pagination.total / pageLimit));
 
   const fetchPage = useCallback(async (page: number, limit = pageLimit) => {
@@ -61,7 +60,7 @@ export function InventoryStock() {
     try {
       const offset = page * limit
       const res = await api.get<StockPageResponse>(`/api/admin/inventory/stock?limit=${limit}&offset=${offset}`)
-      dispatch(setStockItems(res.rows))
+      dispatch(setStockPage({ items: res.rows, total: res.total, limit: res.limit, offset: res.offset }))
       return res
     } finally {
       setLoading(false)
@@ -69,19 +68,16 @@ export function InventoryStock() {
   }, [dispatch, pageLimit])
 
   useEffect(() => {
-    dispatch(setStockItems([]))
-    setCurrentPage(0)
-    didInit.current = true
-  }, [pageLimit, dispatch])
-
-  useEffect(() => {
-    if (didInit.current) {
-      fetchPage(currentPage)
-    }
+    fetchPage(currentPage)
   }, [currentPage, pageLimit, fetchPage])
 
   const handleLimitChange = (value: string | null) => {
-    if (value !== null) setPageLimit(Number(value));
+    if (value !== null) {
+      const limit = Number(value)
+      setPageLimit(limit)
+      setCurrentPage(0)
+      dispatch(setStockPage({ items: [], total: 0, limit, offset: 0 }))
+    }
   };
 
   const goToPage = (page: number) => {

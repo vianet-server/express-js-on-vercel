@@ -59,20 +59,10 @@ const inventorySlice = createSlice({
     setStockItems(state, action: PayloadAction<StockItem[]>) {
       state.stockItems = action.payload
     },
-    appendStockItems(state, action: PayloadAction<{ items: StockItem[]; total: number; offset: number }>) {
-      const { items = [], total = 0, offset = 0 } = action.payload ?? {}
-      if (offset === 0) {
-        state.stockItems = items
-      } else {
-        const existingIds = new Set((state.stockItems ?? []).map(i => i.id))
-        for (const item of items) {
-          if (!existingIds.has(item.id)) {
-            state.stockItems.push(item)
-            existingIds.add(item.id)
-          }
-        }
-      }
-      state.stockPagination = { limit: state.stockPagination.limit, total, offset }
+    setStockPage(state, action: PayloadAction<{ items: StockItem[]; total: number; limit: number; offset: number }>) {
+      const { items = [], total = 0, limit = state.stockPagination?.limit ?? 50, offset = 0 } = action.payload ?? {}
+      state.stockItems = items
+      state.stockPagination = { offset, limit, total }
     },
     updateStockItem(state, action: PayloadAction<StockItem>) {
       const idx = (state.stockItems ?? []).findIndex(i => i.id === action.payload.id)
@@ -122,7 +112,7 @@ const inventorySlice = createSlice({
 
 export const {
   setStockItems,
-  appendStockItems,
+  setStockPage,
   updateStockItem,
   setCurrentStockDetail,
   setSkuData,
