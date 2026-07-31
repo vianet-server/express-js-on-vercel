@@ -51,7 +51,7 @@ export function InventoryStockDetail() {
     if (!form || !id) return;
     setSaving(true);
     try {
-      await api.put(`/api/admin/inventory/stock/${id}`, form);
+      await api.post(`/api/admin/inventory/stock/${id}`, form);
       setDirty(false);
     } catch (e) {
       console.error('Save failed', e);

@@ -88,7 +88,7 @@ router.get('/inventory/stock', async (req, res) => {
     const joinClause = 'LEFT JOIN app.inventory inv ON inv.id = s.id';
 
     let countQuery = 'SELECT COUNT(*) FROM app.stock s';
-    let dataQuery = 'SELECT s.*, inv.fullname, inv.brand, inv.model, inv.varient, inv.color, inv.gst FROM app.stock s';
+    let dataQuery = 'SELECT s.*, inv.fullname, inv.brand, inv.model, inv.varient, inv.color, inv.gst,inv.price AS inv_price FROM app.stock s';
     const params: any[] = [];
     let idx = 1;
 
@@ -119,7 +119,7 @@ router.get('/inventory/stock', async (req, res) => {
       variant: r.varient || '',
       color: r.color || '',
       qty: r.quantity || 0,
-      price: parseFloat(r.price) || 0,
+      price: parseFloat(r.inv_price) || 0,
       gst: r.gst || 0,
       min: r.min_stock || r.min || 0,
       max: r.max_stock || r.max || 0,
@@ -220,16 +220,51 @@ router.get('/inventory/control', async (req, res) => {
 router.get('/inventory/stock/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await neonDb.query('SELECT * FROM app.stock WHERE id = $1', [id]);
+    const result = await neonDb.query('SELECT * FROM app.inventory WHERE id = $1', [id]);
     if (result.rows.length === 0) return res.status(404).json({ message: 'Stock item not found' });
     const r = result.rows[0];
     res.json({
-      id: r.id, name: r.stockname, brand: '', model: '', variant: '', color: '',
-      qty: r.quantity || 0, price: parseFloat(r.price) || 0, gst: 0,
-      min: 0, max: 0, description: '', details: '', tags: '', url: '', id_no: '',
+      id: r.id, name: r.fullname || r.stockname || '', brand: r.brand || '', model: r.model || '', variant: r.varient || '', color: r.color || '',
+      qty: r.quantity || 0, price: parseFloat(r.price) || 0, gst: r.gst || 0,
+      min: r.min_stock || r.min || 0, max: r.max_stock || r.max || 0, description: '', details: '', tags: '', url: '', id_no: '',
     });
   } catch (err) {
     console.error('[stockitem] GET /inventory/stock/:id error:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Save stock item detail (used by admin/inventory/stock/:id save form)
+router.post('/inventory/stock/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, brand, model, variant, color, qty, price, gst, min, max, description, details, tags, url, id_no } = req.body;
+
+    const inventoryResult = await neonDb.query(
+      `UPDATE app.inventory
+       SET fullname = $1, brand = $2, model = $3, varient = $4, color = $5,
+           quantity = $6, price = $7, gst = $8, updated_at = NOW()
+       WHERE id = $9 RETURNING *`,
+      [name, brand, model, variant, color, qty, price, gst, id]
+    );
+
+    await neonDb.query(
+      `UPDATE app.stock
+       SET stockname = $1, quantity = $2, price = $3, updated_at = NOW()
+       WHERE id = $4`,
+      [name, qty, price, id]
+    );
+
+    const r = inventoryResult.rows[0];
+    if (!r) return res.status(404).json({ message: 'Stock item not found' });
+
+    res.json({
+      id: r.id, name: r.fullname, brand: r.brand || '', model: r.model || '', variant: r.varient || '', color: r.color || '',
+      qty: r.quantity || 0, price: parseFloat(r.price) || 0, gst: r.gst || 0,
+      min: min || 0, max: max || 0, description: description || '', details: details || '', tags: tags || '', url: url || '', id_no: id_no || '',
+    });
+  } catch (err) {
+    console.error('[stockitem] POST /inventory/stock/:id error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
