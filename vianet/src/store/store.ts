@@ -12,6 +12,8 @@ import {
 import authReducer from './slices/authSlice'
 import inventoryReducer from './slices/inventorySlice'
 import adminCacheReducer from './slices/adminCacheSlice'
+import settingsReducer from './slices/settingsSlice'
+import tallyReducer from './slices/tallySlice'
 
 const storage = {
   getItem: (key: string) => {
@@ -42,13 +44,15 @@ const storage = {
 const persistConfig = {
   key: 'root',
   storage,
-  whitelist: ['auth', 'inventory', 'adminCache'],
+  whitelist: ['auth', 'inventory', 'adminCache', 'settings', 'tally'],
 }
 
 const rootReducer = combineReducers({
   auth: authReducer,
   inventory: inventoryReducer,
   adminCache: adminCacheReducer,
+  settings: settingsReducer,
+  tally: tallyReducer,
 })
 
 const persistedReducer = persistReducer(persistConfig, rootReducer)

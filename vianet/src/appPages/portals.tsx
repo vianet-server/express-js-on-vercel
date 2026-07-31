@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { api } from '@/lib/api'
-import { Placeholder } from '@/components/Placeholder'
 
 interface StockItem {
   id: number
@@ -94,15 +93,6 @@ export function AppStocks() {
           <Button variant="secondary" size="sm" onClick={handleExport}>
             <Download size={14} /> Export
           </Button>
-          {/* <div className="flex items-center gap-2 border rounded-lg px-3 py-1.5">
-            <Search size={14} className="text-muted-foreground" />
-            <Input
-              placeholder="Search name or sku..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="border-0 p-0 h-auto text-sm focus-visible:ring-0 w-48"
-            />
-          </div> */}
         </div>
       </div>
 
@@ -218,52 +208,4 @@ export function AppSetting() {
       </Card>
     </div>
   )
-}
-
-// Employ portal pages - Basic group
-export function EmployHome() {
-  return <Placeholder title="Employ Home" />
-}
-
-export function EmployDashboard() {
-  return <Placeholder title="Dashboard" />
-}
-
-export function EmployNotification() {
-  return <Placeholder title="Notification" />
-}
-
-// Employ portal pages - Tally group
-export function EmployTallyStock() {
-  return <Placeholder title="Tally Stock" />
-}
-
-export function EmployTallyLedger() {
-  return <Placeholder title="Tally Ledger" />
-}
-
-export function EmployTallyVoucher() {
-  return <Placeholder title="Tally Voucher" />
-}
-
-export function EmployTallyGodown() {
-  return <Placeholder title="Tally Godown" />
-}
-
-// Employ portal pages - Social Media group
-export function EmploySocialHome() {
-  return <Placeholder title="Social Media Home" />
-}
-
-export function EmploySocialAnalytics() {
-  return <Placeholder title="Social Media Analytics" />
-}
-
-export function EmploySocialUpload() {
-  return <Placeholder title="Upload (Interaction & Comments)" />
-}
-
-// Employ portal pages - Setting
-export function EmploySetting() {
-  return <Placeholder title="Setting" />
 }
