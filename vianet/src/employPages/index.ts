@@ -1,15 +1,13 @@
 export { EmployLogin } from './auth/employlogin'
 export { EmploySignup } from './auth/employsignup'
-export {
-  EmployHome,
-  EmployDashboard,
-  EmployNotification,
-  EmployTallyStock,
-  EmployTallyLedger,
-  EmployTallyVoucher,
-  EmployTallyGodown,
-  EmploySocialHome,
-  EmploySocialAnalytics,
-  EmploySocialUpload,
-  EmploySetting,
-} from './portals'
+export { EmployHome } from './home'
+export { EmployDashboard } from './dashboard'
+export { EmployNotification } from './notification'
+export { EmployTallyStock } from './tallyStock'
+export { EmployTallyLedger } from './tallyLedger'
+export { EmployTallyVoucher } from './tallyVoucher'
+export { EmployTallyGodown } from './tallyGodown'
+export { EmploySocialHome } from './socialHome'
+export { EmploySocialAnalytics } from './socialAnalytics'
+export { EmploySocialUpload } from './socialUpload'
+export { EmploySetting } from './setting'

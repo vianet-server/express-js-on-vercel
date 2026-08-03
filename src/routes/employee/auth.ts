@@ -20,15 +20,20 @@ router.post('/register', async (req, res) => {
     if (!groupId) {
       return res.status(400).json({ message: 'No access group available. Contact admin.' });
     }
+    const fullName = [first_name, last_name].filter(Boolean).map(s => s.trim()).join(' ') || email.split('@')[0] || 'Employee';
     const result = await neonDb.query(
-      'INSERT INTO app.users (email, password, user_type, access_group_id, created_at, updated_at) VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING id, email, user_type',
-      [email, password_hash, 'employee', groupId]
+      'INSERT INTO app.users (name, email, password, user_type, access_group_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING id, email, user_type',
+      [fullName, email, password_hash, 'employee', groupId]
     );
     if (employee_id || first_name || last_name || phone || designation) {
-      await neonDb.query(
-        'INSERT INTO employee_profiles (user_id, employee_id, first_name, last_name, phone, designation, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())',
-        [result.rows[0].id, employee_id, first_name, last_name, phone, designation]
-      );
+      try {
+        await neonDb.query(
+          'INSERT INTO employee_profiles (user_id, employee_id, first_name, last_name, phone, designation, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())',
+          [result.rows[0].id, employee_id, first_name, last_name, phone, designation]
+        );
+      } catch (profileErr) {
+        console.warn('[employee/auth] profile insert skipped:', profileErr.message);
+      }
     }
     const token = jwt.sign(
       { id: result.rows[0].id, email: result.rows[0].email, user_type: 'employee' },
