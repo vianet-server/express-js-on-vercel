@@ -22,7 +22,8 @@ export function InventorySku() {
   const accessGroupNames = useMemo(() => (allAccessGroups ?? []).map(g => g.name), [allAccessGroups]);
   const [search, setSearch] = useState('');
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
-  const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
+  const [selectedBrand, setSelectedBrand] = useState<string>('all');
+  const [brands, setBrands] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
 
@@ -65,8 +66,9 @@ export function InventorySku() {
 
   const fetchAll = useCallback(() => {
     setLoading(true);
+    const brandQuery = selectedBrand && selectedBrand !== 'all' ? `?brand=${encodeURIComponent(selectedBrand)}` : '';
     Promise.all([
-      api.get<SkuRow[]>('/api/admin/inventory/sku').catch(() => [] as SkuRow[]),
+      api.get<SkuRow[]>(`/api/admin/inventory/sku${brandQuery}`).catch(() => [] as SkuRow[]),
       api.get<any>('/api/admin/inventory/control').then((r: any) => r?.accessGroups || []).catch(() => []),
     ]).then(([skus, groups]: [SkuRow[], any[]]) => {
       dispatch(setSkuData(skus));
@@ -74,9 +76,21 @@ export function InventorySku() {
       setSelectedGroups((groups ?? []).map((g: any) => g.name));
       setLoading(false);
     }).catch(() => setLoading(false));
-  }, [dispatch]);
+  }, [dispatch, selectedBrand]);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  const fetchBrands = useCallback(() => {
+    api.get<string[]>('/api/admin/inventory/brands')
+      .then(res => setBrands(res || []))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => { 
+    fetchAll(); 
+  }, [fetchAll]);
+
+  useEffect(() => {
+    fetchBrands();
+  }, [fetchBrands]);
 
   useEffect(() => {
     const onFocus = () => { fetchAll(); };
@@ -84,25 +98,16 @@ export function InventorySku() {
     return () => window.removeEventListener('focus', onFocus);
   }, [fetchAll]);
 
-  const allBrands = useMemo(() => [...new Set((skuData ?? []).map(s => s.brand).filter(Boolean))], [skuData]);
-
-  useEffect(() => {
-    setSelectedBrands(prev => prev.length === 0 ? allBrands : prev);
-  }, [allBrands]);
-
   const toggleGroup = (group: string) => {
     setSelectedGroups(prev => prev.includes(group) ? prev.filter(g => g !== group) : [...prev, group]);
-    setPage(1);
-  };
-  const toggleBrand = (brand: string) => {
-    setSelectedBrands(prev => prev.includes(brand) ? prev.filter(b => b !== brand) : [...prev, brand]);
     setPage(1);
   };
   const visibleGroups = accessGroupNames.filter(g => selectedGroups.includes(g));
 
   const filtered = (skuData ?? []).filter(s =>
-    (selectedBrands.length === 0 || selectedBrands.includes(s.brand)) &&
-    (s.sku.toLowerCase().includes(search.toLowerCase()) || s.name.toLowerCase().includes(search.toLowerCase()) || s.brand.toLowerCase().includes(search.toLowerCase()))
+    s.sku.toLowerCase().includes(search.toLowerCase()) || 
+    s.name.toLowerCase().includes(search.toLowerCase()) || 
+    s.brand.toLowerCase().includes(search.toLowerCase())
   );
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -175,20 +180,20 @@ export function InventorySku() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Inventory SKU</h1>
         <div className="flex items-center gap-2">
-          <Popover>
-            <PopoverTrigger className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 cursor-pointer">
-              <Tag size={14} /> Select Stock
-            </PopoverTrigger>
-            <PopoverContent className="w-56 p-2">
-              <div className="flex flex-col gap-1">
-                {allBrands.map(b => (
-                  <label key={b} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer text-sm">
-                    <Checkbox checked={selectedBrands.includes(b)} onCheckedChange={() => toggleBrand(b)} />{b}
-                  </label>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Brand:</span>
+            <Select value={selectedBrand} onValueChange={v => { setSelectedBrand(v || 'all'); setPage(1); }}>
+              <SelectTrigger className="w-[180px] h-9">
+                <SelectValue placeholder="All Brands" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Brands</SelectItem>
+                {brands.map(b => (
+                  <SelectItem key={b} value={b}>{b}</SelectItem>
                 ))}
-              </div>
-            </PopoverContent>
-          </Popover>
+              </SelectContent>
+            </Select>
+          </div>
           <Popover>
             <PopoverTrigger className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 cursor-pointer">
               <Users size={14} /> Select Access Group

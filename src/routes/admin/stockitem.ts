@@ -154,13 +154,23 @@ router.get('/inventory/stock', async (req, res) => {
 // SKU listing endpoint for inventory management
 router.get('/inventory/sku', async (req, res) => {
   try {
+    const brandFilter = req.query.brand as string;
     let hasInvTable = false;
     try {
       const schemaCheck = await neonDb.query("SELECT column_name FROM information_schema.columns WHERE table_schema='app' AND table_name='inventory' AND column_name IN ('brand','model')");
       hasInvTable = schemaCheck.rows.length === 2;
     } catch {}
-    const sql = hasInvTable
-      ? `
+    
+    let sql = '';
+    let params: any[] = [];
+    
+    if (hasInvTable) {
+      let whereClause = '';
+      if (brandFilter && brandFilter !== 'all') {
+        whereClause = 'WHERE inv.brand ILIKE $1';
+        params.push(`%${brandFilter}%`);
+      }
+      sql = `
           SELECT s.id, s.stockname AS name, CAST(s.id AS TEXT) AS sku, s.quantity AS qty, s.price,
                  COALESCE(inv.brand,'') AS brand,
                  COALESCE(inv.model,'') AS model,
@@ -175,10 +185,12 @@ router.get('/inventory/sku', async (req, res) => {
           LEFT JOIN app.inventory inv ON inv.id = s.id
           LEFT JOIN app.inventory_access_group iag ON iag.inventoryid = s.id
           LEFT JOIN app.access_groups g ON g.id = iag.accessgroupid
+          ${whereClause}
           GROUP BY s.id, s.stockname, s.quantity, s.price, inv.brand, inv.model
-          ORDER BY s.stockname
-        `
-      : `
+          ORDER BY s.id DESC
+        `;
+    } else {
+      sql = `
           SELECT s.id, s.stockname AS name, CAST(s.id AS TEXT) AS sku, s.quantity AS qty, s.price,
                  '' AS brand,
                  '' AS model,
@@ -193,9 +205,10 @@ router.get('/inventory/sku', async (req, res) => {
           LEFT JOIN app.inventory_access_group iag ON iag.inventoryid = s.id
           LEFT JOIN app.access_groups g ON g.id = iag.accessgroupid
           GROUP BY s.id, s.stockname, s.quantity, s.price
-          ORDER BY s.stockname
+          ORDER BY s.id DESC
         `;
-    const result = await neonDb.query(sql);
+    }
+    const result = await neonDb.query(sql, params);
     res.json(result.rows.map(r => ({ ...r, status: 'active' })));
   } catch (err) {
     console.error('[stockitem] GET /inventory/sku error:', err);
