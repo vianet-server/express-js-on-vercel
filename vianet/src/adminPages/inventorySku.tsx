@@ -27,8 +27,9 @@ export function InventorySku() {
   const [brands, setBrands] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
 
-  const [editTarget, setEditTarget] = useState<{ sku: string; group: string; field: string; value: number } | null>(null);
+  const [editTarget, setEditTarget] = useState<{ sku: string; group: string; field: string; value: string | number } | null>(null);
   const [addAccess, setAddAccess] = useState<{ selectedSkus: string[]; group: string; qty: number; price: number } | null>(null);
   const [detailGroup, setDetailGroup] = useState<SkuRow | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; row: SkuRow } | null>(null);
@@ -114,11 +115,6 @@ export function InventorySku() {
   };
   const visibleGroups = accessGroupNames.filter(g => selectedGroups.includes(g));
 
-  const toggleBrand = (brand: string) => {
-    setSelectedBrands(prev => prev.includes(brand) ? prev.filter(b => b !== brand) : [...prev, brand]);
-    setPage(1);
-  };
-
   const filtered = (skuData ?? []).filter(s => {
     const q = search.toLowerCase();
     const brandMatch = selectedBrands.length === 0 || selectedBrands.includes(s.brand);
@@ -131,7 +127,7 @@ export function InventorySku() {
   const openEdit = (sku: string, group: string, field: string) => {
     const item = (skuData ?? []).find(s => s.sku === sku);
     const ag = item?.accessGroups?.find(a => a.group === group);
-    setEditTarget({ sku, group, field, value: ag ? field === 'qty' ? ag.qty : ag.price : 0 });
+    setEditTarget({ sku, group, field, value: ag ? field === 'qty' ? ag.qty : field === 'price' ? ag.price : (ag.partnerSkuName || '') : 0 });
   };
 
   const saveEdit = async () => {
@@ -140,8 +136,9 @@ export function InventorySku() {
     const existing = item?.accessGroups?.find(a => a.group === editTarget.group);
     const qty = editTarget.field === 'qty' ? editTarget.value : (existing?.qty ?? 0);
     const price = editTarget.field === 'price' ? editTarget.value : (existing?.price ?? 0);
+    const partnerSkuName = editTarget.field === 'partnerSkuName' ? editTarget.value : (existing?.partnerSkuName || '');
     try {
-      await api.post(`/api/admin/inventory/sku/${editTarget.sku}/access-group/${encodeURIComponent(editTarget.group)}`, { qty, price });
+      await api.post(`/api/admin/inventory/sku/${editTarget.sku}/access-group/${encodeURIComponent(editTarget.group)}`, { qty, price, partnerSkuName });
       const currentAGS = (skuData ?? []).find(s => s.sku === editTarget.sku)?.accessGroups ?? [];
       const idx = currentAGS.findIndex(a => a.group === editTarget.group);
       dispatch(updateSkuItem({
@@ -149,7 +146,7 @@ export function InventorySku() {
         updates: {
           accessGroups: idx >= 0
             ? currentAGS.map(a => a.group === editTarget.group ? { ...a, [editTarget.field]: editTarget.value } : a)
-            : [...currentAGS, { group: editTarget.group, qty, price }],
+            : [...currentAGS, { group: editTarget.group, qty: Number(qty), price: Number(price), partnerSkuName: String(partnerSkuName) }],
         },
       }));
     } catch (e) {
@@ -180,6 +177,77 @@ export function InventorySku() {
       alert(e instanceof Error ? e.message : 'Failed to add stock access');
     }
     setAddAccess(null);
+  };
+
+  const handleExportTemplate = async () => {
+    try {
+      const XLSX = await import('xlsx');
+      const rows = [];
+      for (const s of (skuData ?? [])) {
+        for (const g of visibleGroups) {
+          const ag = s.accessGroups?.find(a => a.group === g);
+          rows.push({
+            SKU_ID: s.sku,
+            Access_Group: g,
+            Partner_SKU_Name: ag?.partnerSkuName || '',
+            Qty: ag?.qty || 0,
+            Price: ag?.price || 0,
+          });
+        }
+      }
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Mappings');
+      XLSX.writeFile(wb, 'AccessGroup_Mappings.xlsx');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to export mappings');
+    }
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setUploading(true);
+    try {
+      const XLSX = await import('xlsx');
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        try {
+          const bstr = evt.target?.result;
+          const wb = XLSX.read(bstr, { type: 'binary' });
+          const wsname = wb.SheetNames[0];
+          const ws = wb.Sheets[wsname];
+          const data = XLSX.utils.sheet_to_json<any>(ws);
+
+          const rowsToUpload = data.map(row => ({
+            skuId: String(row.SKU_ID),
+            accessGroup: String(row.Access_Group),
+            partnerSkuName: row.Partner_SKU_Name ? String(row.Partner_SKU_Name) : '',
+            qty: Number(row.Qty) || 0,
+            price: Number(row.Price) || 0,
+          }));
+
+          const res = await api.post('/api/admin/inventory/access/upload', { rows: rowsToUpload });
+          alert(res.message + (res.errors?.length ? '\\nErrors:\\n' + res.errors.join('\\n') : ''));
+          // reload data
+          const { data: skusData } = await api.get('/api/admin/inventory/sku');
+          dispatch(setSkuData(Array.isArray(skusData) ? skusData : (skusData?.data ?? [])));
+        } catch (err: any) {
+          console.error(err);
+          alert('Upload failed: ' + (err.message || 'Unknown error'));
+        } finally {
+          setUploading(false);
+          e.target.value = '';
+        }
+      };
+      reader.readAsBinaryString(file);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to process file');
+      setUploading(false);
+    }
   };
 
   if (loading) {
@@ -217,8 +285,15 @@ export function InventorySku() {
                   </label>
                   <div className="border-t my-1" />
                   {brands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase())).map(b => (
-                    <label key={b} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer text-sm">
-                      <Checkbox checked={selectedBrands.includes(b)} onCheckedChange={() => toggleBrand(b)} />{b}
+                    <label key={b} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer text-sm font-medium">
+                      <Checkbox 
+                        checked={selectedBrands.includes(b)} 
+                        onCheckedChange={(c) => {
+                          setSelectedBrands(prev => c ? [...prev, b] : prev.filter(x => x !== b));
+                          setPage(1);
+                        }} 
+                      />
+                      {b}
                     </label>
                   ))}
                   {brands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase())).length === 0 && (
@@ -242,6 +317,15 @@ export function InventorySku() {
               </div>
             </PopoverContent>
           </Popover>
+          <Button variant="outline" size="sm" onClick={handleExportTemplate} className="gap-1 px-3" title="Export current view to Excel">
+            <Edit3 size={14} /> Export Map
+          </Button>
+          <div className="relative inline-block">
+            <input type="file" id="file-upload" className="hidden" accept=".xlsx,.csv" onChange={handleImport} />
+            <Button variant="outline" size="sm" onClick={() => document.getElementById('file-upload')?.click()} className="gap-1 px-3" disabled={uploading} title="Import Excel mapping">
+              {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus size={14} />} Import Map
+            </Button>
+          </div>
           <Button variant="secondary" onClick={() => openAddAccess()}><Users size={14} /> Add Access</Button>
           <Button><Plus size={14} /> Add SKU</Button>
         </div>
@@ -259,7 +343,7 @@ export function InventorySku() {
               <th rowSpan={2} className="sticky left-0 z-10 bg-white dark:bg-gray-900 pb-2 pt-3 px-3 font-medium text-left text-muted-foreground min-w-[72px]">SKU ID</th>
               <th colSpan={4} className="pb-1 pt-3 px-3 font-semibold text-center text-xs text-muted-foreground border-x bg-muted/30">Inventory</th>
               {visibleGroups.map(g => (
-                <th key={g} colSpan={2} className="pb-1 pt-3 px-2 font-semibold text-center text-[10px] text-muted-foreground border-x bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors min-w-[90px]" onClick={() => { navigate(`/admin/inventory/access-group/${encodeURIComponent(g)}`); }}>
+                <th key={g} colSpan={3} className="pb-1 pt-3 px-2 font-semibold text-center text-[10px] text-muted-foreground border-x bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors min-w-[120px]" onClick={() => { navigate(`/admin/inventory/access-group/${encodeURIComponent(g)}`); }}>
                   <div className="flex items-center justify-center gap-1"><Users size={10} />{g}</div>
                 </th>
               ))}
@@ -272,6 +356,7 @@ export function InventorySku() {
               <th className="pb-2 px-3 font-medium text-right text-muted-foreground text-[11px] border-r min-w-[64px]">Price</th>
               {visibleGroups.map(g => (
                 <Fragment key={g}>
+                  <th className="pb-2 px-2 font-medium text-left text-muted-foreground text-[11px] min-w-[80px]">P-SKU</th>
                   <th className="pb-2 px-2 font-medium text-right text-muted-foreground text-[11px]">Qty</th>
                   <th className="pb-2 px-2 font-medium text-right text-muted-foreground text-[11px] border-r">Price</th>
                 </Fragment>
@@ -290,6 +375,9 @@ export function InventorySku() {
                   const ag = (s.accessGroups ?? []).find(a => a.group === g);
                   return (
                     <Fragment key={g}>
+                      <td className="py-2.5 px-2 text-left cursor-pointer whitespace-nowrap text-[11px] text-muted-foreground" onClick={() => openEdit(s.sku, g, 'partnerSkuName')}>
+                        {ag && ag.partnerSkuName ? ag.partnerSkuName : '-'}
+                      </td>
                       <td className="py-2.5 px-2 text-right cursor-pointer whitespace-nowrap" onClick={() => openEdit(s.sku, g, 'qty')}>
                         {ag && ag.qty > 0 ? ag.qty : <span className="text-amber-600 font-medium">Blocked</span>}
                       </td>
@@ -370,11 +458,20 @@ export function InventorySku() {
 
       <Dialog open={!!editTarget} onOpenChange={open => !open && setEditTarget(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Edit {editTarget?.field === 'qty' ? 'Quantity' : 'Price'} &mdash; {editTarget?.group}</DialogTitle></DialogHeader>
-          <div className="flex flex-col gap-3 py-2">
-            <label className="text-sm font-medium text-muted-foreground">SKU: {editTarget?.sku}</label>
-            <Input type="number" value={editTarget?.value ?? 0} onChange={e => setEditTarget(prev => prev ? { ...prev, value: Number(e.target.value) } : prev)} className="text-sm" />
-          </div>
+          <DialogHeader><DialogTitle>Edit {editTarget?.field === 'qty' ? 'Quantity' : editTarget?.field === 'price' ? 'Price' : 'Partner SKU Name'} &mdash; {editTarget?.group}</DialogTitle></DialogHeader>
+          <div className="flex items-center gap-2 mb-4">
+              <span className="font-mono text-sm">{editTarget?.sku}</span>
+              <span className="text-sm text-muted-foreground">({editTarget?.group})</span>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">{editTarget?.field === 'qty' ? 'Quantity' : editTarget?.field === 'price' ? 'Price (₹)' : 'Partner SKU Name'}</label>
+              <Input 
+                type={editTarget?.field === 'partnerSkuName' ? 'text' : 'number'}
+                value={editTarget?.value ?? ''} 
+                onChange={(e) => setEditTarget(prev => prev ? { ...prev, value: prev.field === 'partnerSkuName' ? e.target.value : Number(e.target.value) } : null)}
+                autoFocus
+              />
+            </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setEditTarget(null)}>Cancel</Button>
             <Button onClick={saveEdit}>Save</Button>

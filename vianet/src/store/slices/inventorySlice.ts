@@ -8,7 +8,7 @@ export interface StockItem {
 
 export interface SkuRow {
   sku: string; name: string; brand: string; model?: string; qty: number; price: number;
-  accessGroups: { group: string; qty: number; price: number }[];
+  accessGroups: { group: string; qty: number; price: number; partnerSkuName?: string }[];
   status: string;
 }
 
@@ -17,8 +17,8 @@ export interface GroupStock {
 }
 
 export interface AccessGroupDetailData {
-  item: { sku: string; name: string; brand: string; status: string; accessGroups: { group: string; qty: number; price: number }[] };
-  accessGroup: { group: string; qty: number; price: number };
+  item: { sku: string; name: string; brand: string; status: string; accessGroups: { group: string; qty: number; price: number; partnerSkuName?: string }[] };
+  accessGroup: { group: string; qty: number; price: number; partnerSkuName?: string };
   privileges: string[];
   groupStocks: GroupStock[];
   stockConfig: { maxQty: number; allowDiscount: boolean; autoApprove: boolean; notes: string };

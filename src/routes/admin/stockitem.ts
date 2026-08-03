@@ -176,7 +176,7 @@ router.get('/inventory/sku', async (req, res) => {
                  COALESCE(inv.model,'') AS model,
                  COALESCE(
                    json_agg(
-                     json_build_object('group', g.name, 'qty', iag.quantity, 'price', iag.oprice)
+                     json_build_object('group', g.name, 'qty', iag.quantity, 'price', iag.oprice, 'partnerSkuName', iag.partner_sku_name)
                      ORDER BY g.name
                    ) FILTER (WHERE g.id IS NOT NULL),
                    '[]'
@@ -196,7 +196,7 @@ router.get('/inventory/sku', async (req, res) => {
                  '' AS model,
                  COALESCE(
                    json_agg(
-                     json_build_object('group', g.name, 'qty', iag.quantity, 'price', iag.oprice)
+                     json_build_object('group', g.name, 'qty', iag.quantity, 'price', iag.oprice, 'partnerSkuName', iag.partner_sku_name)
                      ORDER BY g.name
                    ) FILTER (WHERE g.id IS NOT NULL),
                    '[]'
@@ -213,6 +213,18 @@ router.get('/inventory/sku', async (req, res) => {
   } catch (err) {
     console.error('[stockitem] GET /inventory/sku error:', err);
     res.json([]);
+  }
+});
+
+router.get('/migrate-partner-sku', async (req, res) => {
+  try {
+    await neonDb.query(`
+      ALTER TABLE app.inventory_access_group 
+      ADD COLUMN IF NOT EXISTS partner_sku_name VARCHAR(255);
+    `);
+    res.json({ message: 'Migration successful' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -370,7 +382,7 @@ router.get('/inventory/sku/:sku/access-group/:group', async (req, res) => {
 router.post('/inventory/sku/:sku/access-group/:group', async (req, res) => {
   try {
     const { sku, group } = req.params;
-    const { qty, price } = req.body;
+    const { qty, price, partnerSkuName } = req.body;
 
     const stock = await neonDb.query('SELECT id FROM app.stock WHERE id = $1', [isNaN(Number(sku)) ? sku : Number(sku)]);
     if (stock.rows.length === 0) return res.status(404).json({ message: 'Stock item not found' });
@@ -387,14 +399,14 @@ router.post('/inventory/sku/:sku/access-group/:group', async (req, res) => {
 
     if (existing.rows.length > 0) {
       await neonDb.query(
-        'UPDATE app.inventory_access_group SET quantity = GREATEST(0, $1), oprice = $2 WHERE inventoryid = $3 AND accessgroupid = $4',
-        [qty ?? 0, price ?? 0, stockId, groupId]
+        'UPDATE app.inventory_access_group SET quantity = GREATEST(0, $1), oprice = $2, partner_sku_name = $3 WHERE inventoryid = $4 AND accessgroupid = $5',
+        [qty ?? 0, price ?? 0, partnerSkuName || null, stockId, groupId]
       );
       res.json({ message: 'Stock access updated' });
     } else {
       await neonDb.query(
-        'INSERT INTO app.inventory_access_group (inventoryid, accessgroupid, quantity, oprice) VALUES ($1, $2, GREATEST(0, $3), $4)',
-        [stockId, groupId, qty ?? 0, price ?? 0]
+        'INSERT INTO app.inventory_access_group (inventoryid, accessgroupid, quantity, oprice, partner_sku_name) VALUES ($1, $2, GREATEST(0, $3), $4, $5)',
+        [stockId, groupId, qty ?? 0, price ?? 0, partnerSkuName || null]
       );
       res.status(201).json({ message: 'Stock assigned to access group' });
     }
@@ -408,7 +420,7 @@ router.post('/inventory/sku/:sku/access-group/:group', async (req, res) => {
 router.put('/inventory/sku/:sku/access-group/:group', async (req, res) => {
   try {
     const { sku, group } = req.params;
-    const { qty, price, gst } = req.body;
+    const { qty, price, gst, partnerSkuName } = req.body;
 
     const stock = await neonDb.query('SELECT id FROM app.stock WHERE id = $1', [isNaN(Number(sku)) ? sku : Number(sku)]);
     if (stock.rows.length === 0) return res.status(404).json({ message: 'Stock item not found' });
@@ -419,8 +431,8 @@ router.put('/inventory/sku/:sku/access-group/:group', async (req, res) => {
     const groupId = groupRow.rows[0].id;
 
     const result = await neonDb.query(
-      'UPDATE app.inventory_access_group SET quantity = GREATEST(0, $1), oprice = $2 WHERE inventoryid = $3 AND accessgroupid = $4 RETURNING *',
-      [qty ?? 0, price ?? 0, stockId, groupId]
+      'UPDATE app.inventory_access_group SET quantity = GREATEST(0, $1), oprice = $2, partner_sku_name = $3 WHERE inventoryid = $4 AND accessgroupid = $5 RETURNING *',
+      [qty ?? 0, price ?? 0, partnerSkuName || null, stockId, groupId]
     );
     if (result.rows.length === 0) return res.status(404).json({ message: 'Mapping not found' });
 
@@ -494,6 +506,62 @@ router.get('/inventory/access-group/:name', async (req, res) => {
     res.json({ group, items: rows.rows });
   } catch (err) {
     console.error('[stockitem] GET access-group stocks error:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// POST /inventory/access/upload — Bulk upload access group mappings (Excel/CSV)
+router.post('/inventory/access/upload', async (req, res) => {
+  try {
+    const { rows } = req.body; // Expects an array of { skuId, accessGroup, partnerSkuName, qty, price }
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.status(400).json({ message: 'Invalid or empty rows array provided' });
+    }
+
+    let successCount = 0;
+    const errors = [];
+
+    for (const row of rows) {
+      try {
+        const stock = await neonDb.query('SELECT id FROM app.stock WHERE id = $1', [isNaN(Number(row.skuId)) ? row.skuId : Number(row.skuId)]);
+        if (stock.rows.length === 0) {
+          errors.push(\`Row SKU \${row.skuId}: Stock item not found\`);
+          continue;
+        }
+        const stockId = stock.rows[0].id;
+
+        const groupRow = await neonDb.query('SELECT id FROM app.access_groups WHERE name = $1', [row.accessGroup]);
+        if (groupRow.rows.length === 0) {
+          errors.push(\`Row SKU \${row.skuId}: Access group '\${row.accessGroup}' not found\`);
+          continue;
+        }
+        const groupId = groupRow.rows[0].id;
+
+        const existing = await neonDb.query(
+          'SELECT id FROM app.inventory_access_group WHERE inventoryid = $1 AND accessgroupid = $2',
+          [stockId, groupId]
+        );
+
+        if (existing.rows.length > 0) {
+          await neonDb.query(
+            'UPDATE app.inventory_access_group SET quantity = GREATEST(0, $1), oprice = $2, partner_sku_name = $3 WHERE inventoryid = $4 AND accessgroupid = $5',
+            [row.qty ?? 0, row.price ?? 0, row.partnerSkuName || null, stockId, groupId]
+          );
+        } else {
+          await neonDb.query(
+            'INSERT INTO app.inventory_access_group (inventoryid, accessgroupid, quantity, oprice, partner_sku_name) VALUES ($1, $2, GREATEST(0, $3), $4, $5)',
+            [stockId, groupId, row.qty ?? 0, row.price ?? 0, row.partnerSkuName || null]
+          );
+        }
+        successCount++;
+      } catch (err) {
+        errors.push(\`Row SKU \${row.skuId}: \${err.message}\`);
+      }
+    }
+
+    res.json({ message: \`Successfully processed \${successCount} rows\`, errors });
+  } catch (err) {
+    console.error('[stockitem] POST /inventory/access/upload error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
