@@ -192,17 +192,17 @@ export function InventoryStock() {
             )}
             <Card className="mt-4">
               <CardHeader><CardTitle>Stock Levels</CardTitle></CardHeader>
-              <CardContent>
-                <table className="w-full text-sm">
-                  <thead>
+              <CardContent className="overflow-x-auto relative max-h-[60vh]">
+                <table className="w-full text-sm min-w-[700px]">
+                  <thead className="sticky top-0 bg-background z-10 shadow-sm">
                     <tr className="border-b text-left text-muted-foreground">
-                      <th className="pb-2 font-medium">Product</th>
-                      <th className="pb-2 font-medium">Brand</th>
-                      <th className="pb-2 font-medium text-right">Stock</th>
-                      <th className="pb-2 font-medium text-right">Min</th>
-                      <th className="pb-2 font-medium text-right">Max</th>
-                      <th className="pb-2 font-medium text-right">Price</th>
-                      <th className="pb-2 font-medium">Status</th>
+                      <th className="py-3 px-2 font-medium">Product</th>
+                      <th className="py-3 px-2 font-medium">Brand</th>
+                      <th className="py-3 px-2 font-medium text-right">Stock</th>
+                      <th className="py-3 px-2 font-medium text-right">Min</th>
+                      <th className="py-3 px-2 font-medium text-right">Max</th>
+                      <th className="py-3 px-2 font-medium text-right">Price</th>
+                      <th className="py-3 px-2 font-medium">Status</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -232,23 +232,23 @@ export function InventoryStock() {
               <CardHeader>
                 <CardTitle>Detailed Stock View</CardTitle>
               </CardHeader>
-              <CardContent className="overflow-x-auto">
+              <CardContent className="overflow-x-auto relative max-h-[70vh]">
                 {loading && (
-                  <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
+                  <div className="flex items-center justify-center py-4 text-sm text-muted-foreground absolute inset-0 bg-background/50 z-20">
                     <Loader2 className="animate-spin size-4 mr-2" /> Loading...
                   </div>
                 )}
                 <table className="w-full text-sm min-w-[1000px]">
-                  <thead>
+                  <thead className="sticky top-0 bg-background z-10 shadow-sm">
                     <tr className="border-b text-left text-muted-foreground">
-                      <th className="pb-2 font-medium whitespace-nowrap px-2 first:pl-0">Stock Name</th>
-                      <th className="pb-2 font-medium whitespace-nowrap px-2">Brand</th>
-                      <th className="pb-2 font-medium whitespace-nowrap px-2">Model</th>
-                      <th className="pb-2 font-medium whitespace-nowrap px-2">Variant</th>
-                      <th className="pb-2 font-medium whitespace-nowrap px-2">Color</th>
-                      <th className="pb-2 font-medium whitespace-nowrap px-2 text-right">Qty</th>
-                      <th className="pb-2 font-medium whitespace-nowrap px-2 text-right">Price</th>
-                      <th className="pb-2 font-medium whitespace-nowrap px-2 text-right">GST %</th>
+                      <th className="py-3 font-medium whitespace-nowrap px-2 first:pl-0">Stock Name</th>
+                      <th className="py-3 font-medium whitespace-nowrap px-2">Brand</th>
+                      <th className="py-3 font-medium whitespace-nowrap px-2">Model</th>
+                      <th className="py-3 font-medium whitespace-nowrap px-2">Variant</th>
+                      <th className="py-3 font-medium whitespace-nowrap px-2">Color</th>
+                      <th className="py-3 font-medium whitespace-nowrap px-2 text-right">Qty</th>
+                      <th className="py-3 font-medium whitespace-nowrap px-2 text-right">Price</th>
+                      <th className="py-3 font-medium whitespace-nowrap px-2 text-right">GST %</th>
                     </tr>
                   </thead>
                   <tbody>
