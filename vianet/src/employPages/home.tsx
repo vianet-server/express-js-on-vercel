@@ -1,6 +1,5 @@
 import { Placeholder } from '@/components/Placeholder'
 
 export function EmployHome() {
-  return <>
-  hi</>
+  return <Placeholder title="Employ Home" />
 }
