@@ -45,6 +45,8 @@ export function InventoryStock() {
   const [currentPage, setCurrentPage] = useState(0)
   const [editAll, setEditAll] = useState<StockItem | null>(null);
   const [editForm, setEditForm] = useState<StockItem | null>(null);
+  const [brands, setBrands] = useState<string[]>([]);
+  const [selectedBrand, setSelectedBrand] = useState('all');
 
   interface StockPageResponse {
     rows: StockItem[];
@@ -55,21 +57,25 @@ export function InventoryStock() {
 
   const totalPages = Math.max(1, Math.ceil(pagination.total / pageLimit));
 
-  const fetchPage = useCallback(async (page: number, limit = pageLimit) => {
+  const fetchPage = useCallback(async (page: number, limit = pageLimit, brand = selectedBrand) => {
     setLoading(true)
     try {
       const offset = page * limit
-      const res = await api.get<StockPageResponse>(`/api/admin/inventory/stock?limit=${limit}&offset=${offset}`)
+      const res = await api.get<StockPageResponse>(`/api/admin/inventory/stock?limit=${limit}&offset=${offset}&brand=${brand}`)
       dispatch(setStockPage({ items: res.rows, total: res.total, limit: res.limit, offset: res.offset }))
       return res
     } finally {
       setLoading(false)
     }
-  }, [dispatch, pageLimit])
+  }, [dispatch, pageLimit, selectedBrand])
+
+  useEffect(() => {
+    api.get<{data: string[]}>('/api/admin/inventory/brands').then(res => setBrands(res.data)).catch(console.error)
+  }, []);
 
   useEffect(() => {
     fetchPage(currentPage)
-  }, [currentPage, pageLimit, fetchPage])
+  }, [currentPage, pageLimit, fetchPage, selectedBrand])
 
   const handleLimitChange = (value: string | null) => {
     if (value !== null) {
@@ -127,9 +133,22 @@ export function InventoryStock() {
     <div className="flex flex-col gap-6 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Inventory Stock</h1>
-        <div className="flex items-center gap-2 border rounded-lg px-3 py-1.5">
-          <Search size={14} className="text-muted-foreground" />
-          <Input placeholder="Search name, brand or model..." value={search} onChange={e => setSearch(e.target.value)} className="border-0 p-0 h-auto text-sm focus-visible:ring-0" />
+        <div className="flex items-center gap-4">
+          <Select value={selectedBrand} onValueChange={(val) => { setSelectedBrand(val); setCurrentPage(0); }}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select Brand" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Brands</SelectItem>
+              {brands.map(b => (
+                <SelectItem key={b} value={b}>{b}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <div className="flex items-center gap-2 border rounded-lg px-3 py-1.5">
+            <Search size={14} className="text-muted-foreground" />
+            <Input placeholder="Search name, brand or model..." value={search} onChange={e => setSearch(e.target.value)} className="border-0 p-0 h-auto text-sm focus-visible:ring-0" />
+          </div>
         </div>
       </div>
 

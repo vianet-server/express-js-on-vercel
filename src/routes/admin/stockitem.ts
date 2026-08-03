@@ -78,28 +78,47 @@ router.delete('/stockitem', async (req, res) => {
   }
 });
 
+// Fetch all distinct brands
+router.get('/inventory/brands', async (req, res) => {
+  try {
+    const result = await neonDb.query('SELECT DISTINCT brand FROM app.inventory WHERE brand IS NOT NULL AND brand != \'\' ORDER BY brand');
+    const brands = result.rows.map(r => r.brand);
+    res.json({ data: brands });
+  } catch (err) {
+    console.error('[stockitem] GET /inventory/brands error:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
 // Paginated stock endpoint for admin/inventory/stock
 router.get('/inventory/stock', async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit) || 50, 500);
-    const offset = parseInt(req.query.offset) || 0;
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 500);
+    const offset = parseInt(req.query.offset as string) || 0;
     const search = req.query.search || '';
+    const brand = req.query.brand || '';
 
     const joinClause = 'LEFT JOIN app.inventory inv ON inv.id = s.id';
 
-    let countQuery = 'SELECT COUNT(*) FROM app.stock s';
-    let dataQuery = 'SELECT s.*, inv.fullname, inv.brand, inv.model, inv.varient, inv.color, inv.gst,inv.price AS inv_price FROM app.stock s';
+    let countQuery = `SELECT COUNT(*) FROM app.stock s ${joinClause} WHERE 1=1`;
+    let dataQuery = `SELECT s.*, inv.fullname, inv.brand, inv.model, inv.varient, inv.color, inv.gst,inv.price AS inv_price FROM app.stock s ${joinClause} WHERE 1=1`;
     const params: any[] = [];
     let idx = 1;
 
     if (search) {
-      const clause = ` WHERE (s.stockname ILIKE $${idx} OR inv.brand ILIKE $${idx} OR inv.model ILIKE $${idx} OR inv.fullname ILIKE $${idx})`;
-      countQuery += ` ${joinClause}` + clause;
-      dataQuery += ` ${joinClause}` + clause;
+      const clause = ` AND (s.stockname ILIKE $${idx} OR inv.brand ILIKE $${idx} OR inv.model ILIKE $${idx} OR inv.fullname ILIKE $${idx})`;
+      countQuery += clause;
+      dataQuery += clause;
       params.push(`%${search}%`);
       idx++;
-    } else {
-      dataQuery += ` ${joinClause} WHERE 1=1`;
+    }
+
+    if (brand && brand !== 'all') {
+      const clause = ` AND inv.brand ILIKE $${idx}`;
+      countQuery += clause;
+      dataQuery += clause;
+      params.push(brand);
+      idx++;
     }
 
     const countResult = await neonDb.query(countQuery, params);
