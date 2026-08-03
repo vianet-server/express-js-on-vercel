@@ -70,7 +70,13 @@ export function InventoryStock() {
   }, [dispatch, pageLimit, selectedBrand])
 
   useEffect(() => {
-    api.get<{data: string[]}>('/api/admin/inventory/brands').then(res => setBrands(res.data)).catch(console.error)
+    api.get<any>('/api/admin/inventory/brands')
+      .then(res => {
+        const rawList = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+        const list = rawList.filter((b: any) => typeof b === 'string' && b.trim().length > 0 && /[a-zA-Z]/.test(b));
+        setBrands(list);
+      })
+      .catch(console.error);
   }, []);
 
   useEffect(() => {
