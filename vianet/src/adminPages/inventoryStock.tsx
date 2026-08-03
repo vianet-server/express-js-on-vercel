@@ -134,7 +134,7 @@ export function InventoryStock() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Inventory Stock</h1>
         <div className="flex items-center gap-4">
-          <Select value={selectedBrand} onValueChange={(val) => { setSelectedBrand(val); setCurrentPage(0); }}>
+          <Select value={selectedBrand} onValueChange={(val) => { setSelectedBrand(val ?? 'all'); setCurrentPage(0); }}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Select Brand" />
             </SelectTrigger>
