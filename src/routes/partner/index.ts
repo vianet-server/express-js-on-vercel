@@ -2,9 +2,13 @@
  * partner/index.js
  *
  * Router entry point for all partner-level routes.
+ * Full paths below are relative to the /partner mount in src/index.ts.
  * Mounts the following sub-routers:
- * - /auth       -> auth.js (register, login)
- * - /profile    -> routes/profile.js (partner profile management)
+ * - /auth       -> auth.js          (/partner/auth/register, /partner/auth/login) — public, no auth
+ * - /profile    -> routes/profile.js (/partner/profile, GET/PUT) — requires auth('partner')
+ *
+ * Frontend callers: none yet — partner portal UI is not built. Intended for external
+ * partner access to their own profile and access-group-scoped inventory.
  */
 
 const express = require('express');

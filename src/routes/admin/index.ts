@@ -2,19 +2,24 @@
  * admin/index.js
  *
  * Router entry point for all admin-level routes.
+ * Full paths below are relative to the /api/admin mount in src/index.ts.
+ * Every sub-router except /login applies adminAuth (JWT with user_type === 'admin').
  * Mounts the following sub-routers:
- * - /login            -> login.js
- * - /accesscontrol    -> accesscontroll.js
- * - /inventory        -> inventory.js
- * - /stockitem        -> stockitem.js
- * - /stock            -> stock.js (covers stock-item, ledger, voucher, godown, masters, salesman)
- * - /api              -> api.js (API key management)
- * - /partner          -> partner.js (partner management)
- * - /employee         -> employee.js (employee management)
- * - /dashboard        -> dashboard.js
- * - /analytics        -> analytics.js
- * - /reports          -> reports.js
- * - /settings         -> settings.js
+ * - /login            -> login.js            (no auth)
+ * - /accesscontrol    -> accesscontroll.js   (mounted at /api/admin/accesscontrol)
+ * - /inventory        -> inventory.js        (mounted at /api/admin/inventory)
+ * - /stockitem        -> stockitem.js        (mounted at /api/admin/stockitem, /inventory/*, /inventory/sku/*, /migrate-partner-sku)
+ * - /stock            -> stock.js            (mounted at /api/admin/stock-item, /ledger, /voucher, /godown, /masters, /salesman, /salesman-chart)
+ * - /api              -> api.js              (mounted at /api/admin/api, /access-groups, /access-group)
+ * - /partner          -> partner.js          (mounted at /api/admin/partner)
+ * - /employee         -> employee.js         (mounted at /api/admin/employee)
+ * - /dashboard        -> dashboard.js        (mounted at /api/admin/dashboard)
+ * - /analytics        -> analytics.js        (mounted at /api/admin/analytics)
+ * - /reports          -> reports.js          (mounted at /api/admin/reports)
+ * - /settings         -> settings.js         (mounted at /api/admin/settings)
+ * - /market           -> market.js           (mounted at /api/admin/market)
+ *
+ * Frontend callers: vianet/src/adminPages/*.tsx (via useAdminQuery / api wrapper).
  */
 
 const express = require('express');

@@ -1,7 +1,7 @@
 const express = require('express');
-const { neonDb } = require('../../config/db');
 const adminAuth = require('../../middleware/adminAuth');
 const crypto = require('crypto');
+const { admin: dbq } = require('../../config/dbqueries');
 
 const router = express.Router();
 router.use(adminAuth);
@@ -10,46 +10,52 @@ function genGuid() { return crypto.randomUUID(); }
 
 // ==================== STOCK ITEM CRUD ====================
 
+/**
+ * POST /api/admin/stock-item
+ *
+ * Create a stock item. Generates a UUID guid, defaults masterid to 0.
+ *
+ * Auth: adminAuth.
+ * Requires (JSON body): { name, quantity?, price? }
+ * Returns:
+ *   201 { message: 'Stock item created', data: created row }
+ *   500 on error
+ *
+ * Called by: no direct frontend caller currently (admin stock UI uses /api/admin/inventory/*).
+ */
 router.post('/stock-item', async (req, res) => {
   try {
     const { name, quantity, price } = req.body;
-    const result = await neonDb.query(
-      'INSERT INTO app.stock (stockname, guid, quantity, price, masterid, created_at, updated_at) VALUES ($1, $2, $3, $4, 0, NOW(), NOW()) RETURNING *',
-      [name, genGuid(), quantity, price]
-    );
-    res.status(201).json({ message: 'Stock item created', data: result.rows[0] });
+    const data = await dbq.createStockItemGuid({ name, guid: genGuid(), quantity, price });
+    res.status(201).json({ message: 'Stock item created', data });
   } catch (err) {
     console.error('[stock] stock-item POST error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
+/**
+ * GET /api/admin/stock-item
+ *
+ * Paginated stock item list with optional name search. Maps DB rows to the
+ * UI shape { id, name, category, qty, value, status }.
+ *
+ * Auth: adminAuth.
+ * Query params: { name?, limit? (default 50, max 500), offset? (default 0) }
+ * Returns:
+ *   200 { rows: [...], total, limit, offset }
+ *   500 fallback { rows: [], total: 0, limit: 50, offset: 0 }
+ *
+ * Called by: no direct frontend caller currently.
+ */
 router.get('/stock-item', async (req, res) => {
   try {
     const { name } = req.query;
     const limit = Math.min(parseInt(req.query.limit as string) || 50, 500);
     const offset = parseInt(req.query.offset as string) || 0;
 
-    let countQuery = 'SELECT COUNT(*) FROM app.stock WHERE 1=1';
-    let dataQuery = 'SELECT * FROM app.stock WHERE 1=1';
-    const params: any[] = [];
-    let idx = 1;
-
-    if (name) {
-      const clause = ` AND stockname ILIKE $${idx++}`;
-      countQuery += clause;
-      dataQuery += clause;
-      params.push(`%${name}%`);
-    }
-
-    const countResult = await neonDb.query(countQuery, params);
-    const total = parseInt(countResult.rows[0].count);
-
-    dataQuery += ` ORDER BY id DESC LIMIT $${idx} OFFSET $${idx + 1}`;
-    params.push(limit, offset);
-
-    const result = await neonDb.query(dataQuery, params);
-    const rows = result.rows.map((r: any) => ({
+    const { rows, total } = await dbq.listStockItemsAdmin({ name, limit, offset });
+    const mapped = rows.map((r: any) => ({
       id: r.id,
       name: r.stockname || '',
       category: '',
@@ -57,33 +63,58 @@ router.get('/stock-item', async (req, res) => {
       value: parseFloat(r.price) || 0,
       status: 'Active',
     }));
-    res.json({ rows, total, limit, offset });
+    res.json({ rows: mapped, total, limit, offset });
   } catch (err) {
     console.error('[stock] stock-item GET error:', err);
     res.json({ rows: [], total: 0, limit: 50, offset: 0 });
   }
 });
 
+/**
+ * PUT /api/admin/stock-item
+ *
+ * Update a stock item by id.
+ *
+ * Auth: adminAuth.
+ * Requires (JSON body): { id, name?, quantity?, price? }
+ * Returns:
+ *   200 { message: 'Stock item updated', data: updated row }
+ *   404 when not found
+ *   500 on error
+ *
+ * Called by: no direct frontend caller currently.
+ */
 router.put('/stock-item', async (req, res) => {
   try {
     const { id, name, quantity, price } = req.body;
-    const result = await neonDb.query(
-      'UPDATE app.stock SET stockname = $1, quantity = $2, price = $3, updated_at = NOW() WHERE id = $4 RETURNING *',
-      [name, quantity, price, id]
-    );
-    if (result.rows.length === 0) return res.status(404).json({ message: 'Stock item not found' });
-    res.status(200).json({ message: 'Stock item updated', data: result.rows[0] });
+    const data = await dbq.updateStockItemById({ id, name, quantity, price });
+    if (!data) return res.status(404).json({ message: 'Stock item not found' });
+    res.status(200).json({ message: 'Stock item updated', data });
   } catch (err) {
     console.error('[stock] stock-item PUT error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
+/**
+ * DELETE /api/admin/stock-item
+ *
+ * Delete a stock item by id.
+ *
+ * Auth: adminAuth.
+ * Requires (JSON body): { id }
+ * Returns:
+ *   200 { message: 'Stock item deleted' }
+ *   404 when not found
+ *   500 on error
+ *
+ * Called by: no direct frontend caller currently.
+ */
 router.delete('/stock-item', async (req, res) => {
   try {
     const { id } = req.body;
-    const result = await neonDb.query('DELETE FROM app.stock WHERE id = $1 RETURNING id', [id]);
-    if (result.rows.length === 0) return res.status(404).json({ message: 'Stock item not found' });
+    const data = await dbq.deleteStockItemById(id);
+    if (!data) return res.status(404).json({ message: 'Stock item not found' });
     res.status(200).json({ message: 'Stock item deleted' });
   } catch (err) {
     console.error('[stock] stock-item DELETE error:', err);
@@ -93,56 +124,99 @@ router.delete('/stock-item', async (req, res) => {
 
 // ==================== LEDGER CRUD ====================
 
+/**
+ * POST /api/admin/ledger
+ *
+ * Create a ledger (customer/supplier party). address/mobile stored as arrays.
+ *
+ * Auth: adminAuth.
+ * Requires (JSON body): { name, address?, mobile? }
+ * Returns:
+ *   201 { message: 'Ledger created', data: created row }
+ *   500 on error
+ *
+ * Called by: no direct frontend caller currently.
+ */
 router.post('/ledger', async (req, res) => {
   try {
     const { name, address, mobile } = req.body;
-    const result = await neonDb.query(
-      'INSERT INTO app.ledger (guid, name, address, mobile) VALUES ($1, $2, $3, $4) RETURNING *',
-      [genGuid(), name, address ? [address] : null, mobile ? [mobile] : null]
-    );
-    res.status(201).json({ message: 'Ledger created', data: result.rows[0] });
+    const data = await dbq.createLedger({ guid: genGuid(), name, address, mobile });
+    res.status(201).json({ message: 'Ledger created', data });
   } catch (err) {
     console.error('[stock] ledger POST error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
+/**
+ * GET /api/admin/ledger
+ *
+ * List ledgers, optionally filtered by name (case-insensitive contains).
+ *
+ * Auth: adminAuth.
+ * Query params: { name? }
+ * Returns:
+ *   200 { message: 'Ledgers fetched', data: [{ id, guid, name, address, mobile, ledgername }] }
+ *   500 on error
+ *
+ * Called by: no direct frontend caller currently.
+ */
 router.get('/ledger', async (req, res) => {
   try {
     const { name } = req.query;
-    let query = 'SELECT id, guid, name, address, mobile, ledgername FROM app.ledger WHERE 1=1';
-    const params: any[] = [];
-    let idx = 1;
-    if (name) { query += ` AND name ILIKE $${idx++}`; params.push(`%${name}%`); }
-    query += ' ORDER BY name';
-    const result = await neonDb.query(query, params);
-    res.status(200).json({ message: 'Ledgers fetched', data: result.rows });
+    const data = await dbq.listLedgers({ name });
+    res.status(200).json({ message: 'Ledgers fetched', data });
   } catch (err) {
     console.error('[stock] ledger GET error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
+/**
+ * PUT /api/admin/ledger
+ *
+ * Update a ledger by id.
+ *
+ * Auth: adminAuth.
+ * Requires (JSON body): { id, name?, address?, mobile? }
+ * Returns:
+ *   200 { message: 'Ledger updated', data: updated row }
+ *   404 when not found
+ *   500 on error
+ *
+ * Called by: no direct frontend caller currently.
+ */
 router.put('/ledger', async (req, res) => {
   try {
     const { id, name, address, mobile } = req.body;
-    const result = await neonDb.query(
-      'UPDATE app.ledger SET name = $1, address = $2, mobile = $3 WHERE id = $4 RETURNING *',
-      [name, address ? [address] : null, mobile ? [mobile] : null, id]
-    );
-    if (result.rows.length === 0) return res.status(404).json({ message: 'Ledger not found' });
-    res.status(200).json({ message: 'Ledger updated', data: result.rows[0] });
+    const data = await dbq.updateLedger({ id, name, address, mobile });
+    if (!data) return res.status(404).json({ message: 'Ledger not found' });
+    res.status(200).json({ message: 'Ledger updated', data });
   } catch (err) {
     console.error('[stock] ledger PUT error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
+/**
+ * DELETE /api/admin/ledger
+ *
+ * Delete a ledger by id.
+ *
+ * Auth: adminAuth.
+ * Requires (JSON body): { id }
+ * Returns:
+ *   200 { message: 'Ledger deleted' }
+ *   404 when not found
+ *   500 on error
+ *
+ * Called by: no direct frontend caller currently.
+ */
 router.delete('/ledger', async (req, res) => {
   try {
     const { id } = req.body;
-    const result = await neonDb.query('DELETE FROM app.ledger WHERE id = $1 RETURNING id', [id]);
-    if (result.rows.length === 0) return res.status(404).json({ message: 'Ledger not found' });
+    const data = await dbq.deleteLedger(id);
+    if (!data) return res.status(404).json({ message: 'Ledger not found' });
     res.status(200).json({ message: 'Ledger deleted' });
   } catch (err) {
     console.error('[stock] ledger DELETE error:', err);
@@ -152,36 +226,52 @@ router.delete('/ledger', async (req, res) => {
 
 // ==================== VOUCHER CRUD ====================
 
+/**
+ * POST /api/admin/voucher
+ *
+ * Create a voucher (sales/receipt/payment/purchase/etc). Generates a UUID guid.
+ *
+ * Auth: adminAuth.
+ * Requires (JSON body): { voucher_type, voucher_number?, date?, narration?, party_ledger_name? }
+ * Returns:
+ *   201 { message: 'Voucher created', data: created row }
+ *   500 on error
+ *
+ * Called by: no direct frontend caller currently (vouchers are displayed via
+ *   GET /api/admin/reports/daybook and /api/admin/reports/outstanding).
+ */
 router.post('/voucher', async (req, res) => {
   try {
     const { voucher_type, voucher_number, date, narration, party_ledger_name } = req.body;
-    const result = await neonDb.query(
-      `INSERT INTO app.vouchers (guid, date, voucher_type, voucher_number, party_ledger_name, narration)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [genGuid(), date, voucher_type, voucher_number, party_ledger_name, narration]
-    );
-    res.status(201).json({ message: 'Voucher created', data: result.rows[0] });
+    const data = await dbq.createVoucher({ guid: genGuid(), date, voucher_type, voucher_number, party_ledger_name, narration });
+    res.status(201).json({ message: 'Voucher created', data });
   } catch (err) {
     console.error('[stock] voucher POST error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
+/**
+ * GET /api/admin/voucher
+ *
+ * List vouchers, optionally filtered by type/number/date range (max 200 rows,
+ * newest first). Each row gets a derived `amount` (sum of ledgerentries where
+ * isDeemedPositive === 'No') plus type/number aliases.
+ *
+ * Auth: adminAuth.
+ * Query params: { voucher_type?, voucher_number?, from_date?, to_date? }
+ * Returns:
+ *   200 [{ id, guid, date, voucher_type, voucher_number, party_ledger_name, narration,
+ *          ledgerentries, inventoryentries, created_at, billagentname, amount, type, number }]
+ *   500 { message, error }
+ *
+ * Called by: no direct frontend caller currently (see /reports endpoints instead).
+ */
 router.get('/voucher', async (req, res) => {
   try {
     const { voucher_type, voucher_number, from_date, to_date } = req.query;
-    let query = `SELECT id, guid, date, voucher_type, voucher_number, party_ledger_name,
-                        narration, ledgerentries, inventoryentries, created_at, billagentname
-                 FROM app.vouchers WHERE 1=1`;
-    const params: any[] = [];
-    let idx = 1;
-    if (voucher_type) { query += ` AND voucher_type = $${idx++}`; params.push(voucher_type); }
-    if (voucher_number) { query += ` AND voucher_number = $${idx++}`; params.push(voucher_number); }
-    if (from_date) { query += ` AND date >= $${idx++}`; params.push(from_date); }
-    if (to_date) { query += ` AND date <= $${idx++}`; params.push(to_date); }
-    query += ' ORDER BY date DESC LIMIT 200';
-    const result = await neonDb.query(query, params);
-    const rows = result.rows.map((r: any) => ({
+    const result = await dbq.listVouchers({ voucher_type, voucher_number, from_date, to_date });
+    const rows = result.map((r: any) => ({
       ...r,
       type: r.voucher_type,
       number: r.voucher_number,
@@ -198,27 +288,51 @@ router.get('/voucher', async (req, res) => {
   }
 });
 
+/**
+ * PUT /api/admin/voucher
+ *
+ * Update a voucher by id.
+ *
+ * Auth: adminAuth.
+ * Requires (JSON body): { id, voucher_type?, voucher_number?, date?, narration?, party_ledger_name? }
+ * Returns:
+ *   200 { message: 'Voucher updated', data: updated row }
+ *   404 when not found
+ *   500 on error
+ *
+ * Called by: no direct frontend caller currently.
+ */
 router.put('/voucher', async (req, res) => {
   try {
     const { id, voucher_type, voucher_number, date, narration, party_ledger_name } = req.body;
-    const result = await neonDb.query(
-      `UPDATE app.vouchers SET voucher_type = $1, voucher_number = $2, date = $3,
-       narration = $4, party_ledger_name = $5 WHERE id = $6 RETURNING *`,
-      [voucher_type, voucher_number, date, narration, party_ledger_name, id]
-    );
-    if (result.rows.length === 0) return res.status(404).json({ message: 'Voucher not found' });
-    res.status(200).json({ message: 'Voucher updated', data: result.rows[0] });
+    const data = await dbq.updateVoucher({ id, voucher_type, voucher_number, date, narration, party_ledger_name });
+    if (!data) return res.status(404).json({ message: 'Voucher not found' });
+    res.status(200).json({ message: 'Voucher updated', data });
   } catch (err) {
     console.error('[stock] voucher PUT error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
+/**
+ * DELETE /api/admin/voucher
+ *
+ * Delete a voucher by id.
+ *
+ * Auth: adminAuth.
+ * Requires (JSON body): { id }
+ * Returns:
+ *   200 { message: 'Voucher deleted' }
+ *   404 when not found
+ *   500 on error
+ *
+ * Called by: no direct frontend caller currently.
+ */
 router.delete('/voucher', async (req, res) => {
   try {
     const { id } = req.body;
-    const result = await neonDb.query('DELETE FROM app.vouchers WHERE id = $1 RETURNING id', [id]);
-    if (result.rows.length === 0) return res.status(404).json({ message: 'Voucher not found' });
+    const data = await dbq.deleteVoucher(id);
+    if (!data) return res.status(404).json({ message: 'Voucher not found' });
     res.status(200).json({ message: 'Voucher deleted' });
   } catch (err) {
     console.error('[stock] voucher DELETE error:', err);
@@ -228,55 +342,99 @@ router.delete('/voucher', async (req, res) => {
 
 // ==================== GODOWN CRUD ====================
 
+/**
+ * POST /api/admin/godown
+ *
+ * Create a godown (warehouse).
+ *
+ * Auth: adminAuth.
+ * Requires (JSON body): { name, address? }
+ * Returns:
+ *   201 { message: 'Godown created', data: created row }
+ *   500 on error
+ *
+ * Called by: no direct frontend caller currently.
+ */
 router.post('/godown', async (req, res) => {
   try {
     const { name, address } = req.body;
-    const result = await neonDb.query(
-      'INSERT INTO godowns (name, address, created_at, updated_at) VALUES ($1, $2, NOW(), NOW()) RETURNING *',
-      [name, address]
-    );
-    res.status(201).json({ message: 'Godown created', data: result.rows[0] });
+    const data = await dbq.createGodown({ name, address });
+    res.status(201).json({ message: 'Godown created', data });
   } catch (err) {
     console.error('[stock] godown POST error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
+/**
+ * GET /api/admin/godown
+ *
+ * List godowns, optionally filtered by name.
+ *
+ * Auth: adminAuth.
+ * Query params: { name? }
+ * Returns:
+ *   200 { message: 'Godowns fetched', data: [...godown rows] }
+ *   500 on error
+ *
+ * Called by: no direct frontend caller currently.
+ */
 router.get('/godown', async (req, res) => {
   try {
     const { name } = req.query;
-    let query = 'SELECT * FROM godowns WHERE 1=1';
-    const params: any[] = [];
-    let idx = 1;
-    if (name) { query += ` AND name ILIKE $${idx++}`; params.push(`%${name}%`); }
-    const result = await neonDb.query(query, params);
-    res.status(200).json({ message: 'Godowns fetched', data: result.rows });
+    const data = await dbq.listGodowns({ name });
+    res.status(200).json({ message: 'Godowns fetched', data });
   } catch (err) {
     console.error('[stock] godown GET error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
+/**
+ * PUT /api/admin/godown
+ *
+ * Update a godown by id.
+ *
+ * Auth: adminAuth.
+ * Requires (JSON body): { id, name?, address? }
+ * Returns:
+ *   200 { message: 'Godown updated', data: updated row }
+ *   404 when not found
+ *   500 on error
+ *
+ * Called by: no direct frontend caller currently.
+ */
 router.put('/godown', async (req, res) => {
   try {
     const { id, name, address } = req.body;
-    const result = await neonDb.query(
-      'UPDATE godowns SET name = $1, address = $2, updated_at = NOW() WHERE id = $3 RETURNING *',
-      [name, address, id]
-    );
-    if (result.rows.length === 0) return res.status(404).json({ message: 'Godown not found' });
-    res.status(200).json({ message: 'Godown updated', data: result.rows[0] });
+    const data = await dbq.updateGodown({ id, name, address });
+    if (!data) return res.status(404).json({ message: 'Godown not found' });
+    res.status(200).json({ message: 'Godown updated', data });
   } catch (err) {
     console.error('[stock] godown PUT error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
+/**
+ * DELETE /api/admin/godown
+ *
+ * Delete a godown by id.
+ *
+ * Auth: adminAuth.
+ * Requires (JSON body): { id }
+ * Returns:
+ *   200 { message: 'Godown deleted' }
+ *   404 when not found
+ *   500 on error
+ *
+ * Called by: no direct frontend caller currently.
+ */
 router.delete('/godown', async (req, res) => {
   try {
     const { id } = req.body;
-    const result = await neonDb.query('DELETE FROM godowns WHERE id = $1 RETURNING id', [id]);
-    if (result.rows.length === 0) return res.status(404).json({ message: 'Godown not found' });
+    const data = await dbq.deleteGodown(id);
+    if (!data) return res.status(404).json({ message: 'Godown not found' });
     res.status(200).json({ message: 'Godown deleted' });
   } catch (err) {
     console.error('[stock] godown DELETE error:', err);
@@ -286,56 +444,71 @@ router.delete('/godown', async (req, res) => {
 
 // ==================== MASTERS & SALESMAN ====================
 
+/**
+ * GET /api/admin/masters
+ *
+ * Record counts per master table (stock, ledger, voucher, godown).
+ *
+ * Auth: adminAuth.
+ * Query params: none.
+ * Returns:
+ *   200 [{ id, name, records, lastUpdated, status }] for the 4 masters
+ *   500 fallback [] (e.g. table missing)
+ *
+ * Called by: vianet/src/adminPages/tallyMasters.tsx -> api.get('/api/admin/masters')
+ *   Displays: cards/rows of master tables with their record counts and sync status.
+ */
 router.get('/masters', async (req, res) => {
   try {
-    const [stock, ledger, voucher, godown] = await Promise.all([
-      neonDb.query("SELECT COUNT(*) FROM app.stock"),
-      neonDb.query("SELECT COUNT(*) FROM app.ledger"),
-      neonDb.query("SELECT COUNT(*) FROM app.vouchers"),
-      neonDb.query("SELECT COUNT(*) FROM godowns"),
-    ]);
-    res.json([
-      { id: 'stock', name: 'Stock Items', records: parseInt(stock.rows[0].count), lastUpdated: '', status: 'Active' },
-      { id: 'ledger', name: 'Ledgers', records: parseInt(ledger.rows[0].count), lastUpdated: '', status: 'Active' },
-      { id: 'voucher', name: 'Vouchers', records: parseInt(voucher.rows[0].count), lastUpdated: '', status: 'Active' },
-      { id: 'godown', name: 'Godowns', records: parseInt(godown.rows[0].count), lastUpdated: '', status: 'Active' },
-    ]);
+    const counts = await dbq.getMasterCounts();
+    res.json(counts.map((c: any) => ({ ...c, lastUpdated: '', status: 'Active' })));
   } catch (err) {
     console.error('[stock] GET /masters error:', err);
     res.json([]);
   }
 });
 
+/**
+ * GET /api/admin/salesman
+ *
+ * Salesman leaderboard from app.sales_records: order count + total sales per salesman.
+ *
+ * Auth: adminAuth.
+ * Query params: none.
+ * Returns:
+ *   200 [{ id, name, orders, sales, region, status, target, achieved, commission }]
+ *   region/target/achieved/commission are placeholder values ('' or 0).
+ *   500 fallback []
+ *
+ * Called by: no direct frontend caller currently.
+ */
 router.get('/salesman', async (req, res) => {
   try {
-    const result = await neonDb.query(`
-      SELECT
-        ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) AS id,
-        salesman AS name,
-        COUNT(*)::integer AS orders,
-        COALESCE(SUM(bill_amt), 0) AS sales
-      FROM app.sales_records
-      WHERE salesman IS NOT NULL AND salesman != ''
-      GROUP BY salesman
-      ORDER BY COUNT(*) DESC
-    `);
-    res.json(result.rows.map((r: any) => ({ id: r.id, name: r.name, orders: r.orders, sales: parseFloat(r.sales) || 0, region: '', status: 'Active', target: 0, achieved: 0, commission: 0 })));
+    const result = await dbq.listSalesmen();
+    res.json(result.map((r: any) => ({ id: r.id, name: r.name, orders: r.orders, sales: parseFloat(r.sales) || 0, region: '', status: 'Active', target: 0, achieved: 0, commission: 0 })));
   } catch (err) {
     console.error('[stock] GET /salesman error:', err);
     res.json([]);
   }
 });
 
+/**
+ * GET /api/admin/salesman-chart
+ *
+ * Daily sales per salesman from app.sales_records (for charting).
+ *
+ * Auth: adminAuth.
+ * Query params: none.
+ * Returns:
+ *   200 [{ date, name, sales }]
+ *   500 fallback []
+ *
+ * Called by: no direct frontend caller currently.
+ */
 router.get('/salesman-chart', async (req, res) => {
   try {
-    const result = await neonDb.query(`
-      SELECT sales_date, salesman, SUM(bill_amt) AS sales
-      FROM app.sales_records
-      WHERE salesman IS NOT NULL AND salesman != ''
-      GROUP BY sales_date, salesman
-      ORDER BY sales_date
-    `);
-    res.json(result.rows.map((r: any) => ({ date: r.sales_date, name: r.salesman, sales: parseFloat(r.sales) || 0 })));
+    const result = await dbq.listSalesmanChart();
+    res.json(result.map((r: any) => ({ date: r.sales_date, name: r.salesman, sales: parseFloat(r.sales) || 0 })));
   } catch (err) {
     console.error('[stock] GET /salesman-chart error:', err);
     res.json([]);

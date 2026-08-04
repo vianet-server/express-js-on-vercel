@@ -1,3 +1,15 @@
+/**
+ * adminAuth
+ *
+ * Admin-only JWT middleware. Verifies `Authorization: Bearer <jwt>` and requires
+ * user_type === 'admin'. Attaches the payload to req.user.
+ *
+ * Errors:
+ *   401 when no/invalid token
+ *   403 when the user is not an admin
+ *
+ * Used by: every /api/admin/* route (mounted via router.use(adminAuth)).
+ */
 const jwt = require('jsonwebtoken');
 
 const adminAuth = (req, res, next) => {

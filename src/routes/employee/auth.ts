@@ -1,60 +1,87 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { neonDb } = require('../../config/db');
+const { findUserByEmail, getMinAccessGroupId, createUser, createEmployeeProfile, findEmployeeLoginUser } = require('../../config/dbqueries/employee');
 
 const router = express.Router();
 
+/**
+ * POST /employee/auth/register
+ *
+ * Employee self-registration. Creates a user with user_type 'employee' assigned to
+ * the lowest-id access group, optional employee_profiles row, and returns a JWT.
+ *
+ * Auth: none (public).
+ * Requires (JSON body): { email, password, employee_id?, first_name?, last_name?, phone?, designation? }
+ * Returns:
+ *   201 { token, message, email, user_type: 'employee' }
+ *   400 when email/password missing or no access group exists
+ *   409 when email already exists
+ *   500 on error
+ *
+ * Called by: vianet/src/employPages/auth/employsignup.tsx -> fetch('/employee/auth/register', {...})
+ *   Displays: sign-up form; on success navigates to /employ/login.
+ */
 router.post('/register', async (req, res) => {
   try {
     const { email, password, employee_id, first_name, last_name, phone, designation } = req.body;
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required' });
     }
-    const existing = await neonDb.query('SELECT * FROM app.users WHERE email = $1', [email]);
-    if (existing.rows.length > 0) {
+    const existing = await findUserByEmail(email);
+    if (existing) {
       return res.status(409).json({ message: 'User already exists' });
     }
     const password_hash = await bcrypt.hash(password, 10);
-    const groupId = (await neonDb.query('SELECT MIN(id) as id FROM app.access_groups')).rows[0]?.id;
+    const groupId = await getMinAccessGroupId();
     if (!groupId) {
       return res.status(400).json({ message: 'No access group available. Contact admin.' });
     }
     const fullName = [first_name, last_name].filter(Boolean).map(s => s.trim()).join(' ') || email.split('@')[0] || 'Employee';
-    const result = await neonDb.query(
-      'INSERT INTO app.users (name, email, password, user_type, access_group_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING id, email, user_type',
-      [fullName, email, password_hash, 'employee', groupId]
-    );
+    const result = await createUser({ name: fullName, email, password_hash, user_type: 'employee', access_group_id: groupId });
     if (employee_id || first_name || last_name || phone || designation) {
       try {
-        await neonDb.query(
-          'INSERT INTO employee_profiles (user_id, employee_id, first_name, last_name, phone, designation, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())',
-          [result.rows[0].id, employee_id, first_name, last_name, phone, designation]
-        );
+        await createEmployeeProfile({ user_id: result.id, employee_id, first_name, last_name, phone, designation });
       } catch (profileErr) {
         console.warn('[employee/auth] profile insert skipped:', profileErr.message);
       }
     }
     const token = jwt.sign(
-      { id: result.rows[0].id, email: result.rows[0].email, user_type: 'employee' },
+      { id: result.id, email: result.email, user_type: 'employee' },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
-    res.status(201).json({ token, message: 'Employee registered', email: result.rows[0].email, user_type: 'employee' });
+    res.status(201).json({ token, message: 'Employee registered', email: result.email, user_type: 'employee' });
   } catch (err) {
     console.error('[employee/auth] register error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
+/**
+ * POST /employee/auth/login
+ *
+ * Employee login. Accepts users of type 'employee' OR 'admin', returns a JWT.
+ *
+ * Auth: none (public).
+ * Requires (JSON body): { email, password }
+ * Returns:
+ *   200 { token, message, email, user_type }
+ *   400 { message, token: null } when credentials missing
+ *   401 { message, token: null } on invalid credentials
+ *   500 { message, token: null, error }
+ *
+ * Called by: vianet/src/employPages/auth/employlogin.tsx -> fetch('/employee/auth/login', {...})
+ *   Displays: login form; on success stores the JWT via useAuth().login() and
+ *   navigates to /employ/home (or the originally requested employ route).
+ */
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required', token: null });
     }
-    const result = await neonDb.query('SELECT * FROM app.users WHERE email = $1 AND (user_type = $2 OR user_type = $3)', [email, 'employee', 'admin']);
-    const user = result.rows[0];
+    const user = await findEmployeeLoginUser(email);
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials', token: null });
     }

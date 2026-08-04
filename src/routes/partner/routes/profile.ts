@@ -1,38 +1,58 @@
 const express = require('express');
-const { neonDb } = require('../../../config/db');
+const { getUserBriefById, findPartnerProfile, updatePartnerProfileByUserId, createPartnerProfile } = require('../../../config/dbqueries/partner');
 const auth = require('../../../middleware/auth');
 
 const router = express.Router();
 
 router.use(auth('partner'));
 
+/**
+ * GET /partner/profile
+ *
+ * Fetch the authenticated partner's user row + partner_profiles row.
+ *
+ * Auth: auth('partner') (admin also allowed).
+ * Query params: none.
+ * Returns:
+ *   200 { message: 'Partner profile fetched', data: { id, email, user_type, profile } }
+ *   500 on error
+ *
+ * Called by: no frontend caller yet (partner portal UI not built).
+ */
 router.get('/', async (req, res) => {
   try {
     const user_id = req.user.id;
-    const userResult = await neonDb.query('SELECT id, email, user_type FROM app.users WHERE id = $1', [user_id]);
-    const profileResult = await neonDb.query('SELECT * FROM partner_profiles WHERE user_id = $1', [user_id]);
-    res.status(200).json({ message: 'Partner profile fetched', data: { ...userResult.rows[0], profile: profileResult.rows[0] || null } });
+    const user = await getUserBriefById(user_id);
+    const profile = await findPartnerProfile(user_id);
+    res.status(200).json({ message: 'Partner profile fetched', data: { ...user, profile: profile || null } });
   } catch (err) {
     console.error('[partner/profile] GET error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
+/**
+ * PUT /partner/profile
+ *
+ * Update the authenticated partner's profile (upserts partner_profiles).
+ *
+ * Auth: auth('partner') (admin also allowed).
+ * Requires (JSON body): { company_name?, phone?, address? }
+ * Returns:
+ *   200 { message: 'Partner profile updated' }
+ *   500 on error
+ *
+ * Called by: no frontend caller yet.
+ */
 router.put('/', async (req, res) => {
   try {
     const user_id = req.user.id;
     const { company_name, phone, address } = req.body;
-    const existing = await neonDb.query('SELECT * FROM partner_profiles WHERE user_id = $1', [user_id]);
-    if (existing.rows.length > 0) {
-      await neonDb.query(
-        'UPDATE partner_profiles SET company_name = $1, phone = $2, address = $3, updated_at = NOW() WHERE user_id = $4',
-        [company_name, phone, address, user_id]
-      );
+    const existing = await findPartnerProfile(user_id);
+    if (existing) {
+      await updatePartnerProfileByUserId({ user_id, company_name, phone, address });
     } else {
-      await neonDb.query(
-        'INSERT INTO partner_profiles (user_id, company_name, phone, address, created_at, updated_at) VALUES ($1, $2, $3, $4, NOW(), NOW())',
-        [user_id, company_name, phone, address]
-      );
+      await createPartnerProfile({ user_id, company_name, phone, address });
     }
     res.status(200).json({ message: 'Partner profile updated' });
   } catch (err) {

@@ -6,69 +6,108 @@
  */
 
 const express = require('express');
-const { neonDb } = require('../../config/db');
 const adminAuth = require('../../middleware/adminAuth');
+const { admin: dbq } = require('../../config/dbqueries');
 
 const router = express.Router();
 
 router.use(adminAuth);
 
-// Create a new inventory record
+/**
+ * POST /api/admin/inventory
+ *
+ * Create an inventory record (stock quantity per godown).
+ *
+ * Auth: adminAuth.
+ * Requires (JSON body): { stockitem_id, godown_id, quantity }
+ * Returns:
+ *   201 { message: 'Inventory record created', data: created row }
+ *   500 on error
+ *
+ * Called by: no direct frontend caller currently (frontend uses /api/admin/inventory/stock/* and sku/access-group/*).
+ */
 router.post('/inventory', async (req, res) => {
   try {
     const { stockitem_id, godown_id, quantity } = req.body;
-    const result = await neonDb.query(
-      'INSERT INTO inventory (stockitem_id, godown_id, quantity, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW()) RETURNING *',
-      [stockitem_id, godown_id, quantity]
-    );
-    res.status(201).json({ message: 'Inventory record created', data: result.rows[0] });
+    const data = await dbq.createInventoryRecord({ stockitem_id, godown_id, quantity });
+    res.status(201).json({ message: 'Inventory record created', data });
   } catch (err) {
     console.error('[inventory] POST error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
-// Get all inventory records with optional filtering
+/**
+ * GET /api/admin/inventory
+ *
+ * List inventory records, optionally filtered by stockitem_id and/or godown_id.
+ *
+ * Auth: adminAuth.
+ * Query params: { stockitem_id?, godown_id? }
+ * Returns:
+ *   200 { message: 'Inventory records fetched', data: [...rows] }
+ *   500 on error
+ *
+ * Called by: no direct frontend caller currently.
+ */
 router.get('/inventory', async (req, res) => {
   try {
     const { stockitem_id, godown_id } = req.query;
-    let query = 'SELECT * FROM inventory WHERE 1=1';
-    const params: any[] = [];
-    let idx = 1;
-    if (stockitem_id) { query += ` AND stockitem_id = $${idx++}`; params.push(stockitem_id); }
-    if (godown_id) { query += ` AND godown_id = $${idx++}`; params.push(godown_id); }
-    const result = await neonDb.query(query, params);
-    res.status(200).json({ message: 'Inventory records fetched', data: result.rows });
+    const data = await dbq.listInventoryRecords({ stockitem_id, godown_id });
+    res.status(200).json({ message: 'Inventory records fetched', data });
   } catch (err) {
     console.error('[inventory] GET error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
-// Update an inventory record by ID
+/**
+ * PUT /api/admin/inventory
+ *
+ * Update an inventory record by id.
+ *
+ * Auth: adminAuth.
+ * Requires (JSON body): { id, stockitem_id?, godown_id?, quantity? }
+ * Returns:
+ *   200 { message: 'Inventory record updated', data: updated row }
+ *   404 when not found
+ *   500 on error
+ *
+ * Called by: no direct frontend caller currently.
+ */
 router.put('/inventory', async (req, res) => {
   try {
     const { id, stockitem_id, godown_id, quantity } = req.body;
-    const result = await neonDb.query(
-      'UPDATE inventory SET stockitem_id = $1, godown_id = $2, quantity = $3, updated_at = NOW() WHERE id = $4 RETURNING *',
-      [stockitem_id, godown_id, quantity, id]
-    );
-    if (result.rows.length === 0) {
+    const data = await dbq.updateInventoryRecord({ id, stockitem_id, godown_id, quantity });
+    if (!data) {
       return res.status(404).json({ message: 'Inventory record not found' });
     }
-    res.status(200).json({ message: 'Inventory record updated', data: result.rows[0] });
+    res.status(200).json({ message: 'Inventory record updated', data });
   } catch (err) {
     console.error('[inventory] PUT error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
-// Delete an inventory record by ID
+/**
+ * DELETE /api/admin/inventory
+ *
+ * Delete an inventory record by id.
+ *
+ * Auth: adminAuth.
+ * Requires (JSON body): { id }
+ * Returns:
+ *   200 { message: 'Inventory record deleted' }
+ *   404 when not found
+ *   500 on error
+ *
+ * Called by: no direct frontend caller currently.
+ */
 router.delete('/inventory', async (req, res) => {
   try {
     const { id } = req.body;
-    const result = await neonDb.query('DELETE FROM inventory WHERE id = $1 RETURNING id', [id]);
-    if (result.rows.length === 0) {
+    const data = await dbq.deleteInventoryRecord(id);
+    if (!data) {
       return res.status(404).json({ message: 'Inventory record not found' });
     }
     res.status(200).json({ message: 'Inventory record deleted' });

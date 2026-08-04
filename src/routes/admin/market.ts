@@ -1,34 +1,34 @@
 const express = require('express');
-const { neonDb } = require('../../config/db');
+const { getMarketOverview, getMarketSalesTrend, getMarketCategoryData, getMarketCandlestick } = require('../../config/dbqueries/admin');
 const adminAuth = require('../../middleware/adminAuth');
 
 const router = express.Router();
 
 router.use(adminAuth);
 
+/**
+ * GET /api/admin/market
+ *
+ * Market overview: 30-day sales/orders vs the prior 30 days, today vs yesterday
+ * volume, top 10 products by value, total stock count, top 5 regions, plus a
+ * formatted summary list.
+ *
+ * Auth: adminAuth.
+ * Query params: none.
+ * Returns:
+ *   200 {
+ *     marketIndex: { value, change, changePct, dayChange, dayChangePct, volume, volumeChange },
+ *     topMovers: [{ rank, product, category, price, total_value }],
+ *     marketSummary: [{ label, value }]
+ *   }
+ *   500 fallback zeroed object
+ *
+ * Called by: vianet/src/adminPages/market.tsx -> useAdminQuery('/api/admin/market')
+ *   Displays: market index card, top movers, and summary stats.
+ */
 router.get('/', async (req, res) => {
   try {
-    const now30 = await neonDb.query(
-      "SELECT COALESCE(SUM(bill_amt),0) AS total, COUNT(*) AS orders FROM app.sales_records WHERE sales_date >= CURRENT_DATE - 30"
-    );
-    const prev30 = await neonDb.query(
-      "SELECT COALESCE(SUM(bill_amt),0) AS total FROM app.sales_records WHERE sales_date >= CURRENT_DATE - 60 AND sales_date < CURRENT_DATE - 30"
-    );
-    const todaySales = await neonDb.query(
-      "SELECT COALESCE(SUM(bill_amt),0) AS vol FROM app.sales_records WHERE sales_date = CURRENT_DATE"
-    );
-    const yesterdaySales = await neonDb.query(
-      "SELECT COALESCE(SUM(bill_amt),0) AS vol FROM app.sales_records WHERE sales_date = CURRENT_DATE - 1"
-    );
-    const topProducts = await neonDb.query(
-      "SELECT stockname, quantity, price, (COALESCE(quantity,0) * COALESCE(price,0)) AS total_value FROM app.stock ORDER BY total_value DESC LIMIT 10"
-    );
-    const stockCount = await neonDb.query(
-      "SELECT COUNT(*) AS cnt FROM app.stock"
-    );
-    const regionData = await neonDb.query(
-      "SELECT COALESCE(NULLIF(parent, ''), 'Other') AS region, SUM(bill_amt) AS sales FROM app.sales_records WHERE sales_date >= CURRENT_DATE - 30 GROUP BY region ORDER BY sales DESC LIMIT 5"
-    );
+    const { now30, prev30, todaySales, yesterdaySales, topProducts, stockCount, regionData } = await getMarketOverview();
 
     const n30 = parseFloat(now30.rows[0].total);
     const ord30 = parseInt(now30.rows[0].orders);
@@ -77,24 +77,48 @@ router.get('/', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/admin/market/sales-trend
+ *
+ * Daily sales (revenue + orders) from app.sales_records for the last 30 days.
+ *
+ * Auth: adminAuth.
+ * Query params: none.
+ * Returns:
+ *   200 [{ day, sales, orders }]
+ *   500 fallback []
+ *
+ * Called by: vianet/src/adminPages/market.tsx -> useAdminQuery('/api/admin/market/sales-trend')
+ *   Displays: 30-day sales trend chart.
+ */
 router.get('/sales-trend', async (req, res) => {
   try {
-    const r = await neonDb.query(
-      "SELECT sales_date::text AS day, SUM(bill_amt) AS sales, COUNT(*) AS orders FROM app.sales_records WHERE sales_date >= CURRENT_DATE - 30 GROUP BY sales_date ORDER BY sales_date"
-    );
-    res.json(r.rows.map(function(x) {
+    const r = await getMarketSalesTrend();
+    res.json(r.map(function(x) {
       return { day: x.day, sales: parseFloat(x.sales) || 0, orders: parseInt(x.orders) || 0 };
     }));
   } catch (e) { console.error('[market] sales-trend error:', e); res.json([]); }
 });
 
+/**
+ * GET /api/admin/market/category-data
+ *
+ * Top 10 products by stock value with % share of the total.
+ *
+ * Auth: adminAuth.
+ * Query params: none.
+ * Returns:
+ *   200 [{ name, value, count, total }]  (value = % share 0-100)
+ *   500 fallback []
+ *
+ * Called by: vianet/src/adminPages/market.tsx -> useAdminQuery('/api/admin/market/category-data')
+ *   Displays: category share chart.
+ */
 router.get('/category-data', async (req, res) => {
   try {
-    const r = await neonDb.query(
-      "SELECT stockname, quantity, price, (COALESCE(quantity,0) * COALESCE(price,0)) AS total FROM app.stock ORDER BY total DESC LIMIT 10"
-    );
-    const total = r.rows.reduce(function(s, x) { return s + (parseFloat(x.total) || 0); }, 0);
-    res.json(r.rows.map(function(x, i) {
+    const r = await getMarketCategoryData();
+    const total = r.reduce(function(s, x) { return s + (parseFloat(x.total) || 0); }, 0);
+    res.json(r.map(function(x, i) {
       const t = parseFloat(x.total) || 0;
       return {
         name: x.stockname,
@@ -106,12 +130,25 @@ router.get('/category-data', async (req, res) => {
   } catch (e) { console.error('[market] category-data error:', e); res.json([]); }
 });
 
+/**
+ * GET /api/admin/market/candlestick
+ *
+ * Weekly OHLCV candles derived from the last 84 days of daily sales; returns the
+ * most recent 12 weeks.
+ *
+ * Auth: adminAuth.
+ * Query params: none.
+ * Returns:
+ *   200 [{ weekStart, open, high, low, close, volume, count }]
+ *   or [] when no data / on error
+ *
+ * Called by: vianet/src/adminPages/market.tsx -> useAdminQuery('/api/admin/market/candlestick')
+ *   Displays: candlestick chart of weekly sales.
+ */
 router.get('/candlestick', async (req, res) => {
   try {
-    const r = await neonDb.query(
-      "SELECT sales_date, SUM(bill_amt) AS sales FROM app.sales_records WHERE sales_date >= CURRENT_DATE - 84 GROUP BY sales_date ORDER BY sales_date"
-    );
-    const daily = r.rows.map(function(x) {
+    const r = await getMarketCandlestick();
+    const daily = r.map(function(x) {
       return { date: x.sales_date, sales: parseFloat(x.sales) || 0 };
     });
     if (daily.length === 0) { res.json([]); return; }

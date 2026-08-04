@@ -1,24 +1,49 @@
 const express = require('express');
-const { neonDb } = require('../../config/db');
+const { listEmployees, getMinAccessGroupId, createUserNoName, createEmployeeProfile, getEmployeeById, updateEmployeeUserEmail, updateEmployeeProfileByUserId, findEmployeeProfile, deleteEmployeeById } = require('../../config/dbqueries/admin');
 const adminAuth = require('../../middleware/adminAuth');
 
 const router = express.Router();
 
 router.use(adminAuth);
 
+/**
+ * GET /api/admin/employee
+ *
+ * List all employee users.
+ *
+ * Auth: adminAuth.
+ * Query params: none.
+ * Returns:
+ *   200 { message: 'Employees fetched', data: [{ id, email, user_type, created_at, updated_at }] }
+ *   500 on error
+ *
+ * Called by: no direct frontend caller currently (employee management UI not built).
+ */
 router.get('/', async (req, res) => {
   try {
-    const result = await neonDb.query(
-      'SELECT id, email, user_type, created_at, updated_at FROM app.users WHERE user_type = $1',
-      ['employee']
-    );
-    res.status(200).json({ message: 'Employees fetched', data: result.rows });
+    const result = await listEmployees();
+    res.status(200).json({ message: 'Employees fetched', data: result });
   } catch (err) {
     console.error('[admin/employee] GET error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
+/**
+ * POST /api/admin/employee
+ *
+ * Create an employee user (assigned to the lowest-id access group) and optionally
+ * an employee_profiles row.
+ *
+ * Auth: adminAuth.
+ * Requires (JSON body): { email, password, employee_id?, first_name?, last_name?, phone?, designation? }
+ * Returns:
+ *   201 { message: 'Employee created', data: { id, email, user_type } }
+ *   400 when email/password missing or no access group exists
+ *   500 on error
+ *
+ * Called by: no direct frontend caller currently.
+ */
 router.post('/', async (req, res) => {
   try {
     const { email, password, employee_id, first_name, last_name, phone, designation } = req.body;
@@ -27,80 +52,105 @@ router.post('/', async (req, res) => {
     }
     const bcrypt = require('bcryptjs');
     const password_hash = await bcrypt.hash(password, 10);
-    const groupId = (await neonDb.query('SELECT MIN(id) as id FROM app.access_groups')).rows[0]?.id;
+    const groupId = await getMinAccessGroupId();
     if (!groupId) {
       return res.status(400).json({ message: 'No access group available.' });
     }
-    const result = await neonDb.query(
-      'INSERT INTO app.users (email, password, user_type, access_group_id, created_at, updated_at) VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING id, email, user_type',
-      [email, password_hash, 'employee', groupId]
-    );
+    const result = await createUserNoName({ email, password_hash, user_type: 'employee', access_group_id: groupId });
     if (employee_id || first_name || last_name || phone || designation) {
-      await neonDb.query(
-        'INSERT INTO employee_profiles (user_id, employee_id, first_name, last_name, phone, designation, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())',
-        [result.rows[0].id, employee_id, first_name, last_name, phone, designation]
-      );
+      await createEmployeeProfile({ user_id: result.id, employee_id, first_name, last_name, phone, designation });
     }
-    res.status(201).json({ message: 'Employee created', data: result.rows[0] });
+    res.status(201).json({ message: 'Employee created', data: result });
   } catch (err) {
     console.error('[admin/employee] POST error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
+/**
+ * GET /api/admin/employee/:id
+ *
+ * Fetch one employee user plus their employee_profiles row (or null).
+ *
+ * Auth: adminAuth.
+ * Path params: { id }
+ * Returns:
+ *   200 { message: 'Employee fetched', data: { id, email, user_type, created_at, updated_at, profile } }
+ *   404 when employee not found
+ *   500 on error
+ *
+ * Called by: no direct frontend caller currently.
+ */
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await neonDb.query(
-      'SELECT id, email, user_type, created_at, updated_at FROM app.users WHERE id = $1 AND user_type = $2',
-      [id, 'employee']
-    );
-    if (result.rows.length === 0) {
+    const { user, profile } = await getEmployeeById(id);
+    if (!user) {
       return res.status(404).json({ message: 'Employee not found' });
     }
-    const profileResult = await neonDb.query('SELECT * FROM employee_profiles WHERE user_id = $1', [id]);
-    res.status(200).json({ message: 'Employee fetched', data: { ...result.rows[0], profile: profileResult.rows[0] || null } });
+    res.status(200).json({ message: 'Employee fetched', data: { ...user, profile: profile || null } });
   } catch (err) {
     console.error('[admin/employee] GET by id error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
+/**
+ * PUT /api/admin/employee/:id
+ *
+ * Update an employee's email and profile (employee_id, first/last name, phone,
+ * designation), upserting the employee_profiles row if needed.
+ *
+ * Auth: adminAuth.
+ * Path params: { id }
+ * Requires (JSON body): { email?, employee_id?, first_name?, last_name?, phone?, designation? }
+ * Returns:
+ *   200 { message: 'Employee updated', data: { id, email, user_type } }
+ *   404 when employee not found
+ *   500 on error
+ *
+ * Called by: no direct frontend caller currently.
+ */
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { email, employee_id, first_name, last_name, phone, designation } = req.body;
-    const userResult = await neonDb.query(
-      'UPDATE app.users SET email = $1, updated_at = NOW() WHERE id = $2 AND user_type = $3 RETURNING id, email, user_type',
-      [email, id, 'employee']
-    );
-    if (userResult.rows.length === 0) {
+    const userResult = await updateEmployeeUserEmail({ id, email });
+    if (!userResult) {
       return res.status(404).json({ message: 'Employee not found' });
     }
-    const existingProfile = await neonDb.query('SELECT * FROM employee_profiles WHERE user_id = $1', [id]);
-    if (existingProfile.rows.length > 0) {
-      await neonDb.query(
-        'UPDATE employee_profiles SET employee_id = $1, first_name = $2, last_name = $3, phone = $4, designation = $5, updated_at = NOW() WHERE user_id = $6',
-        [employee_id, first_name, last_name, phone, designation, id]
-      );
+    const existingProfile = await findEmployeeProfile(id);
+    if (existingProfile) {
+      await updateEmployeeProfileByUserId({ user_id: id, employee_id, first_name, last_name, phone, designation });
     } else if (employee_id || first_name || last_name) {
-      await neonDb.query(
-        'INSERT INTO employee_profiles (user_id, employee_id, first_name, last_name, phone, designation, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())',
-        [id, employee_id, first_name, last_name, phone, designation]
-      );
+      await createEmployeeProfile({ user_id: id, employee_id, first_name, last_name, phone, designation });
     }
-    res.status(200).json({ message: 'Employee updated', data: userResult.rows[0] });
+    res.status(200).json({ message: 'Employee updated', data: userResult });
   } catch (err) {
     console.error('[admin/employee] PUT error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
+/**
+ * DELETE /api/admin/employee/:id
+ *
+ * Delete an employee user (scoped to user_type = 'employee').
+ *
+ * Auth: adminAuth.
+ * Path params: { id }
+ * Returns:
+ *   200 { message: 'Employee deleted' }
+ *   404 when employee not found
+ *   500 on error
+ *
+ * Called by: no direct frontend caller currently.
+ */
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await neonDb.query('DELETE FROM app.users WHERE id = $1 AND user_type = $2 RETURNING id', [id, 'employee']);
-    if (result.rows.length === 0) {
+    const result = await deleteEmployeeById(id);
+    if (!result) {
       return res.status(404).json({ message: 'Employee not found' });
     }
     res.status(200).json({ message: 'Employee deleted' });

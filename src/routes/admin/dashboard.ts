@@ -1,31 +1,43 @@
 const express = require('express');
-const { neonDb } = require('../../config/db');
+const { getDashboardStats, getTopSalesmen, getDashboardMonthlyTrend, getProductShare } = require('../../config/dbqueries/admin');
 const adminAuth = require('../../middleware/adminAuth');
 
 const router = express.Router();
 
 router.use(adminAuth);
 
+/**
+ * GET /api/admin/dashboard/stats
+ *
+ * Today's sales/orders, change % vs yesterday, total stock value, and the top salesman.
+ * Profit is estimated as 20% of today's sales.
+ *
+ * Auth: adminAuth.
+ * Query params: none.
+ * Returns:
+ *   200 { todaySale, saleChangePercent, totalProfit, profitChangePercent, totalSpend, spendChangePercent, topSalesman: { name, amount } | null, totalOrders }
+ *   500 fallback zeroed object
+ *
+ * Called by: vianet/src/adminPages/dashboard.tsx -> useAdminQuery('/api/admin/dashboard/stats')
+ *   Displays: KPI cards (today's sale, profit, spend, orders) and the top salesman.
+ */
 router.get('/stats', async (req, res) => {
   try {
-    const ts = await neonDb.query("SELECT COALESCE(SUM(bill_amt),0) AS total, COUNT(*) AS orders FROM app.sales_records WHERE sales_date = CURRENT_DATE");
-    const ys = await neonDb.query("SELECT COALESCE(SUM(bill_amt),0) AS total FROM app.sales_records WHERE sales_date = CURRENT_DATE - 1");
-    const sm = await neonDb.query("SELECT salesman AS name, SUM(bill_amt) AS amount FROM app.sales_records WHERE sales_date = CURRENT_DATE AND salesman IS NOT NULL AND salesman != '' GROUP BY salesman ORDER BY amount DESC LIMIT 1");
-    const sv = await neonDb.query("SELECT COALESCE(SUM(quantity * price),0) AS total FROM app.stock");
+    const { today, yesterday, topSalesman, stockValue } = await getDashboardStats();
 
-    const today = parseFloat(ts.rows[0].total);
-    const yesterday = parseFloat(ys.rows[0].total);
-    const orders = parseInt(ts.rows[0].orders);
-    const pct = yesterday > 0 ? Math.round(((today - yesterday) / yesterday) * 100) : (today > 0 ? 100 : 0);
+    const todaySale = parseFloat(today.total);
+    const yesterdaySale = parseFloat(yesterday.total);
+    const orders = parseInt(today.orders);
+    const pct = yesterdaySale > 0 ? Math.round(((todaySale - yesterdaySale) / yesterdaySale) * 100) : (todaySale > 0 ? 100 : 0);
 
     res.json({
-      todaySale: today,
+      todaySale,
       saleChangePercent: pct,
-      totalProfit: today * 0.2,
+      totalProfit: todaySale * 0.2,
       profitChangePercent: 0,
-      totalSpend: parseFloat(sv.rows[0].total),
+      totalSpend: stockValue,
       spendChangePercent: 0,
-      topSalesman: sm.rows.length > 0 ? { name: sm.rows[0].name, amount: parseFloat(sm.rows[0].amount) } : null,
+      topSalesman: topSalesman ? { name: topSalesman.name, amount: parseFloat(topSalesman.amount) } : null,
       totalOrders: orders,
     });
   } catch (err) {
@@ -34,24 +46,66 @@ router.get('/stats', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/admin/dashboard/top-salesmen
+ *
+ * Top 5 salesmen by total bill amount.
+ *
+ * Auth: adminAuth.
+ * Query params: none.
+ * Returns:
+ *   200 [{ name, sales }]
+ *   500 fallback []
+ *
+ * Called by: vianet/src/adminPages/dashboard.tsx -> useAdminQuery('/api/admin/dashboard/top-salesmen')
+ *   Displays: top salesmen leaderboard (names + sales).
+ */
 router.get('/top-salesmen', async (req, res) => {
   try {
-    const r = await neonDb.query("SELECT salesman AS name, SUM(bill_amt) AS sales FROM app.sales_records WHERE salesman IS NOT NULL AND salesman != '' GROUP BY salesman ORDER BY sales DESC LIMIT 5");
-    res.json(r.rows.map(function(x) { return { name: x.name, sales: parseFloat(x.sales) || 0 }; }));
+    const r = await getTopSalesmen();
+    res.json(r.map(function(x) { return { name: x.name, sales: parseFloat(x.sales) || 0 }; }));
   } catch (e) { console.error('[dashboard] top-salesmen error:', e); res.json([]); }
 });
 
+/**
+ * GET /api/admin/dashboard/monthly-trend
+ *
+ * Monthly sales for the last 12 months. Profit is estimated at 20% of sales.
+ *
+ * Auth: adminAuth.
+ * Query params: none.
+ * Returns:
+ *   200 [{ month: 'Jan 2026', sales, profit }]
+ *   500 fallback []
+ *
+ * Called by: vianet/src/adminPages/dashboard.tsx -> useAdminQuery('/api/admin/dashboard/monthly-trend')
+ *   Displays: monthly sales trend chart.
+ */
 router.get('/monthly-trend', async (req, res) => {
   try {
-    const r = await neonDb.query("SELECT TO_CHAR(DATE_TRUNC('month', sales_date), 'Mon YYYY') AS month, SUM(bill_amt) AS sales FROM app.sales_records WHERE sales_date >= CURRENT_DATE - INTERVAL '12 months' GROUP BY DATE_TRUNC('month', sales_date) ORDER BY DATE_TRUNC('month', sales_date)");
-    res.json(r.rows.map(function(x) { return { month: x.month, sales: parseFloat(x.sales) || 0, profit: (parseFloat(x.sales) || 0) * 0.2 }; }));
+    const r = await getDashboardMonthlyTrend();
+    res.json(r.map(function(x) { return { month: x.month, sales: parseFloat(x.sales) || 0, profit: (parseFloat(x.sales) || 0) * 0.2 }; }));
   } catch (e) { console.error('[dashboard] monthly-trend error:', e); res.json([]); }
 });
 
+/**
+ * GET /api/admin/dashboard/product-share
+ *
+ * Top 10 products by quantity (donut/pie share data).
+ *
+ * Auth: adminAuth.
+ * Query params: none.
+ * Returns:
+ *   200 [{ name, value }]  (value = stock quantity)
+ *   500 fallback []
+ *
+ * Called by: vianet/src/adminPages/dashboard.tsx -> useAdminQuery('/api/admin/dashboard/product-share')
+ *   Displays: product share chart by stock quantity.
+ */
 router.get('/product-share', async (req, res) => {
   try {
-    const r = await neonDb.query("SELECT stockname AS name, COALESCE(quantity, 0) AS value FROM app.stock ORDER BY quantity DESC LIMIT 10");
-    res.json(r.rows);
+    const r = await getProductShare();
+    res.json(r);
   } catch (e) { console.error('[dashboard] product-share error:', e); res.json([]); }
 });
 
