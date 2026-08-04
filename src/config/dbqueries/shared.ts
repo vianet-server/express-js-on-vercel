@@ -480,9 +480,9 @@ async function createInventoryRecord({ stockitem_id, godown_id, quantity }) {
  * @returns {Promise<object[]>} inventory rows
  * @route Used by GET /api/admin/inventory, GET /api/inventory
  */
-async function listInventoryRecords({ stockitem_id, godown_id } = {}) {
+async function listInventoryRecords({ stockitem_id, godown_id }: any = {}) {
   let query = 'SELECT * FROM inventory WHERE 1=1';
-  const params = [];
+  const params: any[] = [];
   let idx = 1;
   if (stockitem_id) { query += ` AND stockitem_id = $${idx++}`; params.push(stockitem_id); }
   if (godown_id) { query += ` AND godown_id = $${idx++}`; params.push(godown_id); }
