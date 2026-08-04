@@ -519,20 +519,20 @@ router.post('/inventory/access/upload', async (req, res) => {
     }
 
     let successCount = 0;
-    const errors = [];
+    const errors: string[] = [];
 
     for (const row of rows) {
       try {
         const stock = await neonDb.query('SELECT id FROM app.stock WHERE id = $1', [isNaN(Number(row.skuId)) ? row.skuId : Number(row.skuId)]);
         if (stock.rows.length === 0) {
-          errors.push(\`Row SKU \${row.skuId}: Stock item not found\`);
+          errors.push(`Row SKU ${row.skuId}: Stock item not found`);
           continue;
         }
         const stockId = stock.rows[0].id;
 
         const groupRow = await neonDb.query('SELECT id FROM app.access_groups WHERE name = $1', [row.accessGroup]);
         if (groupRow.rows.length === 0) {
-          errors.push(\`Row SKU \${row.skuId}: Access group '\${row.accessGroup}' not found\`);
+          errors.push(`Row SKU ${row.skuId}: Access group '${row.accessGroup}' not found`);
           continue;
         }
         const groupId = groupRow.rows[0].id;
@@ -555,11 +555,11 @@ router.post('/inventory/access/upload', async (req, res) => {
         }
         successCount++;
       } catch (err) {
-        errors.push(\`Row SKU \${row.skuId}: \${err.message}\`);
+        errors.push(`Row SKU ${row.skuId}: ${err.message}`);
       }
     }
 
-    res.json({ message: \`Successfully processed \${successCount} rows\`, errors });
+    res.json({ message: `Successfully processed ${successCount} rows`, errors });
   } catch (err) {
     console.error('[stockitem] POST /inventory/access/upload error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
