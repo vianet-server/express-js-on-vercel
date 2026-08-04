@@ -260,9 +260,9 @@ async function createLedger({ guid, name, address, mobile }) {
  * @returns {Promise<object[]>} rows [{ id, guid, name, address, mobile, ledgername }] ordered by name
  * @route Used by GET /api/admin/ledger, GET /api/stock/ledger
  */
-async function listLedgers({ name } = {}) {
+async function listLedgers({ name }: any = {}) {
   let query = 'SELECT id, guid, name, address, mobile, ledgername FROM app.ledger WHERE 1=1';
-  const params = [];
+  const params: any[] = [];
   let idx = 1;
   if (name) {
     query += ` AND name ILIKE $${idx++}`;
@@ -337,11 +337,11 @@ async function createVoucher({ guid, date, voucher_type, voucher_number, party_l
  * @returns {Promise<object[]>} voucher rows (ledgerentries/inventoryentries included)
  * @route Used by GET /api/admin/voucher, GET /api/stock/voucher
  */
-async function listVouchers({ voucher_type, voucher_number, from_date, to_date } = {}) {
+async function listVouchers({ voucher_type, voucher_number, from_date, to_date }: any = {}) {
   let query = `SELECT id, guid, date, voucher_type, voucher_number, party_ledger_name,
                       narration, ledgerentries, inventoryentries, created_at, billagentname
                FROM app.vouchers WHERE 1=1`;
-  const params = [];
+  const params: any[] = [];
   let idx = 1;
   if (voucher_type) { query += ` AND voucher_type = $${idx++}`; params.push(voucher_type); }
   if (voucher_number) { query += ` AND voucher_number = $${idx++}`; params.push(voucher_number); }
@@ -411,9 +411,9 @@ async function createGodown({ name, address }) {
  * @returns {Promise<object[]>} godown rows
  * @route Used by GET /api/admin/godown, GET /api/stock/godown
  */
-async function listGodowns({ name } = {}) {
+async function listGodowns({ name }: any = {}) {
   let query = 'SELECT * FROM godowns WHERE 1=1';
-  const params = [];
+  const params: any[] = [];
   let idx = 1;
   if (name) {
     query += ` AND name ILIKE $${idx++}`;

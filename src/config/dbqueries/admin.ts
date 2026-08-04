@@ -77,8 +77,8 @@ async function ensureUserColumns() {
  * @route Used by GET /api/admin/accesscontrol
  */
 async function listAccessControlUsers({ email, user_type, limit, offset }) {
-  const filters = [];
-  const params = [];
+  const filters: string[] = [];
+  const params: any[] = [];
   let idx = 1;
 
   if (email) { filters.push(`u.email ILIKE $${idx++}`); params.push(`%${email}%`); }
@@ -142,7 +142,7 @@ async function deleteAccessControlUser(id) {
 async function listStockItemsAdmin({ name, limit, offset }) {
   let countQuery = 'SELECT COUNT(*) FROM app.stock WHERE 1=1';
   let dataQuery = 'SELECT * FROM app.stock WHERE 1=1';
-  const params = [];
+  const params: any[] = [];
   let idx = 1;
 
   if (name) {
@@ -189,9 +189,9 @@ async function createStockItemLegacy({ name, quantity, price }) {
  * @returns {Promise<object[]>} app.stock rows
  * @route Used by GET /api/admin/stockitem
  */
-async function listStockItemsLegacy({ name, sku } = {}) {
+async function listStockItemsLegacy({ name, sku }: any = {}) {
   let query = 'SELECT * FROM app.stock WHERE 1=1';
-  const params = [];
+  const params: any[] = [];
   let idx = 1;
   if (name) { query += ` AND name ILIKE $${idx++}`; params.push(`%${name}%`); }
   if (sku) { query += ` AND sku = $${idx++}`; params.push(sku); }
@@ -229,7 +229,7 @@ async function listInventoryStock({ search, brand, limit, offset }) {
 
   let countQuery = `SELECT COUNT(*) FROM app.stock s ${joinClause} WHERE 1=1`;
   let dataQuery = `SELECT s.*, inv.fullname, inv.brand, inv.model, inv.varient, inv.color, inv.gst, inv.price AS inv_price FROM app.stock s ${joinClause} WHERE 1=1`;
-  const params = [];
+  const params: any[] = [];
   let idx = 1;
 
   if (search) {
@@ -266,7 +266,7 @@ async function listInventoryStock({ search, brand, limit, offset }) {
  * @returns {Promise<object[]>} rows [{ id, name, sku, qty, price, brand, model, accessGroups }]
  * @route Used by GET /api/admin/inventory/sku
  */
-async function listInventorySku({ brand } = {}) {
+async function listInventorySku({ brand }: any = {}) {
   const brandFilter = brand;
   let hasInvTable = false;
   try {
@@ -277,7 +277,7 @@ async function listInventorySku({ brand } = {}) {
   } catch {}
 
   let sql = '';
-  const params = [];
+  const params: any[] = [];
 
   if (hasInvTable) {
     let whereClause = '';
@@ -668,13 +668,13 @@ async function createApiKey({ keyid, key_name, apiKey, accessGroupId, userId, pe
  * @returns {Promise<object[]>} keys ordered by created_at DESC
  * @route Used by GET /api/admin/api
  */
-async function listApiKeys({ user_id, key_name } = {}) {
+async function listApiKeys({ user_id, key_name }: any = {}) {
   let query = `SELECT k.keyid, k.key_name, k.key, k.access_group_id, k.permissions, k.duration,
                       k.is_active, k.created_at, k.last_used, g.name AS group_name
                FROM app.api k
                LEFT JOIN app.access_groups g ON g.id = k.access_group_id
                WHERE 1=1`;
-  const params = [];
+  const params: any[] = [];
   let idx = 1;
   if (user_id) { query += ` AND k.user_id = $${idx++}`; params.push(user_id); }
   if (key_name) { query += ` AND k.key_name ILIKE $${idx++}`; params.push(`%${key_name}%`); }

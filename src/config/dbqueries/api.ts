@@ -24,7 +24,7 @@ const shared = require('./shared');
  * @param {any[]} [params] - existing query params
  * @returns {{ text: string, params: any[] }} final query text + params
  */
-function scopedV1Query(accessGroupId, baseQuery, params = []) {
+function scopedV1Query(accessGroupId, baseQuery, params: any[] = []) {
   let idx = params.length + 1;
   if (accessGroupId) {
     return {
