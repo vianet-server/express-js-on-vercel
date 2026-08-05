@@ -24,7 +24,9 @@ export function InventorySku() {
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
   const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
   const [brandSearch, setBrandSearch] = useState('');
-  const [brands, setBrands] = useState<string[]>([]);
+  const [brands, setBrands] = useState<string[]>([
+    "AGARO", "Alphatech", "Amazfit", "Amazon", "Amazon Devise 2", "Amazon Devise ST", "Amazon Scheme", "AP Brand Not Doing", "Apple Accessories", "ASUS NEW", "Bath Lenns Set", "Batteries", "Belkin", "Binatone", "Black Zone Mobile", "Boat", "Bose", "Boult Audio", "Computer Accessories", "Computer Consumables", "Digitek", "DJI Osmo", "DURACELL", "Ekmatra", "EPOS", "EVM OLD", "Feiyutech Kica", "Fin FOC", "Fingers", "Fingers Aeging", "Fire Boltt", "Fitbit", "Fujifilm", "Fujifilm Dummy", "FUZO", "Gifting", "GO PRO", "Gripp", "Harman Kardon", "HP", "Infinity", "Infocus", "Itel Handsets", "Jabra New", "JBL", "JBL 2", "JBL Pro", "Kalpesh", "Karbonn New", "Klipsch Speaker", "KODAK", "Lava", "Lava Dummy", "Lenovo Tablets", "Luxury", "Mantra", "Maxima", "Micromax New", "MIVI", "Moto Phones", "NG Earsafe", "Nikita", "Nokia New", "NOTHING", "One Plus", "Ooge", "Other TWS and Acc", "Pebble", "Philips Mobile Phone", "Philips New", "Philips PC", "Poco", "Portronics New", "Promate", "Qubo", "Raopro", "RICO", "Samsung Micro", "Sandisk", "Saregama", "Sennheiser", "Skullkandy New", "SOff", "Sony", "Spacething", "SPIGEN", "Stuffcool New", "Sushi", "Swiss Military", "Tecno", "Tecno Dummy", "Tecno FOC", "Tucano", "Twieto", "URBN", "Villaon", "Xech", "Zebronics", "Zeb Tele", "Zeb Watches", "Zoook New"
+  ]);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -85,23 +87,10 @@ export function InventorySku() {
     }).catch(() => setLoading(false));
   }, [dispatch]);
 
-  const fetchBrands = useCallback(() => {
-    api.get<any>('/api/admin/inventory/brands')
-      .then(res => {
-        const rawList = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
-        const list = rawList.filter((b: any) => typeof b === 'string' && b.trim().length > 0 && /[a-zA-Z]/.test(b));
-        setBrands(list);
-      })
-      .catch(() => {});
-  }, []);
-
+  // fetchBrands removed to use hardcoded list of main brands as per Tally
   useEffect(() => { 
     fetchAll(); 
   }, [fetchAll]);
-
-  useEffect(() => {
-    fetchBrands();
-  }, [fetchBrands]);
 
   useEffect(() => {
     const onFocus = () => { fetchAll(); };
@@ -117,8 +106,12 @@ export function InventorySku() {
 
   const filtered = (skuData ?? []).filter(s => {
     const q = search.toLowerCase();
-    const brandMatch = selectedBrands.length === 0 || selectedBrands.includes(s.brand);
-    return brandMatch && (!q || s.sku.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || s.brand.toLowerCase().includes(q));
+    const sBrand = (s.brand || '').toLowerCase();
+    const brandMatch = selectedBrands.length === 0 || selectedBrands.some(b => {
+      const bLower = b.toLowerCase();
+      return sBrand === bLower || sBrand.startsWith(bLower + ' ') || sBrand.startsWith(bLower + '-');
+    });
+    return brandMatch && (!q || s.sku.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || sBrand.includes(q));
   });
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
