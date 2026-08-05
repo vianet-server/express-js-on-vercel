@@ -1,25 +1,25 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-const { neonDb } = require('../config/db');
-async function ensureLogTable() {
-    try {
-        await neonDb.query(`
-      CREATE TABLE IF NOT EXISTS api_key_log (
-        id SERIAL PRIMARY KEY,
-        api_key_id TEXT NOT NULL,
-        endpoint TEXT NOT NULL,
-        method TEXT NOT NULL,
-        status INTEGER,
-        created_at TIMESTAMPTZ DEFAULT NOW()
-      )
-    `);
-        await neonDb.query(`ALTER TABLE api_key_log ALTER COLUMN api_key_id TYPE TEXT`).catch(() => { });
-    }
-    catch (err) {
-        console.warn('[apiKeyAuth] ensureLogTable warning:', err.message);
-    }
-}
-ensureLogTable();
+/**
+ * apiKeyAuth(requiredPermission)
+ *
+ * API-key authentication + permission guard for /api/v1/* endpoints.
+ * Reads `Authorization: Bearer <api_key>`, resolves it in app.api (joined with the
+ * access group), checks is_active, expiry (duration like '1h'/'7d'/'never'), and that
+ * the key's permissions include requiredPermission. On success records usage:
+ * updates last_used and inserts a row into api_key_log (table auto-created here).
+ *
+ * Sets req.apiKey = { id, name, key, accessGroupId, groupName, permissions }.
+ *
+ * Errors:
+ *   401 when no/invalid API key
+ *   403 when revoked, expired, or missing permission
+ *   500 on failure
+ */
+const { ensureLogTable, findApiKey, touchApiKey, logApiUsage } = require('../config/dbqueries/api');
+ensureLogTable().catch((err) => {
+    console.warn('[apiKeyAuth] ensureLogTable warning:', err.message);
+});
 const apiKeyAuth = (requiredPermission) => {
     return async (req, res, next) => {
         try {
@@ -33,15 +33,10 @@ const apiKeyAuth = (requiredPermission) => {
             if (!apiKey) {
                 return res.status(401).json({ message: 'API key is required' });
             }
-            const result = await neonDb.query(`SELECT k.keyid, k.key_name, k.key, k.access_group_id, k.permissions, k.duration,
-                k.is_active, k.created_at, g.name AS group_name
-         FROM app.api k
-         LEFT JOIN app.access_groups g ON g.id = k.access_group_id
-         WHERE k.key = $1`, [apiKey]);
-            if (result.rows.length === 0) {
+            const key = await findApiKey(apiKey);
+            if (!key) {
                 return res.status(401).json({ message: 'Invalid API key' });
             }
-            const key = result.rows[0];
             if (!key.is_active) {
                 return res.status(403).json({ message: 'API key has been revoked' });
             }
@@ -61,9 +56,9 @@ const apiKeyAuth = (requiredPermission) => {
             if (requiredPermission && !perms.includes(requiredPermission)) {
                 return res.status(403).json({ message: `API key does not have the '${requiredPermission}' permission` });
             }
-            await neonDb.query('UPDATE app.api SET last_used = NOW() WHERE keyid = $1', [key.keyid]);
+            await touchApiKey(key.keyid);
             try {
-                await neonDb.query(`INSERT INTO api_key_log (api_key_id, endpoint, method, status) VALUES ($1, $2, $3, $4)`, [key.keyid, req.originalUrl, req.method, null]);
+                await logApiUsage({ keyid: key.keyid, endpoint: req.originalUrl, method: req.method, status: null });
             }
             catch (logErr) {
                 console.warn('[apiKeyAuth] log insert warning:', logErr.message);

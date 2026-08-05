@@ -3,31 +3,72 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { neonDb } = require('../../config/db');
+const { findUserByEmail, getMinAccessGroupId, createUser } = require('../../config/dbqueries/api');
+const { sendWelcomeEmail } = require('../../services/email');
 const router = express.Router();
+/**
+ * POST /api/auth/register
+ *
+ * Public app-user registration. Creates a 'user' assigned to the provided access
+ * group (or the lowest-id group). Does NOT return a token.
+ *
+ * Auth: none (public).
+ * Requires (JSON body): { email, password, user_type?, access_group_id? }
+ * Returns:
+ *   201 { message: 'User registered', data: { id, email, user_type } }
+ *   400 when email/password missing or no access group available
+ *   409 when email already exists
+ *   500 on error
+ *
+ * Called by:
+ *   - vianet/src/appPages/auth/appsignup.tsx -> fetch('/api/auth/register', {...})
+ *   - vianet/src/pages/auth/signup.tsx        -> fetch('/api/auth/register', {...}) (no token invite path)
+ *   Both display a sign-up form and then route the user to login.
+ */
 router.post('/register', async (req, res) => {
     try {
         const { email, password, user_type, access_group_id } = req.body;
         if (!email || !password) {
             return res.status(400).json({ message: 'Email and password are required' });
         }
-        const existing = await neonDb.query('SELECT * FROM app.users WHERE email = $1', [email]);
-        if (existing.rows.length > 0) {
+        const existing = await findUserByEmail(email);
+        if (existing) {
             return res.status(409).json({ message: 'User already exists' });
         }
         const password_hash = await bcrypt.hash(password, 10);
-        const groupId = access_group_id || (await neonDb.query('SELECT MIN(id) as id FROM app.access_groups')).rows[0]?.id;
+        const groupId = access_group_id || (await getMinAccessGroupId());
         if (!groupId) {
             return res.status(400).json({ message: 'No access group available. Contact admin.' });
         }
-        const result = await neonDb.query('INSERT INTO app.users (name, email, password, user_type, access_group_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING id, email, user_type', [email, email, password_hash, user_type || 'user', groupId]);
-        res.status(201).json({ message: 'User registered', data: result.rows[0] });
+        const result = await createUser({ name: email, email, password_hash, user_type: user_type || 'user', access_group_id: groupId });
+        sendWelcomeEmail({ to: result.email }).catch((err) => console.error('[auth] welcome email error:', err?.message || err));
+        res.status(201).json({ message: 'User registered', data: result });
     }
     catch (err) {
         console.error('[auth] register error:', err);
         res.status(500).json({ message: 'Server error', error: err.message });
     }
 });
+/**
+ * POST /api/auth/signup-with-token
+ *
+ * Invited signup: verifies a JWT invitation token (issued by the admin
+ * POST /api/admin/access-group link), creates the user with the token's
+ * usertype + access group, and returns a fresh 24h auth token.
+ *
+ * Auth: none (public) — the invitation JWT itself carries the role/group.
+ * Requires (JSON body): { name?, email, password, token }
+ * Returns:
+ *   200 { token, message, email, user_type }
+ *   400 when email/password/token missing, or token invalid/missing accessgroup
+ *   409 when email already exists
+ *   500 on error
+ *
+ * Called by: vianet/src/pages/auth/signup.tsx -> fetch('/api/auth/signup-with-token', {...})
+ *   (invite link /app/signup?Token=<jwt> from admin inventory control).
+ *   Displays: "Create Your Account" form; on success logs the user in and
+ *   navigates to /app/home.
+ */
 router.post('/signup-with-token', async (req, res) => {
     try {
         const { name, email, password, token } = req.body;
@@ -46,28 +87,44 @@ router.post('/signup-with-token', async (req, res) => {
         if (!accessgroup) {
             return res.status(400).json({ message: 'Invalid invitation token' });
         }
-        const existing = await neonDb.query('SELECT * FROM app.users WHERE email = $1', [email]);
-        if (existing.rows.length > 0) {
+        const existing = await findUserByEmail(email);
+        if (existing) {
             return res.status(409).json({ message: 'User already exists' });
         }
         const password_hash = await bcrypt.hash(password, 10);
-        const result = await neonDb.query('INSERT INTO app.users (name, email, password, user_type, access_group_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING id, email, user_type', [name || email, email, password_hash, user_type, accessgroup]);
-        const authToken = jwt.sign({ id: result.rows[0].id, email: result.rows[0].email, user_type: result.rows[0].user_type }, process.env.JWT_SECRET, { expiresIn: '24h' });
-        res.json({ token: authToken, message: 'Signup successful', email: result.rows[0].email, user_type: result.rows[0].user_type });
+        const result = await createUser({ name: name || email, email, password_hash, user_type, access_group_id: accessgroup });
+        const authToken = jwt.sign({ id: result.id, email: result.email, user_type: result.user_type }, process.env.JWT_SECRET, { expiresIn: '24h' });
+        sendWelcomeEmail({ to: result.email }).catch((err) => console.error('[auth] welcome email error:', err?.message || err));
+        res.json({ token: authToken, message: 'Signup successful', email: result.email, user_type: result.user_type });
     }
     catch (err) {
         console.error('[auth] signup-with-token error:', err);
         res.status(500).json({ message: 'Server error', error: err.message });
     }
 });
+/**
+ * POST /api/auth/login
+ *
+ * Public app-user login, returns a 24h JWT.
+ *
+ * Auth: none (public).
+ * Requires (JSON body): { email, password }
+ * Returns:
+ *   200 { token, message, email, user_type }
+ *   400 { message, token: null } when credentials missing
+ *   401 { message, token: null } on invalid credentials
+ *   500 { message, token: null, error }
+ *
+ * Called by: vianet/src/appPages/auth/applogin.tsx -> fetch('/api/auth/login', {...})
+ *   Displays: login form; on success stores the JWT and routes to the app portal.
+ */
 router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
         if (!email || !password) {
             return res.status(400).json({ message: 'Email and password are required', token: null });
         }
-        const result = await neonDb.query('SELECT * FROM app.users WHERE email = $1', [email]);
-        const user = result.rows[0];
+        const user = await findUserByEmail(email);
         if (!user) {
             return res.status(401).json({ message: 'Invalid credentials', token: null });
         }

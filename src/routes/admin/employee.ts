@@ -1,6 +1,7 @@
 const express = require('express');
 const { listEmployees, getMinAccessGroupId, createUserNoName, createEmployeeProfile, getEmployeeById, updateEmployeeUserEmail, updateEmployeeProfileByUserId, findEmployeeProfile, deleteEmployeeById } = require('../../config/dbqueries/admin');
 const adminAuth = require('../../middleware/adminAuth');
+const { sendWelcomeEmail } = require('../../services/email');
 
 const router = express.Router();
 
@@ -60,6 +61,9 @@ router.post('/', async (req, res) => {
     if (employee_id || first_name || last_name || phone || designation) {
       await createEmployeeProfile({ user_id: result.id, employee_id, first_name, last_name, phone, designation });
     }
+    sendWelcomeEmail({ to: result.email }).catch((err) =>
+      console.error('[admin/employee] welcome email error:', err?.message || err)
+    );
     res.status(201).json({ message: 'Employee created', data: result });
   } catch (err) {
     console.error('[admin/employee] POST error:', err);

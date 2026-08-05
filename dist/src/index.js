@@ -13,25 +13,48 @@ app.use(cors({
     credentials: true,
 }));
 app.use(express.json());
-// API routes
+/**
+ * GET /api
+ *
+ * Health/ping endpoint. No params or auth required.
+ * Returns: plain text "hi"
+ * Called by: nothing in the frontend (used as a deploy/uptime check).
+ */
 app.get('/api', (req, res) => {
     res.send('hi');
 });
+/**
+ * GET /api/users
+ *
+ * Placeholder demo endpoint returning a hard-coded user list. No params or auth.
+ * Returns: JSON array [{ id, name }]
+ * Called by: nothing in the frontend (sample data).
+ */
 app.get('/api/users', (req, res) => {
     res.json([
         { id: 1, name: 'Alice' },
         { id: 2, name: 'Bob' },
     ]);
 });
-// Mount routers
+/**
+ * Router mount map (each mount's routes are documented in its own file):
+ * - /api        -> public app API   (auth, stock, inventory, keys, v1)  -> consumed by vianet/src/appPages/* and vianet/src/pages/auth/*
+ * - /partner    -> partner portal   (auth, profile)                     -> no frontend caller yet
+ * - /employee   -> employee portal  (auth, profile)                     -> consumed by vianet/src/employPages/auth/*
+ * - /api/admin  -> admin dashboard  (login, dashboard, analytics, reports, settings, inventory, stock, api, partner, employee, market) -> consumed by vianet/src/adminPages/*
+ */
 app.use('/api', apiRoutes);
 app.use('/partner', partnerRoutes);
 app.use('/employee', employeeRoutes);
 app.use('/api/admin', adminRoutes);
-// Serve React static files (Vite build)
-app.use(express.static(path.join(__dirname, '..', 'vianet', 'dist')));
-// SPA fallback (must be last)
+// Serve React static files (Vite build) — hashed filenames are immutable
+app.use(express.static(path.join(__dirname, '..', 'vianet', 'dist'), {
+    maxAge: '1y',
+    immutable: true,
+}));
+// SPA fallback — never cache index.html so it always picks up the latest JS chunks
 app.get('*', (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, must-revalidate');
     res.sendFile(path.join(__dirname, '..', 'vianet', 'dist', 'index.html'));
 });
 module.exports = app;

@@ -1,5 +1,21 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+/**
+ * auth(...allowedRoles)
+ *
+ * JWT authentication + role guard. Reads `Authorization: Bearer <jwt>`.
+ * Verifies the token against process.env.JWT_SECRET and attaches the payload to
+ * req.user ({ id, email, user_type }).
+ *
+ * Role rule: if allowedRoles is non-empty, the user must be 'admin' OR one of the
+ * allowedRoles, otherwise 403. 'admin' always passes.
+ *
+ * Errors:
+ *   401 when no/invalid token
+ *   403 when role not allowed
+ *
+ * Used by: /api/*, /partner/*, /employee/* routes (e.g. auth('user'), auth('employee'), auth('partner')).
+ */
 const jwt = require('jsonwebtoken');
 const auth = (...allowedRoles) => {
     return (req, res, next) => {

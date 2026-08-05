@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { findUserByEmail, getMinAccessGroupId, createUser } = require('../../config/dbqueries/api');
+const { sendWelcomeEmail } = require('../../services/email');
 
 const router = express.Router();
 
@@ -40,6 +41,9 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'No access group available. Contact admin.' });
     }
     const result = await createUser({ name: email, email, password_hash, user_type: user_type || 'user', access_group_id: groupId });
+    sendWelcomeEmail({ to: result.email }).catch((err) =>
+      console.error('[auth] welcome email error:', err?.message || err)
+    );
     res.status(201).json({ message: 'User registered', data: result });
   } catch (err) {
     console.error('[auth] register error:', err);
@@ -94,6 +98,9 @@ router.post('/signup-with-token', async (req, res) => {
       { id: result.id, email: result.email, user_type: result.user_type },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
+    );
+    sendWelcomeEmail({ to: result.email }).catch((err) =>
+      console.error('[auth] welcome email error:', err?.message || err)
     );
     res.json({ token: authToken, message: 'Signup successful', email: result.email, user_type: result.user_type });
   } catch (err) {

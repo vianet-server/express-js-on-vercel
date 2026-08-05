@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { findUserByEmail, getMinAccessGroupId, createUser, createEmployeeProfile, findEmployeeLoginUser } = require('../../config/dbqueries/employee');
+const { sendWelcomeEmail } = require('../../services/email');
 
 const router = express.Router();
 
@@ -39,6 +40,9 @@ router.post('/register', async (req, res) => {
     }
     const fullName = [first_name, last_name].filter(Boolean).map(s => s.trim()).join(' ') || email.split('@')[0] || 'Employee';
     const result = await createUser({ name: fullName, email, password_hash, user_type: 'employee', access_group_id: groupId });
+    sendWelcomeEmail({ to: result.email }).catch((err) =>
+      console.error('[employee/auth] welcome email error:', err?.message || err)
+    );
     if (employee_id || first_name || last_name || phone || designation) {
       try {
         await createEmployeeProfile({ user_id: result.id, employee_id, first_name, last_name, phone, designation });

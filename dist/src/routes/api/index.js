@@ -2,12 +2,18 @@
 /**
  * api/index.js
  *
- * Router entry point for all public API routes.
+ * Router entry point for all public app API routes.
+ * Full paths below are relative to the /api mount in src/index.ts.
  * Mounts the following sub-routers:
- * - /auth       -> auth.js (register, login)
- * - /stock      -> routes/stock.js (stock-item, ledger, voucher, godown)
- * - /inventory  -> routes/inventory.js
- * - /keys       -> keys/index.js (API key management)
+ * - /auth       -> auth.js           (/api/auth/register, /api/auth/signup-with-token, /api/auth/login) — public, no auth
+ * - /stock      -> routes/stock.js   (/api/stock/stock-item, /ledger, /voucher, /godown) — auth('user')
+ * - /inventory  -> routes/inventory.js (/api/inventory) — auth('user')
+ * - /keys       -> keys/index.js     (/api/keys) — auth('user')
+ * - /v1         -> v1/index.js       (/api/v1/products, /analytics/sales) — apiKeyAuth(permission)
+ *
+ * Frontend callers:
+ * - /api/auth/*          -> vianet/src/appPages/auth/*, vianet/src/pages/auth/signup.tsx
+ * - /api/stock/stock-item -> vianet/src/appPages/portals.tsx
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 const express = require('express');

@@ -1,17 +1,30 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const express = require('express');
-const { neonDb } = require('../../config/db');
+const { getPnlData, getOutstandingVouchers, getBalanceSheetData, getDaybook } = require('../../config/dbqueries/admin');
 const adminAuth = require('../../middleware/adminAuth');
 const router = express.Router();
 router.use(adminAuth);
-// === P&L — use pre-computed data from app.profitloss ===
+/**
+ * GET /api/admin/reports/pnl
+ *
+ * Profit & Loss rows from the latest pre-computed app.profitloss row.
+ * Income/expense is derived from the sign of each amount.
+ *
+ * Auth: adminAuth.
+ * Query params: none.
+ * Returns:
+ *   200 [{ id, label, amount, type: 'income'|'expense', subs: [] }]
+ *   or [] when no data / on error
+ *
+ * Called by: vianet/src/adminPages/pnl.tsx -> api.get('/api/admin/reports/pnl')
+ *   Displays: P&L statement table (income vs expense entries).
+ */
 router.get('/pnl', async (req, res) => {
     try {
-        const result = await neonDb.query("SELECT data FROM app.profitloss ORDER BY id DESC LIMIT 1");
-        if (result.rows.length === 0)
+        const pl = await getPnlData();
+        if (!pl)
             return res.json([]);
-        const pl = result.rows[0].data;
         const rows = (pl.rows || []).map((r, i) => ({
             id: i + 1,
             label: r.name || 'Unknown',
@@ -25,14 +38,26 @@ router.get('/pnl', async (req, res) => {
         res.json([]);
     }
 });
-// === Outstanding — use app.vouchers with correct column names ===
+/**
+ * GET /api/admin/reports/outstanding
+ *
+ * Outstanding receivables/payables from the latest 200 vouchers. Derives
+ * aging (days), status (due/overdue/critical), and category (receivable/payable)
+ * from the voucher type and amount.
+ *
+ * Auth: adminAuth.
+ * Query params: none.
+ * Returns:
+ *   200 [{ id, customer, amount, days, date, status, category, subs: [{ invoice, amount, due }] }]
+ *   or [] on error
+ *
+ * Called by: vianet/src/adminPages/outstanding.tsx -> api.get('/api/admin/reports/outstanding')
+ *   Displays: outstanding bills table with aging and status badges.
+ */
 router.get('/outstanding', async (req, res) => {
     try {
-        const vouchers = await neonDb.query(`SELECT id, date, voucher_type, voucher_number, narration, party_ledger_name,
-              COALESCE((SELECT SUM((e->>'amount')::numeric) FROM jsonb_array_elements(ledgerentries) e
-WHERE (e->>'isDeemedPositive') = 'No'), 0) AS amount
-        FROM app.vouchers ORDER BY date DESC LIMIT 200`);
-        const rows = vouchers.rows.map((r) => {
+        const vouchers = await getOutstandingVouchers();
+        const rows = vouchers.map((r) => {
             const days = r.date ? Math.floor((Date.now() - new Date(r.date).getTime()) / 86400000) : 0;
             let status = 'due';
             if (days > 60)
@@ -66,13 +91,26 @@ WHERE (e->>'isDeemedPositive') = 'No'), 0) AS amount
         res.json([]);
     }
 });
-// === Balance Sheet — use pre-computed data from app.balancesheet ===
+/**
+ * GET /api/admin/reports/balance-sheet
+ *
+ * Balance sheet rows from the latest pre-computed app.balancesheet row.
+ * Asset/liability is derived from the sign of each amount.
+ *
+ * Auth: adminAuth.
+ * Query params: none.
+ * Returns:
+ *   200 [{ id, label, amount, type: 'liability'|'asset', subs: [] }]
+ *   or [] when no data / on error
+ *
+ * Called by: vianet/src/adminPages/balanceSheet.tsx -> api.get('/api/admin/reports/balance-sheet')
+ *   Displays: balance sheet statement table.
+ */
 router.get('/balance-sheet', async (req, res) => {
     try {
-        const result = await neonDb.query("SELECT data FROM app.balancesheet ORDER BY id DESC LIMIT 1");
-        if (result.rows.length === 0)
+        const bs = await getBalanceSheetData();
+        if (!bs)
             return res.json([]);
-        const bs = result.rows[0].data;
         const rows = (bs.rows || []).map((r, i) => ({
             id: i + 1,
             label: r.name || 'Unknown',
@@ -86,7 +124,22 @@ router.get('/balance-sheet', async (req, res) => {
         res.json([]);
     }
 });
-// === Daybook — use app.vouchers with date range ===
+/**
+ * GET /api/admin/reports/daybook
+ *
+ * Daybook: vouchers within a date range (defaults to the current month) enriched
+ * with per-voucher inventory entries and ledger entries, and mapped to a display
+ * type (Sale/Payment/Purchase/Expense/Other).
+ *
+ * Auth: adminAuth.
+ * Query params: { from_date?, to_date? } (YYYY-MM-DD)
+ * Returns:
+ *   200 [{ id, date, type, voucherType, customer, ref, narration, salesman, amount, inventoryEntries: [...], ledgerEntries: [...] }]
+ *   or [] on error
+ *
+ * Called by: vianet/src/adminPages/daybook.tsx -> useAdminQuery('/api/admin/reports/daybook')
+ *   Displays: daybook transactions list grouped by day with inventory/ledger drilldowns.
+ */
 router.get('/daybook', async (req, res) => {
     try {
         const now = new Date();
@@ -94,55 +147,8 @@ router.get('/daybook', async (req, res) => {
             new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
         const to_date = req.query.to_date ||
             now.toISOString().split('T')[0];
-        const vouchers = await neonDb.query(`SELECT id, date, voucher_type, voucher_number, narration, party_ledger_name,
-              billagentname,
-              COALESCE((SELECT SUM((e->>'amount')::numeric) FROM jsonb_array_elements(ledgerentries) e
-                        WHERE (e->>'isDeemedPositive') = 'No'), 0) AS amount
-       FROM app.vouchers
-       WHERE date >= $1 AND date <= $2
-       ORDER BY date DESC`, [from_date, to_date]);
-        const invQuery = await neonDb.query(`SELECT v.id::int AS vid,
-              COALESCE(
-                jsonb_agg(
-                  jsonb_build_object(
-                    'item', e->>'stockItemName',
-                    'qty', CAST(SPLIT_PART(COALESCE(e->>'billedQty', '0'), ' ', 1) AS numeric),
-                    'unit', COALESCE(NULLIF(SPLIT_PART(COALESCE(e->>'billedQty', ''), ' ', 2), ''), ''),
-                    'rate', CAST(SPLIT_PART(COALESCE(e->>'rate', '0'), '/', 1) AS numeric),
-                    'amount', CAST(COALESCE(e->>'amount', '0') AS numeric),
-                    'description', e->>'description',
-                    'serialNo', COALESCE(e->>'serialNo', '[]')
-                  )
-                ) FILTER (WHERE e->>'stockItemName' IS NOT NULL), '[]'::jsonb
-              ) AS invEntries
-       FROM app.vouchers v
-       LEFT JOIN LATERAL jsonb_array_elements(v.inventoryentries) e ON true
-       WHERE v.date >= $1 AND v.date <= $2
-       GROUP BY v.id`, [from_date, to_date]);
-        const invMap = {};
-        for (const row of invQuery.rows) {
-            invMap[String(row.vid)] = row.inventries || [];
-        }
-        const ledQuery = await neonDb.query(`SELECT v.id::int AS vid,
-              COALESCE(
-                jsonb_agg(
-                  jsonb_build_object(
-                    'ledgerName', e->>'ledgerName',
-                    'amount', CAST(COALESCE(e->>'amount', '0') AS numeric),
-                    'isDeemedPositive', e->>'isDeemedPositive',
-                    'description', e->>'description'
-                  )
-                ), '[]'::jsonb
-              ) AS ledEntries
-       FROM app.vouchers v
-       LEFT JOIN LATERAL jsonb_array_elements(v.ledgerentries) e ON true
-       WHERE v.date >= $1 AND v.date <= $2
-       GROUP BY v.id`, [from_date, to_date]);
-        const ledMap = {};
-        for (const row of ledQuery.rows) {
-            ledMap[String(row.vid)] = row.ledentries || [];
-        }
-        const rows = vouchers.rows.map((r) => {
+        const { voucherRows, invMap, ledMap } = await getDaybook({ from_date, to_date });
+        const rows = voucherRows.map((r) => {
             const raw = r.voucher_type || '';
             let displayType;
             if (/receipt|sales|credit note/i.test(raw) && !/return/i.test(raw))
