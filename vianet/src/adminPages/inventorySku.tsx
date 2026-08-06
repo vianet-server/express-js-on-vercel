@@ -86,16 +86,6 @@ export function InventorySku() {
     }).catch(() => setLoading(false));
   }, [dispatch]);
 
-  const fetchBrands = useCallback(() => {
-    api.get<any>('/api/admin/inventory/brands')
-      .then(res => {
-        const rawList = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
-        const list = rawList.filter((b: any) => typeof b === 'string' && b.trim().length > 0 && /[a-zA-Z]/.test(b));
-        setBrands(list);
-      })
-      .catch(() => {});
-  }, []);
-
   // Only show the full-screen loading spinner on first load. When the Redux
   // store already has cached SKU data (e.g. returning to this page after
   // navigating away), render immediately and refresh in the background so the
@@ -109,10 +99,6 @@ export function InventorySku() {
     // Redux update would recreate the effect and re-trigger fetchAll.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchAll]);
-
-  useEffect(() => {
-    fetchBrands();
-  }, [fetchBrands]);
 
   const toggleGroup = (group: string) => {
     setSelectedGroups(prev => prev.includes(group) ? prev.filter(g => g !== group) : [...prev, group]);
