@@ -303,7 +303,7 @@ async function listInventorySku({ brand }: any = {}) {
         LEFT JOIN app.access_groups g ON g.id = iag.accessgroupid
         ${whereClause}
         GROUP BY s.id, s.stockname, s.quantity, s.price, inv.brand, inv.model
-        ORDER BY s.id DESC
+        ORDER BY s.id
       `;
   } else {
     sql = `
@@ -321,7 +321,7 @@ async function listInventorySku({ brand }: any = {}) {
         LEFT JOIN app.inventory_access_group iag ON iag.inventoryid = s.id
         LEFT JOIN app.access_groups g ON g.id = iag.accessgroupid
         GROUP BY s.id, s.stockname, s.quantity, s.price
-        ORDER BY s.id DESC
+        ORDER BY s.id
       `;
   }
   const result = await neonDb.query(sql, params);

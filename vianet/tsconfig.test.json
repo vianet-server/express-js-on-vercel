@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "verbatimModuleSyntax": false,
+    "erasableSyntaxOnly": false,
+    "allowImportingTsExtensions": false,
+    "isolatedModules": false,
+    "esModuleInterop": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "baseUrl": ".",
+    "types": ["jest", "node", "vite/client", "@testing-library/jest-dom"],
+    "jsx": "react-jsx"
+  },
+  "include": ["src", "test"]
+}

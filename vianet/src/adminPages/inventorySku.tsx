@@ -73,7 +73,6 @@ export function InventorySku() {
   };
 
   const fetchAll = useCallback(() => {
-    setLoading(true);
     Promise.all([
       api.get<SkuRow[]>('/api/admin/inventory/sku').catch(() => [] as SkuRow[]),
       api.get<any>('/api/admin/inventory/control').then((r: any) => r?.accessGroups || []).catch(() => []),
@@ -95,19 +94,23 @@ export function InventorySku() {
       .catch(() => {});
   }, []);
 
-  useEffect(() => { 
-    fetchAll(); 
+  // Only show the full-screen loading spinner on first load. When the Redux
+  // store already has cached SKU data (e.g. returning to this page after
+  // navigating away), render immediately and refresh in the background so the
+  // page doesn't flicker/reload on every screen switch.
+  useEffect(() => {
+    if (skuData && skuData.length > 0) {
+      setLoading(false);
+    }
+    fetchAll();
+    // `skuData` must NOT be in the deps (read once at mount); otherwise every
+    // Redux update would recreate the effect and re-trigger fetchAll.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchAll]);
 
   useEffect(() => {
     fetchBrands();
   }, [fetchBrands]);
-
-  useEffect(() => {
-    const onFocus = () => { fetchAll(); };
-    window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
-  }, [fetchAll]);
 
   const toggleGroup = (group: string) => {
     setSelectedGroups(prev => prev.includes(group) ? prev.filter(g => g !== group) : [...prev, group]);
