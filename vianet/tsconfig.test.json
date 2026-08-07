@@ -1,17 +1,16 @@
 {
   "extends": "./tsconfig.app.json",
   "compilerOptions": {
-    "module": "commonjs",
-    "moduleResolution": "node",
+    "module": "esnext",
+    "moduleResolution": "bundler",
     "verbatimModuleSyntax": false,
     "erasableSyntaxOnly": false,
-    "allowImportingTsExtensions": false,
-    "isolatedModules": false,
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
     "esModuleInterop": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "baseUrl": ".",
-    "types": ["jest", "node", "vite/client", "@testing-library/jest-dom"],
+    "types": ["vitest/globals", "node", "vite/client", "@testing-library/jest-dom"],
     "jsx": "react-jsx"
   },
   "include": ["src", "test"]
