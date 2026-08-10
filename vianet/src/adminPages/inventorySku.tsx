@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment, useMemo, useCallback } from 'react';
+import { useState, useEffect, Fragment, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,11 +8,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Search, Plus, Users, Edit3, Eye, ShieldCheck, ShieldOff, Loader2 } from 'lucide-react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { api } from '@/lib/api';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setSkuData, updateSkuItem, setAllAccessGroups, type SkuRow } from '@/store/slices/inventorySlice';
-
-const PAGE_SIZE = 8;
 
 export function InventorySku() {
   const navigate = useNavigate();
@@ -27,7 +26,6 @@ export function InventorySku() {
   const [brands] = useState<string[]>([
     "AGARO", "Alphatech", "Amazfit", "Amazon", "Amazon Devise 2", "Amazon Devise ST", "Amazon Scheme", "AP Brand Not Doing", "Apple Accessories", "ASUS NEW", "Bath Lenns Set", "Batteries", "Belkin", "Binatone", "Black Zone Mobile", "Boat", "Bose", "Boult Audio", "Computer Accessories", "Computer Consumables", "Digitek", "DJI Osmo", "DURACELL", "Ekmatra", "EPOS", "EVM OLD", "Feiyutech Kica", "Fin FOC", "Fingers", "Fingers Aeging", "Fire Boltt", "Fitbit", "Fujifilm", "Fujifilm Dummy", "FUZO", "Gifting", "GO PRO", "Gripp", "Harman Kardon", "HP", "Infinity", "Infocus", "Itel Handsets", "Jabra New", "JBL", "JBL 2", "JBL Pro", "Kalpesh", "Karbonn New", "Klipsch Speaker", "KODAK", "Lava", "Lava Dummy", "Lenovo Tablets", "Luxury", "Mantra", "Maxima", "Micromax New", "MIVI", "Moto Phones", "NG Earsafe", "Nikita", "Nokia New", "NOTHING", "One Plus", "Ooge", "Other TWS and Acc", "Pebble", "Philips Mobile Phone", "Philips New", "Philips PC", "Poco", "Portronics New", "Promate", "Qubo", "Raopro", "RICO", "Samsung Micro", "Sandisk", "Saregama", "Sennheiser", "Skullkandy New", "SOff", "Sony", "Spacething", "SPIGEN", "Stuffcool New", "Sushi", "Swiss Military", "Tecno", "Tecno Dummy", "Tecno FOC", "Tucano", "Twieto", "URBN", "Villaon", "Xech", "Zebronics", "Zeb Tele", "Zeb Watches", "Zoook New"
   ]);
-  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
 
@@ -102,7 +100,6 @@ export function InventorySku() {
 
   const toggleGroup = (group: string) => {
     setSelectedGroups(prev => prev.includes(group) ? prev.filter(g => g !== group) : [...prev, group]);
-    setPage(1);
   };
   const visibleGroups = accessGroupNames.filter(g => selectedGroups.includes(g));
 
@@ -116,8 +113,19 @@ export function InventorySku() {
     return brandMatch && (!q || s.sku.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || sBrand.includes(q));
   });
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const pageData = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const virtualizer = useVirtualizer({
+    count: filtered.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 56,
+    getItemKey: (index) => filtered[index].sku,
+    overscan: 10,
+  });
 
   const openEdit = (sku: string, group: string, field: string) => {
     const item = (skuData ?? []).find(s => s.sku === sku);
@@ -276,7 +284,7 @@ export function InventorySku() {
                 </div>
                 <div className="flex flex-col gap-1 overflow-y-auto flex-1 pr-1">
                   <label className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer text-sm font-medium">
-                    <Checkbox checked={selectedBrands.length === 0} onCheckedChange={() => { setSelectedBrands([]); setPage(1); }} />All Brands
+                    <Checkbox checked={selectedBrands.length === 0} onCheckedChange={() => { setSelectedBrands([]); }} />All Brands
                   </label>
                   <div className="border-t my-1" />
                   {brands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase())).map(b => (
@@ -285,7 +293,6 @@ export function InventorySku() {
                         checked={selectedBrands.includes(b)} 
                         onCheckedChange={(c) => {
                           setSelectedBrands(prev => c ? [...prev, b] : prev.filter(x => x !== b));
-                          setPage(1);
                         }} 
                       />
                       {b}
@@ -331,7 +338,7 @@ export function InventorySku() {
         <Input placeholder="Search by SKU, product or brand..." value={search} onChange={e => setSearch(e.target.value)} className="border-0 p-0 h-auto text-sm focus-visible:ring-0" />
       </div>
 
-      <div className="overflow-x-auto border rounded-lg">
+      <div ref={scrollRef} className="overflow-auto border rounded-lg max-h-[70vh]">
         <table className="w-full text-sm table-fixed">
           <thead>
             <tr className="border-b">
@@ -359,34 +366,58 @@ export function InventorySku() {
             </tr>
           </thead>
           <tbody>
-            {pageData.map((s) => (
-              <tr key={s.sku} className="border-b last:border-0 hover:bg-muted/20 relative" onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, row: s }); }}>
-                <td className="sticky left-0 z-10 bg-white dark:bg-gray-900 py-2.5 px-3 font-mono text-xs text-muted-foreground truncate">{s.sku}</td>
-                <td className="py-2.5 px-3 font-medium truncate">{s.name}</td>
-                <td className="py-2.5 px-3 text-muted-foreground truncate">{s.brand}</td>
-                <td className="py-2.5 px-3 text-right whitespace-nowrap">{s.qty}</td>
-                <td className="py-2.5 px-3 text-right border-r whitespace-nowrap">₹{(s.price ?? 0).toLocaleString()}</td>
-                {visibleGroups.map(g => {
-                  const ag = (s.accessGroups ?? []).find(a => a.group === g);
-                  return (
-                    <Fragment key={g}>
-                      <td className="py-2.5 px-2 text-left cursor-pointer whitespace-nowrap text-[11px] text-muted-foreground" onClick={() => openEdit(s.sku, g, 'partnerSkuName')}>
-                        {ag && ag.partnerSkuName ? ag.partnerSkuName : '-'}
-                      </td>
-                      <td className="py-2.5 px-2 text-right cursor-pointer whitespace-nowrap" onClick={() => openEdit(s.sku, g, 'qty')}>
-                        {ag && ag.qty > 0 ? ag.qty : <span className="text-amber-600 font-medium">Blocked</span>}
-                      </td>
-                      <td className="py-2.5 px-2 text-right border-r cursor-pointer whitespace-nowrap" onClick={() => openEdit(s.sku, g, 'price')}>
-                        {ag && ag.qty > 0 ? `₹${ag.price.toLocaleString()}` : <span className="text-amber-600 font-medium">Blocked</span>}
-                      </td>
-                    </Fragment>
-                  );
-                })}
-                <td className="py-2.5 px-3 whitespace-nowrap">
-                  <Badge variant={s.status === 'Active' ? 'default' : s.status === 'Inactive' ? 'secondary' : 'destructive'}>{s.status}</Badge>
-                </td>
-              </tr>
-            ))}
+            {mounted && filtered.length > 0 && (() => {
+              const items = virtualizer.getVirtualItems();
+              const totalSize = virtualizer.getTotalSize();
+              const colSpan = 2 + 4 + visibleGroups.length * 3;
+              const lead = items[0]?.start ?? 0;
+              const tail = totalSize - (items[items.length - 1]?.end ?? 0);
+              return (
+                <Fragment>
+                  {lead > 0 && (
+                    <tr style={{ height: lead }}>
+                      <td colSpan={colSpan} />
+                    </tr>
+                  )}
+                  {items.map((virtualRow) => {
+                    const s = filtered[virtualRow.index];
+                    return (
+                      <tr key={virtualRow.key} data-index={virtualRow.index} ref={virtualizer.measureElement} className="border-b last:border-0 hover:bg-muted/20 relative" onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, row: s }); }}>
+                        <td className="sticky left-0 z-10 bg-white dark:bg-gray-900 py-2.5 px-3 font-mono text-xs text-muted-foreground truncate">{s.sku}</td>
+                        <td className="py-2.5 px-3 font-medium truncate">{s.name}</td>
+                        <td className="py-2.5 px-3 text-muted-foreground truncate">{s.brand}</td>
+                        <td className="py-2.5 px-3 text-right whitespace-nowrap">{s.qty}</td>
+                        <td className="py-2.5 px-3 text-right border-r whitespace-nowrap">₹{(s.price ?? 0).toLocaleString()}</td>
+                        {visibleGroups.map(g => {
+                          const ag = (s.accessGroups ?? []).find(a => a.group === g);
+                          return (
+                            <Fragment key={g}>
+                              <td className="py-2.5 px-2 text-left cursor-pointer whitespace-nowrap text-[11px] text-muted-foreground" onClick={() => openEdit(s.sku, g, 'partnerSkuName')}>
+                                {ag && ag.partnerSkuName ? ag.partnerSkuName : '-'}
+                              </td>
+                              <td className="py-2.5 px-2 text-right cursor-pointer whitespace-nowrap" onClick={() => openEdit(s.sku, g, 'qty')}>
+                                {ag && ag.qty > 0 ? ag.qty : <span className="text-amber-600 font-medium">Blocked</span>}
+                              </td>
+                              <td className="py-2.5 px-2 text-right border-r cursor-pointer whitespace-nowrap" onClick={() => openEdit(s.sku, g, 'price')}>
+                                {ag && ag.qty > 0 ? `₹${ag.price.toLocaleString()}` : <span className="text-amber-600 font-medium">Blocked</span>}
+                              </td>
+                            </Fragment>
+                          );
+                        })}
+                        <td className="py-2.5 px-3 whitespace-nowrap">
+                          <Badge variant={s.status === 'Active' ? 'default' : s.status === 'Inactive' ? 'secondary' : 'destructive'}>{s.status}</Badge>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {tail > 0 && (
+                    <tr style={{ height: tail }}>
+                      <td colSpan={colSpan} />
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })()}
           </tbody>
         </table>
       </div>
@@ -430,25 +461,8 @@ export function InventorySku() {
 
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Showing {filtered.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}&ndash;{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} SKUs
+          Showing {filtered.length} SKUs
         </p>
-        <div className="flex items-center gap-1">
-          <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Prev</Button>
-          {(() => {
-            const pages: (number | string)[] = [];
-            const start = Math.max(1, page - 2);
-            const end = Math.min(totalPages, page + 2);
-            if (start > 1) { pages.push(1); if (start > 2) pages.push('...'); }
-            for (let i = start; i <= end; i++) pages.push(i);
-            if (end < totalPages) { if (end < totalPages - 1) pages.push('...'); pages.push(totalPages); }
-            return pages.map((p, i) =>
-              typeof p === 'string'
-                ? <span key={`e${i}`} className="px-1 text-xs text-muted-foreground">...</span>
-                : <Button key={p} size="sm" variant={page === p ? 'default' : 'outline'} onClick={() => setPage(p)} className="min-w-8 h-8 px-2">{p}</Button>
-            );
-          })()}
-          <Button size="sm" variant="outline" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next</Button>
-        </div>
       </div>
 
       <Dialog open={!!editTarget} onOpenChange={open => !open && setEditTarget(null)}>
