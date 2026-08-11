@@ -265,13 +265,21 @@ export function InventorySku() {
     <div className="flex flex-col gap-6 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Inventory SKU</h1>
+
+        {/**  under header access and search controlls are in this div */}
         <div className="flex items-center gap-2">
+
+
+          {/**
+              brand search popover logic and trigger 
+           */}
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Brand:</span>
             <Popover>
               <PopoverTrigger className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-3 py-2 cursor-pointer min-w-[150px] max-w-[220px]">
                 <span className="truncate">{selectedBrands.length === 0 ? 'All Brands' : selectedBrands.length === 1 ? selectedBrands[0] : `${selectedBrands.length} brands`}</span>
               </PopoverTrigger>
+              
               <PopoverContent className="w-64 p-2 max-h-[60vh] flex flex-col" align="start">
                 <div className="px-1 pb-2 border-b mb-2 sticky top-0 bg-background z-10">
                   <Input 
@@ -305,9 +313,14 @@ export function InventorySku() {
               </PopoverContent>
             </Popover>
           </div>
+
+          {/**
+              access-group toggle
+          */}
           <Popover>
+
             <PopoverTrigger className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 cursor-pointer">
-              <Users size={14} /> Select Access Group
+              <Users size={14} /> Select Access-Group
             </PopoverTrigger>
             <PopoverContent className="w-56 p-2">
               <div className="flex flex-col gap-1">
@@ -319,30 +332,38 @@ export function InventorySku() {
               </div>
             </PopoverContent>
           </Popover>
+
+          {/**  export mapping excel button */}
           <Button variant="outline" size="sm" onClick={handleExportTemplate} className="gap-1 px-3" title="Export current view to Excel">
             <Edit3 size={14} /> Export Map
           </Button>
+
+          {/** import excel button */}
           <div className="relative inline-block">
             <input type="file" id="file-upload" className="hidden" accept=".xlsx,.csv" onChange={handleImport} />
             <Button variant="outline" size="sm" onClick={() => document.getElementById('file-upload')?.click()} className="gap-1 px-3" disabled={uploading} title="Import Excel mapping">
               {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus size={14} />} Import Map
             </Button>
           </div>
+
+          {/**  add access button add sku button */}
           <Button variant="secondary" onClick={() => openAddAccess()}><Users size={14} /> Add Access</Button>
           <Button><Plus size={14} /> Add SKU</Button>
         </div>
       </div>
 
+      {/**  named search bar in  the project*/}
       <div className="flex items-center gap-2 border rounded-lg px-3 py-1.5 max-w-md">
         <Search size={14} className="text-muted-foreground shrink-0" />
         <Input placeholder="Search by SKU, product or brand..." value={search} onChange={e => setSearch(e.target.value)} className="border-0 p-0 h-auto text-sm focus-visible:ring-0" />
       </div>
 
-      <div ref={scrollRef} className="overflow-auto border rounded-lg max-h-[70vh]">
+        {/**  export map button */}
+      <div ref={scrollRef} className="overflow-auto border rounded-lg max-h-[70vh]"> 
         <table className="w-full text-sm table-fixed">
           <thead>
             <tr className="border-b">
-              <th rowSpan={2} className="sticky left-0 z-10 bg-white dark:bg-gray-900 pb-2 pt-3 px-3 font-medium text-left text-muted-foreground min-w-[72px]">SKU ID</th>
+              <th rowSpan={2} className="sticky left-0 z-10 bg-white dark:bg-gray-900 pb-2 pt-3 px-3 font-medium text-left text-muted-foreground min-w-[72px]">DB ID</th>
               <th colSpan={4} className="pb-1 pt-3 px-3 font-semibold text-center text-xs text-muted-foreground border-x bg-muted/30">Inventory</th>
               {visibleGroups.map(g => (
                 <th key={g} colSpan={3} className="pb-1 pt-3 px-2 font-semibold text-center text-[10px] text-muted-foreground border-x bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors min-w-[120px]" onClick={() => { navigate(`/admin/inventory/access-group/${encodeURIComponent(g)}`); }}>

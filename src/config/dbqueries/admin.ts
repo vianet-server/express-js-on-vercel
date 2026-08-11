@@ -292,7 +292,7 @@ async function listInventorySku({ brand }: any = {}) {
                COALESCE(inv.model,'') AS model,
                COALESCE(
                  json_agg(
-                   json_build_object('group', g.name, 'qty', iag.quantity, 'price', iag.oprice, 'partnerSkuName', iag.partner_sku_name)
+                   json_build_object('group', g.name, 'qty', COALESCE(iag.quantity,0) + COALESCE(inv.quantity,0), 'price', iag.oprice, 'partnerSkuName', iag.partner_sku_name)
                    ORDER BY g.name
                  ) FILTER (WHERE g.id IS NOT NULL),
                  '[]'
