@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Calendar, Download, FileDown, FileSpreadsheet, Search, AlertTriangle, ChevronRight, ChevronDown, Plus, Loader2, ArrowDownCircle, ArrowUpCircle, Filter } from 'lucide-react';
+import { Calendar, Download, FileDown, FileSpreadsheet, Search, ChevronRight, ChevronDown, Plus, Loader2, ArrowDownCircle, ArrowUpCircle, Filter } from 'lucide-react';
 import { api } from '@/lib/api';
 
 const statusStyles = {
@@ -233,11 +233,9 @@ export function Outstanding() {
           </div>
           <div className="mt-4 flex items-center gap-3">
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant={ageFilter !== 'all' ? 'default' : 'outline'} size="sm" className="gap-1.5">
-                  <Filter size={14} />
-                  {ageFilter === 'all' ? 'Filter by Age' : ageFilter}
-                </Button>
+              <DropdownMenuTrigger render={<Button variant={ageFilter !== 'all' ? 'default' : 'outline'} size="sm" className="gap-1.5" />}>
+                <Filter size={14} />
+                {ageFilter === 'all' ? 'Filter by Age' : ageFilter}
               </DropdownMenuTrigger>
               <DropdownMenuContent>
                 <DropdownMenuItem onClick={() => setAgeFilter('all')}>All</DropdownMenuItem>
@@ -335,11 +333,9 @@ export function Outstanding() {
             <Search size={16} className="text-muted-foreground" />
             <Input placeholder="Search by customer name..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="max-w-sm" />
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant={ageFilter !== 'all' ? 'default' : 'outline'} size="sm" className="gap-1.5 ml-2">
-                  <Filter size={14} />
-                  {ageFilter === 'all' ? 'Filter by Age' : ageFilter}
-                </Button>
+              <DropdownMenuTrigger render={<Button variant={ageFilter !== 'all' ? 'default' : 'outline'} size="sm" className="gap-1.5 ml-2" />}>
+                <Filter size={14} />
+                {ageFilter === 'all' ? 'Filter by Age' : ageFilter}
               </DropdownMenuTrigger>
               <DropdownMenuContent>
                 <DropdownMenuItem onClick={() => setAgeFilter('all')}>All</DropdownMenuItem>
