@@ -65,10 +65,20 @@ export function BalanceSheet() {
   const [searchQuery, setSearchQuery] = useState('');
   const [datewisePick, setDatewisePick] = useState('');
   const [datewiseCols, setDatewiseCols] = useState<string[]>([]);
+  const [showMonthPick, setShowMonthPick] = useState(false);
+  const [monthPick, setMonthPick] = useState('');
 
   useEffect(() => {
     api.get('/api/admin/reports/balance-sheet')
-      .then(res => setData(res))
+      .then(res => {
+        const sortedData = [...res].sort((a: any, b: any) => b.amount - a.amount);
+        sortedData.forEach(item => {
+          if (item.subs) {
+            item.subs.sort((a: any, b: any) => b.amount - a.amount);
+          }
+        });
+        setData(sortedData);
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
@@ -79,6 +89,14 @@ export function BalanceSheet() {
       setShowDateRange(false);
     }
   }, [dateFrom, dateTo]);
+
+  const handleMonthApply = useCallback(() => {
+    if (monthPick) {
+      const d = new Date(monthPick);
+      setActivePeriod(d.toLocaleDateString('default', { month: 'long', year: 'numeric' }));
+      setShowMonthPick(false);
+    }
+  }, [monthPick]);
 
   const handleAddDateColumn = () => {
     if (datewisePick && !datewiseCols.includes(datewisePick)) {
@@ -118,6 +136,7 @@ export function BalanceSheet() {
               <DropdownMenuItem onClick={() => setActivePeriod('This Month')}>This Month</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setActivePeriod('This Year')}>This Year</DropdownMenuItem>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setShowMonthPick(true)}>Select Month</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setShowDateRange(true)}>Custom Range</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -137,6 +156,19 @@ export function BalanceSheet() {
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setShowDateRange(false)}>Cancel</Button>
             <Button onClick={handleCustomApply} disabled={!dateFrom || !dateTo}>Apply</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showMonthPick} onOpenChange={setShowMonthPick}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Select Month</DialogTitle></DialogHeader>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5"><label className="text-sm font-medium">Month</label><Input type="month" value={monthPick} onChange={(e) => setMonthPick(e.target.value)} /></div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowMonthPick(false)}>Cancel</Button>
+            <Button onClick={handleMonthApply} disabled={!monthPick}>Apply</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
