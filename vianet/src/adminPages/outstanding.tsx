@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Calendar, Download, FileDown, FileSpreadsheet, Search, AlertTriangle, ChevronRight, ChevronDown, Plus, Loader2, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
+import { Calendar, Download, FileDown, FileSpreadsheet, Search, AlertTriangle, ChevronRight, ChevronDown, Plus, Loader2, ArrowDownCircle, ArrowUpCircle, Filter } from 'lucide-react';
 import { api } from '@/lib/api';
 
 const statusStyles = {
@@ -81,13 +81,21 @@ export function Outstanding() {
   const [dateTo, setDateTo] = useState('');
   const [showExport, setShowExport] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [show60plus, setShow60plus] = useState(false);
+  const [ageFilter, setAgeFilter] = useState('all');
   const [datewisePick, setDatewisePick] = useState('');
   const [datewiseCols, setDatewiseCols] = useState<string[]>([]);
 
   useEffect(() => {
     api.get('/api/admin/reports/outstanding')
-      .then(res => setData(res))
+      .then(res => {
+        const sortedData = [...res].sort((a: any, b: any) => b.amount - a.amount);
+        sortedData.forEach(item => {
+          if (item.subs) {
+            item.subs.sort((a: any, b: any) => b.amount - a.amount);
+          }
+        });
+        setData(sortedData);
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
@@ -110,10 +118,23 @@ export function Outstanding() {
   const overdueTotal = data.filter((i: any) => i.days > 30).reduce((s: number, i: any) => s + i.amount, 0);
   const criticalTotal = data.filter((i: any) => i.days > 60).reduce((s: number, i: any) => s + i.amount, 0);
 
+  const ageBuckets = [
+    { label: '0-30 days', min: -Infinity, max: 30, color: 'bg-blue-500' },
+    { label: '31-60 days', min: 30, max: 60, color: 'bg-amber-500' },
+    { label: '61-90 days', min: 60, max: 90, color: 'bg-orange-400' },
+    { label: '91-120 days', min: 90, max: 120, color: 'bg-orange-600' },
+    { label: '121-150 days', min: 120, max: 150, color: 'bg-red-400' },
+    { label: '151-180 days', min: 150, max: 180, color: 'bg-red-600' },
+    { label: '180+ days', min: 180, max: Infinity, color: 'bg-red-700' },
+  ];
+
   const filteredData = data.filter((i: any) => {
     const match = i.customer.toLowerCase().includes(searchQuery.toLowerCase());
-    if (!show60plus) return match;
-    return match && i.days > 60;
+    if (!match) return false;
+    if (ageFilter === 'all') return true;
+    const bucket = ageBuckets.find(b => b.label === ageFilter);
+    if (!bucket) return true;
+    return i.days > bucket.min && i.days <= bucket.max;
   });
 
   if (loading) {
@@ -211,10 +232,22 @@ export function Outstanding() {
             </Card>
           </div>
           <div className="mt-4 flex items-center gap-3">
-            <Button variant={show60plus ? 'default' : 'outline'} size="sm" onClick={() => setShow60plus(!show60plus)} className="gap-1.5">
-              <AlertTriangle size={14} />
-              More than 60 Days ({data.filter((i: any) => i.days > 60).length})
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant={ageFilter !== 'all' ? 'default' : 'outline'} size="sm" className="gap-1.5">
+                  <Filter size={14} />
+                  {ageFilter === 'all' ? 'Filter by Age' : ageFilter}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => setAgeFilter('all')}>All</DropdownMenuItem>
+                {ageBuckets.map(b => (
+                  <DropdownMenuItem key={b.label} onClick={() => setAgeFilter(b.label)}>
+                    {b.label} ({data.filter((i: any) => i.days > b.min && i.days <= b.max).length})
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
           <Card className="mt-4">
             <CardHeader><CardTitle>Outstanding Overview</CardTitle></CardHeader>
@@ -230,7 +263,10 @@ export function Outstanding() {
                   </tr>
                 </thead>
                 <tbody>
-                  {(show60plus ? data.filter((i: any) => i.days > 60) : data).slice(0, 5).map((item: any, i: number) => (
+                  {(ageFilter === 'all' ? data : data.filter((i: any) => {
+                    const b = ageBuckets.find(bk => bk.label === ageFilter);
+                    return b ? (i.days > b.min && i.days <= b.max) : true;
+                  })).slice(0, 5).map((item: any, i: number) => (
                     <tr key={i} className="border-b last:border-0">
                       <td className="py-2.5 font-medium">{item.customer}</td>
                       <td className="py-2.5 text-right">₹{item.amount.toLocaleString()}</td>
@@ -260,14 +296,15 @@ export function Outstanding() {
                 <Card>
                   <CardHeader><CardTitle>On Time</CardTitle></CardHeader>
                   <CardContent>
-                    <DetailSection title="Due (&le;30 days)" items={data.filter((i: any) => i.category === 'receivable' && i.days <= 30)} icon={<span className="size-2.5 rounded-full bg-blue-500 inline-block" />} />
+                    <DetailSection title={ageBuckets[0].label} items={data.filter((i: any) => i.category === 'receivable' && i.days <= ageBuckets[0].max)} icon={<span className={`size-2.5 rounded-full ${ageBuckets[0].color} inline-block`} />} />
                   </CardContent>
                 </Card>
                 <Card>
                   <CardHeader><CardTitle>Overdue</CardTitle></CardHeader>
                   <CardContent>
-                    <DetailSection title="Overdue (31-60 days)" items={data.filter((i: any) => i.category === 'receivable' && i.days > 30 && i.days <= 60)} icon={<span className="size-2.5 rounded-full bg-amber-500 inline-block" />} />
-                    <DetailSection title="Critical (&gt;60 days)" items={data.filter((i: any) => i.category === 'receivable' && i.days > 60)} icon={<span className="size-2.5 rounded-full bg-red-500 inline-block" />} />
+                    {ageBuckets.slice(1).map(b => (
+                      <DetailSection key={b.label} title={b.label} items={data.filter((i: any) => i.category === 'receivable' && i.days > b.min && i.days <= b.max)} icon={<span className={`size-2.5 rounded-full ${b.color} inline-block`} />} />
+                    ))}
                   </CardContent>
                 </Card>
               </div>
@@ -277,14 +314,15 @@ export function Outstanding() {
                 <Card>
                   <CardHeader><CardTitle>On Time</CardTitle></CardHeader>
                   <CardContent>
-                    <DetailSection title="Due (&le;30 days)" items={data.filter((i: any) => i.category === 'payable' && i.days <= 30)} icon={<span className="size-2.5 rounded-full bg-blue-500 inline-block" />} />
+                    <DetailSection title={ageBuckets[0].label} items={data.filter((i: any) => i.category === 'payable' && i.days <= ageBuckets[0].max)} icon={<span className={`size-2.5 rounded-full ${ageBuckets[0].color} inline-block`} />} />
                   </CardContent>
                 </Card>
                 <Card>
                   <CardHeader><CardTitle>Overdue</CardTitle></CardHeader>
                   <CardContent>
-                    <DetailSection title="Overdue (31-60 days)" items={data.filter((i: any) => i.category === 'payable' && i.days > 30 && i.days <= 60)} icon={<span className="size-2.5 rounded-full bg-amber-500 inline-block" />} />
-                    <DetailSection title="Critical (&gt;60 days)" items={data.filter((i: any) => i.category === 'payable' && i.days > 60)} icon={<span className="size-2.5 rounded-full bg-red-500 inline-block" />} />
+                    {ageBuckets.slice(1).map(b => (
+                      <DetailSection key={b.label} title={b.label} items={data.filter((i: any) => i.category === 'payable' && i.days > b.min && i.days <= b.max)} icon={<span className={`size-2.5 rounded-full ${b.color} inline-block`} />} />
+                    ))}
                   </CardContent>
                 </Card>
               </div>
@@ -296,9 +334,22 @@ export function Outstanding() {
           <div className="mb-4 flex items-center gap-2">
             <Search size={16} className="text-muted-foreground" />
             <Input placeholder="Search by customer name..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="max-w-sm" />
-            <Button variant={show60plus ? 'default' : 'outline'} size="sm" onClick={() => setShow60plus(!show60plus)} className="gap-1.5 ml-2">
-              <AlertTriangle size={14} /> &gt;60 Days
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant={ageFilter !== 'all' ? 'default' : 'outline'} size="sm" className="gap-1.5 ml-2">
+                  <Filter size={14} />
+                  {ageFilter === 'all' ? 'Filter by Age' : ageFilter}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => setAgeFilter('all')}>All</DropdownMenuItem>
+                {ageBuckets.map(b => (
+                  <DropdownMenuItem key={b.label} onClick={() => setAgeFilter(b.label)}>
+                    {b.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
           <Card>
             <CardContent>
