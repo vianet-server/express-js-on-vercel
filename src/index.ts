@@ -54,8 +54,9 @@ app.use('/api/admin', adminRoutes);
 
 // Serve React static files (Vite build) — hashed filenames are immutable
 app.use(express.static(path.join(__dirname, '..', 'vianet', 'dist'), {
-  maxAge: '1y',
-  immutable: true,
+  maxAge: 0,       // Tells browser NOT to store for future use without asking
+  etag: true,      // Enables ETag validation so the server knows if the file changed
+  lastModified: true, // Uses last-modified header for file freshness check
 }));
 
 // SPA fallback — never cache index.html so it always picks up the latest JS chunks

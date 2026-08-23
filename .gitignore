@@ -10,3 +10,4 @@ hash.txt
 user-template.json
 .env.vianet-dev
 .env*
+private

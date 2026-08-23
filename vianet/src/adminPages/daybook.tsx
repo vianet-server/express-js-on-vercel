@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,8 +41,9 @@ export function Daybook() {
   const [openIds, setOpenIds] = useState<number[]>([]);
   const toggle = (id: number) => setOpenIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
 
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
   const [mounted, setMounted] = useState(false);
+  
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -50,6 +51,7 @@ export function Daybook() {
   const daybookKey = `daybook-${fromDate}-${toDate}`;
   const { data: daybookRaw, loading } = useAdminQuery<any[]>(daybookKey, `/api/admin/reports/daybook?from_date=${fromDate}&to_date=${toDate}`);
   const transactionsData = Array.isArray(daybookRaw) ? daybookRaw : [];
+  
   const dailyTotals = (() => {
     const daily: Record<string, { income: number; expense: number }> = {};
     for (const t of transactionsData) {
@@ -70,7 +72,7 @@ export function Daybook() {
 
   const virtualizer = useVirtualizer({
     count: filtered.length,
-    getScrollElement: () => scrollRef.current,
+    getScrollElement: () => scrollEl,
     estimateSize: () => 56,
     getItemKey: (index) => (filtered[index] as any)?.id ?? index,
     overscan: 10,
@@ -217,14 +219,15 @@ export function Daybook() {
 
         <TabsContent value="detail" className="mt-6">
           {mounted && (
-            <div ref={scrollRef} className="h-[72vh] overflow-auto">
+            <div ref={setScrollEl} className="h-[72vh] overflow-auto">
               {filtered.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">No transactions found</p>
               ) : (
               <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
                 {virtualizer.getVirtualItems().map((virtualRow) => {
                   const t: any = filtered[virtualRow.index];
-                  const open = openIds.includes(t.id);
+                  const rowId = t.id ?? virtualRow.index;
+                  const open = openIds.includes(rowId);
                   const hasInventory = (t.inventoryEntries ?? []).length > 0;
                   const hasLedger = (t.ledgerEntries ?? []).length > 0;
                   const hasNarration = t.narration && t.narration !== t.customer;
@@ -237,7 +240,7 @@ export function Daybook() {
                       className="absolute top-0 left-0 w-full pr-3 pb-3"
                       style={{ transform: `translateY(${virtualRow.start}px)` }}
                     >
-                      <Collapsible key={t.id} open={open} onOpenChange={() => toggle(t.id)}>
+                      <Collapsible key={rowId} open={open} onOpenChange={() => toggle(rowId)}>
                         <div className="flex items-center justify-between border rounded-lg px-4 py-3 hover:bg-muted/30 cursor-pointer">
                           <CollapsibleTrigger className="flex items-center gap-3 flex-1 text-left min-w-0">
                             {hasDetail ? (
@@ -337,7 +340,7 @@ export function Daybook() {
                     </div>
                   );
                 })}
-                </div>
+              </div>
               )}
             </div>
           )}

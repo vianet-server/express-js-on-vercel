@@ -292,7 +292,7 @@ async function listInventorySku({ brand }: any = {}) {
                COALESCE(inv.model,'') AS model,
                COALESCE(
                  json_agg(
-                   json_build_object('group', g.name, 'qty', iag.quantity, 'price', iag.oprice, 'partnerSkuName', iag.partner_sku_name)
+                   json_build_object('group', g.name, 'qty', COALESCE(iag.quantity,0) + COALESCE(inv.quantity,0), 'price', iag.oprice, 'partnerSkuName', iag.partner_sku_name)
                    ORDER BY g.name
                  ) FILTER (WHERE g.id IS NOT NULL),
                  '[]'
@@ -303,7 +303,7 @@ async function listInventorySku({ brand }: any = {}) {
         LEFT JOIN app.access_groups g ON g.id = iag.accessgroupid
         ${whereClause}
         GROUP BY s.id, s.stockname, s.quantity, s.price, inv.brand, inv.model
-        ORDER BY s.id DESC
+        ORDER BY s.id
       `;
   } else {
     sql = `
@@ -321,7 +321,7 @@ async function listInventorySku({ brand }: any = {}) {
         LEFT JOIN app.inventory_access_group iag ON iag.inventoryid = s.id
         LEFT JOIN app.access_groups g ON g.id = iag.accessgroupid
         GROUP BY s.id, s.stockname, s.quantity, s.price
-        ORDER BY s.id DESC
+        ORDER BY s.id
       `;
   }
   const result = await neonDb.query(sql, params);
