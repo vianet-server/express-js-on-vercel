@@ -93,4 +93,17 @@ router.get('/sync', async (req, res) => {
   } catch { res.json([]); }
 });
 
+/**
+ * GET /api/admin/settings/last-sync
+ */
+router.get('/last-sync', async (req, res) => {
+  try {
+    const { neonDb } = require('../../config/dbqueries/api');
+    const result = await neonDb.query("SELECT MAX(last_sync_time) as last_sync FROM public.sync_metadata");
+    res.json({ last_sync: result.rows[0]?.last_sync || null });
+  } catch (err) {
+    res.json({ last_sync: null });
+  }
+});
+
 module.exports = router;

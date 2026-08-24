@@ -34,10 +34,12 @@ function fmtDate(d: string) {
 
 export function Daybook() {
   const [search, setSearch] = useState('');
-  const today = new Date().toISOString().split('T')[0];
-  const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
-  const [fromDate, setFromDate] = useState(firstOfMonth);
-  const [toDate, setToDate] = useState(today);
+  const yesterdayDate = new Date();
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterday = yesterdayDate.toISOString().split('T')[0];
+  
+  const [fromDate, setFromDate] = useState(yesterday);
+  const [toDate, setToDate] = useState(yesterday);
   const [openIds, setOpenIds] = useState<number[]>([]);
   const toggle = (id: number) => setOpenIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
 
