@@ -1,6 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect -- server data fetch is a valid effect use */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -9,7 +10,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Edit3, ExternalLink, Check, X, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Edit3, ExternalLink, Check, X, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setStockPage, updateStockItem } from '@/store/slices/inventorySlice';
@@ -19,7 +20,8 @@ interface StockItem {
   qty: number; price: number; gst: number; min: number; max: number;
 }
 
-const LIMIT_OPTIONS = [10, 25, 30, 50, 100]
+/** API caps each response at 500 rows, so the full list is fetched in batches. */
+const FETCH_BATCH = 500
 
 const editFields = [
   { key: 'name', label: 'Stock Name', type: 'text' },
@@ -41,8 +43,6 @@ export function InventoryStock() {
   const pagination = useAppSelector((state) => state.inventory?.stockPagination ?? { offset: 0, limit: 10, total: 0 });
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
-  const [pageLimit, setPageLimit] = useState(10)
-  const [currentPage, setCurrentPage] = useState(0)
   const [editAll, setEditAll] = useState<StockItem | null>(null);
   const [editForm, setEditForm] = useState<StockItem | null>(null);
   const [brands, setBrands] = useState<string[]>([]);
@@ -57,19 +57,31 @@ export function InventoryStock() {
     offset: number;
   }
 
-  const totalPages = Math.max(1, Math.ceil(pagination.total / pageLimit));
-
-  const fetchPage = useCallback(async (page: number, limit = pageLimit, brand = selectedBrand, group = selectedGroup) => {
+  /**
+   * Fetches the entire stock list for the current brand/group filters by
+   * walking the API's paginated endpoint in FETCH_BATCH chunks. Rendering
+   * cost stays flat thanks to table virtualization.
+   */
+  const fetchAll = useCallback(async (brand = selectedBrand, group = selectedGroup) => {
     setLoading(true)
     try {
-      const offset = page * limit
-      const res = await api.get<StockPageResponse>(`/api/admin/inventory/stock?limit=${limit}&offset=${offset}&brand=${brand}&group=${group}`)
-      dispatch(setStockPage({ items: res.rows, total: res.total, limit: res.limit, offset: res.offset }))
-      return res
+      let url = (offset: number) =>
+        `/api/admin/inventory/stock?limit=${FETCH_BATCH}&offset=${offset}&brand=${brand}&group=${group}`
+      const first = await api.get<StockPageResponse>(url(0))
+      let all = [...first.rows]
+      let total = first.total
+      while (all.length < total) {
+        const next = await api.get<StockPageResponse>(url(all.length))
+        if (!next.rows || next.rows.length === 0) break
+        all = all.concat(next.rows)
+        total = next.total
+      }
+      dispatch(setStockPage({ items: all, total, limit: Math.max(all.length, 1), offset: 0 }))
+      return all
     } finally {
       setLoading(false)
     }
-  }, [dispatch, pageLimit, selectedBrand, selectedGroup])
+  }, [dispatch, selectedBrand, selectedGroup])
 
   useEffect(() => {
     api.get<any>('/api/admin/inventory/brands')
@@ -79,7 +91,7 @@ export function InventoryStock() {
         setBrands(list);
       })
       .catch(console.error);
-    
+
     api.get<any>('/api/admin/inventory/groups')
       .then(res => {
         const rawList = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
@@ -90,27 +102,41 @@ export function InventoryStock() {
   }, []);
 
   useEffect(() => {
-    fetchPage(currentPage)
-  }, [currentPage, pageLimit, fetchPage, selectedBrand, selectedGroup])
-
-  const handleLimitChange = (value: string | null) => {
-    if (value !== null) {
-      const limit = Number(value)
-      setPageLimit(limit)
-      setCurrentPage(0)
-      dispatch(setStockPage({ items: [], total: 0, limit, offset: 0 }))
-    }
-  };
-
-  const goToPage = (page: number) => {
-    if (page >= 0 && page < totalPages) setCurrentPage(page)
-  };
+    fetchAll()
+  }, [fetchAll])
 
   const filtered = items.filter(p =>
     (p.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
     (p.brand ?? '').toLowerCase().includes(search.toLowerCase()) ||
     (p.model ?? '').toLowerCase().includes(search.toLowerCase())
   )
+
+  // --- Table virtualization (@tanstack/react-virtual) ---
+  const ROW_H = 41; // py-2.5 + text-sm line + border
+  const overviewScrollRef = useRef<HTMLDivElement>(null);
+  const detailedScrollRef = useRef<HTMLDivElement>(null);
+  const overviewVirt = useVirtualizer({
+    count: filtered.length,
+    getScrollElement: () => overviewScrollRef.current,
+    estimateSize: () => ROW_H,
+    overscan: 10,
+  });
+  const detailedVirt = useVirtualizer({
+    count: filtered.length,
+    getScrollElement: () => detailedScrollRef.current,
+    estimateSize: () => ROW_H,
+    overscan: 10,
+  });
+
+  /** Top/bottom spacer heights so only visible rows are mounted inside <tbody>. */
+  const tableSpacers = (virt: { getTotalSize(): number; getVirtualItems(): { start: number; end: number }[] }) => {
+    const vItems = virt.getVirtualItems();
+    const top = vItems[0]?.start ?? 0;
+    const bottom = vItems.length ? virt.getTotalSize() - vItems[vItems.length - 1].end : 0;
+    return { top, bottom };
+  };
+  const oSpacers = tableSpacers(overviewVirt);
+  const dSpacers = tableSpacers(detailedVirt);
 
   const openEditAll = (item: StockItem) => {
     setEditAll(item);
@@ -123,19 +149,6 @@ export function InventoryStock() {
     setEditAll(null);
     setEditForm(null);
   };
-
-  const getPageNumbers = () => {
-    const pages: (number | string)[] = []
-    const range = 2
-    const start = Math.max(0, currentPage - range)
-    const end = Math.min(totalPages - 1, currentPage + range)
-    if (start > 0) pages.push(0)
-    if (start > 1) pages.push('...')
-    for (let i = start; i <= end; i++) pages.push(i)
-    if (end < totalPages - 2) pages.push('...')
-    if (end < totalPages - 1) pages.push(totalPages - 1)
-    return pages
-  }
 
   if (loading && items.length === 0) {
     return (
@@ -150,7 +163,7 @@ export function InventoryStock() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Inventory Stock</h1>
         <div className="flex items-center gap-4">
-          <Select value={selectedGroup} onValueChange={(val) => { setSelectedGroup(val ?? 'all'); setCurrentPage(0); }}>
+          <Select value={selectedGroup} onValueChange={(val) => { setSelectedGroup(val ?? 'all'); }}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Select Group" />
             </SelectTrigger>
@@ -161,7 +174,7 @@ export function InventoryStock() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={selectedBrand} onValueChange={(val) => { setSelectedBrand(val ?? 'all'); setCurrentPage(0); }}>
+          <Select value={selectedBrand} onValueChange={(val) => { setSelectedBrand(val ?? 'all'); }}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Select Brand" />
             </SelectTrigger>
@@ -181,20 +194,9 @@ export function InventoryStock() {
 
       <div className="flex items-center justify-between">
         <div className="text-sm text-muted-foreground">
-          Page {currentPage + 1} of {totalPages} ({pagination.total} total items)
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">Per page</span>
-          <Select value={String(pageLimit)} onValueChange={handleLimitChange}>
-            <SelectTrigger className="h-8 w-16 text-xs">
-              <SelectValue placeholder={String(pageLimit)} />
-            </SelectTrigger>
-            <SelectContent>
-              {LIMIT_OPTIONS.map(opt => (
-                <SelectItem key={opt} value={String(opt)}>{opt}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {filtered.length === pagination.total
+            ? `${pagination.total} items`
+            : `${filtered.length} of ${pagination.total} items`}
         </div>
       </div>
 
@@ -208,9 +210,9 @@ export function InventoryStock() {
           <TabsContent value="overview">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
               <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Total Products</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{pagination.total}</div></CardContent></Card>
-              <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Total Stock</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{items.reduce((s, p) => s + p.qty, 0).toLocaleString()}</div></CardContent></Card>
+              <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Total Stock</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{items.reduce((s, p) => s + (Number(p.qty) || 0), 0).toLocaleString()}</div></CardContent></Card>
               <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Low Stock Items</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-amber-600">{items.filter(p => p.qty <= p.min).length}</div></CardContent></Card>
-              <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Stock Value</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">₹{items.reduce((s, p) => s + p.qty * (p.price ?? 0), 0).toLocaleString()}</div></CardContent></Card>
+              <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Stock Value</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">₹{items.reduce((s, p) => s + (Number(p.qty) || 0) * (Number(p.price) || 0), 0).toLocaleString()}</div></CardContent></Card>
             </div>
             {loading && (
               <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
@@ -219,39 +221,46 @@ export function InventoryStock() {
             )}
             <Card className="mt-4">
               <CardHeader><CardTitle>Stock Levels</CardTitle></CardHeader>
-              <CardContent className="overflow-x-auto relative max-h-[60vh]">
-                <table className="w-full text-sm min-w-[700px]">
-                  <thead className="sticky top-0 bg-background z-10 shadow-sm">
-                    <tr className="border-b text-left text-muted-foreground">
-                      <th className="py-3 px-2 font-medium">Product</th>
-                      <th className="py-3 px-2 font-medium">Group</th>
-                      <th className="py-3 px-2 font-medium">Brand</th>
-                      <th className="py-3 px-2 font-medium text-right">Stock</th>
-                      <th className="py-3 px-2 font-medium text-right">Min</th>
-                      <th className="py-3 px-2 font-medium text-right">Max</th>
-                      <th className="py-3 px-2 font-medium text-right">Price</th>
-                      <th className="py-3 px-2 font-medium">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map(p => (
-                      <tr key={p.id} className="border-b last:border-0 cursor-pointer hover:bg-muted/30" onClick={() => navigate(`/admin/inventory/stock/${p.id}`)}>
-                        <td className="py-2.5 font-medium">{p.name}</td>
-                        <td className="py-2.5 text-muted-foreground">{p.group}</td>
-                        <td className="py-2.5 text-muted-foreground">{p.brand}</td>
-                        <td className="py-2.5 text-right">{p.qty}</td>
-                        <td className="py-2.5 text-right">{p.min}</td>
-                        <td className="py-2.5 text-right">{p.max}</td>
-                        <td className="py-2.5 text-right">₹{p.price}</td>
-                        <td className="py-2.5">
-                          <Badge variant={p.qty <= p.min ? 'destructive' : p.qty >= p.max * 0.9 ? 'secondary' : 'default'}>
-                            {p.qty <= p.min ? 'Low' : p.qty >= p.max * 0.9 ? 'Excess' : 'Normal'}
-                          </Badge>
-                        </td>
+              <CardContent className="p-0">
+                <div ref={overviewScrollRef} className="overflow-auto relative max-h-[60vh]">
+                  <table className="w-full text-sm min-w-[700px]">
+                    <thead className="sticky top-0 bg-background z-10 shadow-sm">
+                      <tr className="border-b text-left text-muted-foreground">
+                        <th className="py-3 pl-2.5 pr-2 font-medium">Product</th>
+                        <th className="py-3 px-2 font-medium">Group</th>
+                        <th className="py-3 px-2 font-medium">Brand</th>
+                        <th className="py-3 px-2 font-medium text-right">Stock</th>
+                        <th className="py-3 px-2 font-medium text-right">Min</th>
+                        <th className="py-3 px-2 font-medium text-right">Max</th>
+                        <th className="py-3 px-2 font-medium text-right">Price</th>
+                        <th className="py-3 px-2 font-medium">Status</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {oSpacers.top > 0 && <tr style={{ height: oSpacers.top }}><td colSpan={8} /></tr>}
+                      {overviewVirt.getVirtualItems().map(vi => {
+                        const p = filtered[vi.index];
+                        return (
+                          <tr key={p.id} data-index={vi.index} ref={overviewVirt.measureElement} className="border-b last:border-0 cursor-pointer hover:bg-muted/30" onClick={() => navigate(`/admin/inventory/stock/${p.id}`)}>
+                            <td className="py-2.5 pl-2.5 font-medium">{p.name}</td>
+                            <td className="py-2.5 text-muted-foreground">{p.group}</td>
+                            <td className="py-2.5 text-muted-foreground">{p.brand}</td>
+                            <td className="py-2.5 text-right">{p.qty}</td>
+                            <td className="py-2.5 text-right">{p.min}</td>
+                            <td className="py-2.5 text-right">{p.max}</td>
+                            <td className="py-2.5 text-right">₹{p.price}</td>
+                            <td className="py-2.5">
+                              <Badge variant={p.qty <= p.min ? 'destructive' : p.qty >= p.max * 0.9 ? 'secondary' : 'default'}>
+                                {p.qty <= p.min ? 'Low' : p.qty >= p.max * 0.9 ? 'Excess' : 'Normal'}
+                              </Badge>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {oSpacers.bottom > 0 && <tr style={{ height: oSpacers.bottom }}><td colSpan={8} /></tr>}
+                    </tbody>
+                  </table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -261,75 +270,64 @@ export function InventoryStock() {
               <CardHeader>
                 <CardTitle>Detailed Stock View</CardTitle>
               </CardHeader>
-              <CardContent className="overflow-x-auto relative max-h-[70vh]">
+              <CardContent className="relative p-0">
                 {loading && (
                   <div className="flex items-center justify-center py-4 text-sm text-muted-foreground absolute inset-0 bg-background/50 z-20">
                     <Loader2 className="animate-spin size-4 mr-2" /> Loading...
                   </div>
                 )}
-                <table className="w-full text-sm min-w-[1000px]">
-                  <thead className="sticky top-0 bg-background z-10 shadow-sm">
-                    <tr className="border-b text-left text-muted-foreground">
-                      <th className="py-3 font-medium whitespace-nowrap px-2 first:pl-0">Stock Name</th>
-                      <th className="py-3 font-medium whitespace-nowrap px-2">Group</th>
-                      <th className="py-3 font-medium whitespace-nowrap px-2">Brand</th>
-                      <th className="py-3 font-medium whitespace-nowrap px-2">Model</th>
-                      <th className="py-3 font-medium whitespace-nowrap px-2">Variant</th>
-                      <th className="py-3 font-medium whitespace-nowrap px-2">Color</th>
-                      <th className="py-3 font-medium whitespace-nowrap px-2 text-right">Qty</th>
-                      <th className="py-3 font-medium whitespace-nowrap px-2 text-right">Price</th>
-                      <th className="py-3 font-medium whitespace-nowrap px-2 text-right">GST %</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map(p => (
-                      <ContextMenu key={p.id}>
-                        <ContextMenuTrigger className="contents">
-                          <tr className="border-b last:border-0 cursor-pointer hover:bg-muted/30" onClick={() => navigate(`/admin/inventory/stock/${p.id}`)}>
-                            <td className="px-2 py-2.5 font-medium first:pl-0">{p.name}</td>
-                            <td className="px-2 py-2.5">{p.group}</td>
-                            <td className="px-2 py-2.5">{p.brand}</td>
-                            <td className="px-2 py-2.5">{p.model}</td>
-                            <td className="px-2 py-2.5">{p.variant}</td>
-                            <td className="px-2 py-2.5">{p.color}</td>
-                            <td className="px-2 py-2.5 text-right font-medium">{p.qty}</td>
-                            <td className="px-2 py-2.5 text-right">₹{(p.price ?? 0).toLocaleString()}</td>
-                            <td className="px-2 py-2.5 text-right">{p.gst}%</td>
-                          </tr>
-                        </ContextMenuTrigger>
-                        <ContextMenuContent>
-                          <ContextMenuItem onClick={() => openEditAll(p)}>
-                            <Edit3 size={14} /> Edit All Fields
-                          </ContextMenuItem>
-                          <ContextMenuItem onClick={() => navigate(`/admin/inventory/stock/${p.id}`)}>
-                            <ExternalLink size={14} /> Open Detail Page
-                          </ContextMenuItem>
-                        </ContextMenuContent>
-                      </ContextMenu>
-                    ))}
-                  </tbody>
-                </table>
+                <div ref={detailedScrollRef} className="overflow-auto max-h-[70vh]">
+                  <table className="w-full text-sm min-w-[1000px]">
+                    <thead className="sticky top-0 bg-background z-10 shadow-sm">
+                      <tr className="border-b text-left text-muted-foreground">
+                        <th className="py-3 font-medium whitespace-nowrap px-2 first:pl-0">Stock Name</th>
+                        <th className="py-3 font-medium whitespace-nowrap px-2">Group</th>
+                        <th className="py-3 font-medium whitespace-nowrap px-2">Brand</th>
+                        <th className="py-3 font-medium whitespace-nowrap px-2">Model</th>
+                        <th className="py-3 font-medium whitespace-nowrap px-2">Variant</th>
+                        <th className="py-3 font-medium whitespace-nowrap px-2">Color</th>
+                        <th className="py-3 font-medium whitespace-nowrap px-2 text-right">Qty</th>
+                        <th className="py-3 font-medium whitespace-nowrap px-2 text-right">Price</th>
+                        <th className="py-3 font-medium whitespace-nowrap px-2 text-right">GST %</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dSpacers.top > 0 && <tr style={{ height: dSpacers.top }}><td colSpan={9} /></tr>}
+                      {detailedVirt.getVirtualItems().map(vi => {
+                        const p = filtered[vi.index];
+                        return (
+                          <ContextMenu key={p.id}>
+                            <ContextMenuTrigger className="contents">
+                              <tr data-index={vi.index} ref={detailedVirt.measureElement} className="border-b last:border-0 cursor-pointer hover:bg-muted/30" onClick={() => navigate(`/admin/inventory/stock/${p.id}`)}>
+                                <td className="px-2 py-2.5 font-medium first:pl-0">{p.name}</td>
+                                <td className="px-2 py-2.5">{p.group}</td>
+                                <td className="px-2 py-2.5">{p.brand}</td>
+                                <td className="px-2 py-2.5">{p.model}</td>
+                                <td className="px-2 py-2.5">{p.variant}</td>
+                                <td className="px-2 py-2.5">{p.color}</td>
+                                <td className="px-2 py-2.5 text-right font-medium">{p.qty}</td>
+                                <td className="px-2 py-2.5 text-right">₹{(p.price ?? 0).toLocaleString()}</td>
+                                <td className="px-2 py-2.5 text-right">{p.gst}%</td>
+                              </tr>
+                            </ContextMenuTrigger>
+                            <ContextMenuContent>
+                              <ContextMenuItem onClick={() => openEditAll(p)}>
+                                <Edit3 size={14} /> Edit All Fields
+                              </ContextMenuItem>
+                              <ContextMenuItem onClick={() => navigate(`/admin/inventory/stock/${p.id}`)}>
+                                <ExternalLink size={14} /> Open Detail Page
+                              </ContextMenuItem>
+                            </ContextMenuContent>
+                          </ContextMenu>
+                        );
+                      })}
+                      {dSpacers.bottom > 0 && <tr style={{ height: dSpacers.bottom }}><td colSpan={9} /></tr>}
+                    </tbody>
+                  </table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
-
-          <div className="flex items-center justify-center gap-1 pt-4 overflow-x-auto">
-            <Button variant="outline" size="icon" className="size-8" disabled={currentPage === 0} onClick={() => goToPage(currentPage - 1)}>
-              <ChevronLeft size={14} />
-            </Button>
-            {getPageNumbers().map((p, i) =>
-              typeof p === 'string' ? (
-                <span key={`e-${i}`} className="text-xs text-muted-foreground px-1">...</span>
-              ) : (
-                <Button key={p} variant={p === currentPage ? 'default' : 'outline'} size="icon" className="size-8 text-xs" onClick={() => goToPage(p)}>
-                  {p + 1}
-                </Button>
-              )
-            )}
-            <Button variant="outline" size="icon" className="size-8" disabled={currentPage >= totalPages - 1} onClick={() => goToPage(currentPage + 1)}>
-              <ChevronRight size={14} />
-            </Button>
-          </div>
         </div>
       </Tabs>
 

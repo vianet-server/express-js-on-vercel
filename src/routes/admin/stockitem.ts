@@ -188,6 +188,8 @@ router.get('/inventory/stock', async (req, res) => {
 
     const { rows: dataRows, total } = await dbq.listInventoryStock({ search, brand, group, limit, offset });
 
+    // Coerce numerics: pg returns numeric columns as strings, and the
+    // frontend sums qty/price — string + would concatenate, not add.
     const rows = dataRows.map((r: any) => ({
       id: r.id,
       name: r.fullname || r.stockname,
@@ -196,11 +198,11 @@ router.get('/inventory/stock', async (req, res) => {
       model: r.model || '',
       variant: r.varient || '',
       color: r.color || '',
-      qty: r.quantity || 0,
+      qty: parseFloat(r.quantity) || 0,
       price: parseFloat(r.inv_price) || 0,
-      gst: r.gst || 0,
-      min: r.min_stock || r.min || 0,
-      max: r.max_stock || r.max || 0,
+      gst: parseFloat(r.gst) || 0,
+      min: parseFloat(r.min_stock ?? r.min) || 0,
+      max: parseFloat(r.max_stock ?? r.max) || 0,
     }));
 
     res.json({ rows, total, limit, offset });
