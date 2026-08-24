@@ -15,7 +15,7 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setStockPage, updateStockItem } from '@/store/slices/inventorySlice';
 
 interface StockItem {
-  id: number; name: string; brand: string; model: string; variant: string; color: string;
+  id: number; name: string; brand: string; group: string; model: string; variant: string; color: string;
   qty: number; price: number; gst: number; min: number; max: number;
 }
 
