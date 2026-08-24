@@ -400,7 +400,7 @@ export function InventorySku() {
                       <td colSpan={colSpan} />
                     </tr>
                   )}
-                  {items.map((virtualRow) => {
+                  {items.map((virtualRow: any) => {
                     const s = filtered[virtualRow.index];
                     return (
                       <tr key={virtualRow.key} data-index={virtualRow.index} ref={virtualizer.measureElement} className="border-b last:border-0 hover:bg-muted/20 relative" onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, row: s }); }}>
