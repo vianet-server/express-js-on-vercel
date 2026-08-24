@@ -470,3 +470,60 @@ describe('GET /api/admin/reports/balance-sheet', () => {
     expect(res.body).toEqual([]);
   });
 });
+
+// =============================================================================
+// pnl-monthly normalisation (children -> subs)
+// =============================================================================
+
+describe('GET /api/admin/reports/pnl-monthly', () => {
+  it('maps row children into signed subs', async () => {
+    when(/FROM app\.profitloss_monthly/, rows(
+      {
+        month: '2026-01',
+        data: {
+          rows: [
+            { name: 'Sales Accounts', amount: '195418003.99', children: [{ name: 'Sales', amount: '192973332.99' }, { name: 'SAMPLE', amount: '0' }] },
+            { name: 'Indirect Expenses', amount: '-8072236.53', children: [{ name: 'Salary', amount: '-2897109.00' }] },
+            { name: 'Cost of Sales :', amount: '-184177679.34' }, // no children key
+          ],
+        },
+      },
+    ));
+    const res = await request(app).get('/api/admin/reports/pnl-monthly').set(adminBearer());
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0].month).toBe('2026-01');
+
+    const sales = res.body[0].data[0];
+    expect(sales).toMatchObject({ label: 'Sales Accounts', amount: 195418003.99, type: 'income' });
+    expect(sales.subs).toEqual([
+      { label: 'Sales', amount: 192973332.99 },
+      { label: 'SAMPLE', amount: 0 },
+    ]);
+
+    const indirect = res.body[0].data.find((d: any) => d.label === 'Indirect Expenses');
+    expect(indirect).toMatchObject({ type: 'expense' });
+    expect(indirect.subs[0]).toEqual({ label: 'Salary', amount: -2897109 });
+
+    const cos = res.body[0].data.find((d: any) => d.label === 'Cost of Sales :');
+    expect(cos.subs).toEqual([]);
+  });
+
+  it('unwraps the double-wrapped sync payload stored in the DB', async () => {
+    when(/FROM app\.profitloss_monthly/, rows(
+      {
+        month: '2026-01',
+        // Sync tool stores { month, data } as the whole JSONB value
+        data: {
+          month: '2026-01',
+          data: { rows: [{ name: 'Sales Accounts', amount: '18276224.43', children: [{ name: 'Sales', amount: '18276224.43' }] }] },
+        },
+      },
+    ));
+    const res = await request(app).get('/api/admin/reports/pnl-monthly').set(adminBearer());
+    expect(res.status).toBe(200);
+    expect(res.body[0].month).toBe('2026-01');
+    expect(res.body[0].data[0]).toMatchObject({ label: 'Sales Accounts', amount: 18276224.43, type: 'income' });
+    expect(res.body[0].data[0].subs).toEqual([{ label: 'Sales', amount: 18276224.43 }]);
+  });
+});

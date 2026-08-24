@@ -59,26 +59,35 @@ router.post('/pnl', async (req, res) => {
 /**
  * GET /api/admin/reports/pnl-monthly
  *
- * Fetches historical month-by-month P&L data for comparison.
+ * Fetches historical month-by-month P&L data for comparison. Each row may
+ * carry Tally-style `children` (ledger-level breakdown), which are returned
+ * as `subs` [{ label, amount }] (signed: positive credit / negative debit).
  */
 router.get('/pnl-monthly', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 12;
     const history = await getMonthlyPnlData(limit);
     if (!history || history.length === 0) return res.json([]);
-    
+
     // Format the response. `history` is sorted DESC by month in the query.
+    // Tolerates two stored shapes for `data`: { rows: [...] } and the
+    // double-wrapped sync payload { month: "...", data: { rows: [...] } }.
     const result = history.map((h: any) => {
-      let rows = (h.data.rows || []).map((r: any, i: number) => ({
+      const payload = Array.isArray(h.data?.rows) ? h.data : h.data?.data;
+      let rows = (payload?.rows || []).map((r: any, i: number) => ({
         id: i + 1,
         label: r.name || 'Unknown',
         amount: Math.abs(parseFloat(r.amount) || 0),
         type: (parseFloat(r.amount) || 0) >= 0 ? 'income' : 'expense',
+        subs: (Array.isArray(r.children) ? r.children : []).map((c: any) => ({
+          label: c.name || 'Unknown',
+          amount: parseFloat(c.amount) || 0,
+        })),
       }));
       rows.sort((a: any, b: any) => b.amount - a.amount);
       return { month: h.month, data: rows };
     });
-    
+
     res.json(result);
   } catch (err) {
     console.error('[reports] GET pnl-monthly error:', err);
