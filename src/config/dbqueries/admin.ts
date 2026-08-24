@@ -1006,6 +1006,18 @@ async function getPnlData() {
 }
 
 /**
+ * Save P&L data
+ * @param {object} data - JSON payload of P&L
+ */
+async function savePnlData(data) {
+  const result = await neonDb.query(
+    'INSERT INTO app.profitloss (data) VALUES ($1) RETURNING *',
+    [data]
+  );
+  return result.rows[0];
+}
+
+/**
  * Save monthly P&L data
  * @param {string} month - YYYY-MM
  * @param {object} data - JSON payload of P&L
@@ -1485,6 +1497,7 @@ module.exports = {
   getAnalyticsSalesByRegion,
   getAnalyticsOrdersByChannel,
   getPnlData,
+  savePnlData,
   saveMonthlyPnlData,
   getMonthlyPnlData,
   getBalanceSheetData,

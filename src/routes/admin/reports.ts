@@ -1,5 +1,5 @@
 const express = require('express');
-const { getPnlData, saveMonthlyPnlData, getMonthlyPnlData, getOutstandingVouchers, getBalanceSheetData, saveBalanceSheetData, getDaybook } = require('../../config/dbqueries/admin');
+const { getPnlData, savePnlData, saveMonthlyPnlData, getMonthlyPnlData, getOutstandingVouchers, getBalanceSheetData, saveBalanceSheetData, getDaybook } = require('../../config/dbqueries/admin');
 const adminAuth = require('../../middleware/adminAuth');
 
 const router = express.Router();
@@ -36,6 +36,24 @@ router.get('/pnl', async (req, res) => {
     rows.sort((a, b) => b.amount - a.amount);
     res.json(rows);
   } catch { res.json([]); }
+});
+
+/**
+ * POST /api/admin/reports/pnl
+ *
+ * Syncs a general P&L row.
+ * Body: { data: { rows: [...] } }
+ */
+router.post('/pnl', async (req, res) => {
+  try {
+    const { data } = req.body;
+    if (!data) return res.status(400).json({ message: 'data required' });
+    const saved = await savePnlData(data);
+    res.json({ message: 'P&L saved', data: saved });
+  } catch (err) {
+    console.error('[reports] POST pnl error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
 /**
