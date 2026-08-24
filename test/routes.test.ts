@@ -402,3 +402,71 @@ describe('apiKeyAuth guard', () => {
     expect(res.body.data[0].type).toBe('Sales');
   });
 });
+
+// =============================================================================
+// balance-sheet normalisation
+// =============================================================================
+
+describe('GET /api/admin/reports/balance-sheet', () => {
+  it('normalises the raw nested Tally snapshot from app.balancesheet', async () => {
+    when(/FROM app\.balancesheet/, row({
+      data: {
+        balancesheet: {
+          included: [
+            {
+              AccName: 'Capital Account',
+              Amount: '3874350.99',
+              Children: [
+                {
+                  AccName: 'Reserves & Surplus',
+                  Amount: '8447737.43',
+                  Children: [
+                    { AccName: 'Personal Expenses', Amount: '-43416.00' },
+                    { AccName: 'Primery', Amount: {} },
+                  ],
+                },
+              ],
+            },
+            {
+              AccName: 'Fixed Assets',
+              Amount: '-7139698.29',
+              Children: [{ AccName: 'Computer', Amount: '-197436.00' }],
+            },
+          ],
+        },
+      },
+    }));
+    const res = await request(app).get('/api/admin/reports/balance-sheet').set(adminBearer());
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(2);
+
+    const capital = res.body[0];
+    expect(capital).toMatchObject({ label: 'Capital Account', amount: 3874350.99, type: 'liability' });
+    expect(capital.subs).toHaveLength(3); // Reserves & Surplus + its 2 children
+    expect(capital.subs[0]).toMatchObject({ label: expect.stringContaining('Reserves & Surplus'), amount: 8447737.43 });
+    expect(capital.subs[1].label).toContain('Personal Expenses');
+    expect(capital.subs[1].amount).toBe(43416);
+    expect(capital.subs[2].label).toContain('Primery');
+    expect(capital.subs[2].amount).toBe(0);
+
+    expect(res.body[1]).toMatchObject({ label: 'Fixed Assets', amount: 7139698.29, type: 'asset' });
+    expect(res.body[1].subs[0].amount).toBe(197436);
+  });
+
+  it('still supports the legacy { rows: [...] } shape', async () => {
+    when(/FROM app\.balancesheet/, row({
+      data: { rows: [{ name: 'Sundry Creditors', amount: '30978938.18' }, { name: 'Closing Stock', amount: '-51154310.00' }] },
+    }));
+    const res = await request(app).get('/api/admin/reports/balance-sheet').set(adminBearer());
+    expect(res.status).toBe(200);
+    expect(res.body[0]).toMatchObject({ label: 'Sundry Creditors', type: 'liability', subs: [] });
+    expect(res.body[1]).toMatchObject({ label: 'Closing Stock', type: 'asset' });
+  });
+
+  it('returns [] when nothing has ever been synced', async () => {
+    when(/FROM app\.balancesheet/, { rows: [] });
+    const res = await request(app).get('/api/admin/reports/balance-sheet').set(adminBearer());
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([]);
+  });
+});

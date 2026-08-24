@@ -155,15 +155,85 @@ router.get('/outstanding', async (req, res) => {
 });
 
 /**
+ * Parse a Tally balance-sheet Amount value. Values arrive either as numeric
+ * strings ("3874350.99") or empty objects ({}) when Tally has no balance.
+ */
+function parseBsAmount(v: any): number {
+  if (v === null || v === undefined || typeof v === 'object') return 0;
+  const n = parseFloat(v);
+  return isNaN(n) ? 0 : n;
+}
+
+/**
+ * Recursively flatten a Tally balance-sheet node's Children into the flat
+ * `subs` list the frontend renders (indented labels by depth).
+ */
+function collectBsSubs(node: any, depth: number = 1): any[] {
+  const subs: any[] = [];
+  for (const child of node.Children || []) {
+    const prefix = '\u00a0\u00a0\u00a0\u00a0'.repeat(Math.max(0, depth - 1));
+    subs.push({
+      label: `${prefix}${child.AccName || 'Unknown'}`,
+      amount: Math.abs(parseBsAmount(child.Amount)),
+    });
+    subs.push(...collectBsSubs(child, depth + 1));
+  }
+  return subs;
+}
+
+/**
+ * Normalise whatever is stored in app.balancesheet.data into the row shape
+ * the balance-sheet page expects:
+ *   [{ id, label, amount (abs), type: 'liability'|'asset', subs: [{ label, amount }] }]
+ *
+ * Supports two stored shapes:
+ *   1. Legacy:  { rows: [{ name, amount }] }
+ *   2. Tally snapshot (raw sync payload):
+ *              { balancesheet: { included: [{ AccName, Amount, Children: [...] }] } }
+ * Sign convention (both shapes): positive -> liability, negative -> asset.
+ */
+function normalizeBalanceSheetData(bs: any): any[] {
+  if (!bs) return [];
+
+  // Legacy pre-computed rows
+  if (Array.isArray(bs.rows)) {
+    return bs.rows.map((r: any, i: number) => ({
+      id: i + 1,
+      label: r.name || 'Unknown',
+      amount: Math.abs(parseFloat(r.amount) || 0),
+      type: (parseFloat(r.amount) || 0) >= 0 ? 'liability' : 'asset',
+      subs: [],
+    }));
+  }
+
+  // Raw Tally snapshot tree
+  const included = bs?.balancesheet?.included;
+  if (!Array.isArray(included)) return [];
+
+  return included.map((node: any, i: number) => {
+    const amt = parseBsAmount(node.Amount);
+    return {
+      id: i + 1,
+      label: node.AccName || 'Unknown',
+      amount: Math.abs(amt),
+      type: amt >= 0 ? 'liability' : 'asset',
+      subs: collectBsSubs(node),
+    };
+  });
+}
+
+/**
  * GET /api/admin/reports/balance-sheet
  *
- * Balance sheet rows from the latest pre-computed app.balancesheet row.
- * Asset/liability is derived from the sign of each amount.
+ * Balance sheet rows from the latest app.balancesheet row. Accepts both the
+ * legacy pre-computed { rows: [...] } shape and the raw nested Tally sync
+ * snapshot ({ balancesheet: { included: [...] } }), normalising either into
+ * the flat UI shape. Asset/liability is derived from the sign of each amount.
  *
  * Auth: adminAuth.
  * Query params: none.
  * Returns:
- *   200 [{ id, label, amount, type: 'liability'|'asset', subs: [] }]
+ *   200 [{ id, label, amount, type: 'liability'|'asset', subs: [{ label, amount }] }]
  *   or [] when no data / on error
  *
  * Called by: vianet/src/adminPages/balanceSheet.tsx -> api.get('/api/admin/reports/balance-sheet')
@@ -172,28 +242,24 @@ router.get('/outstanding', async (req, res) => {
 router.get('/balance-sheet', async (req, res) => {
   try {
     const bs = await getBalanceSheetData();
-    if (!bs) return res.json([]);
-    const rows = (bs.rows || []).map((r: any, i: number) => ({
-      id: i + 1,
-      label: r.name || 'Unknown',
-      amount: Math.abs(parseFloat(r.amount) || 0),
-      type: (parseFloat(r.amount) || 0) >= 0 ? 'liability' : 'asset',
-      subs: [],
-    }));
-    res.json(rows);
+    res.json(normalizeBalanceSheetData(bs));
   } catch { res.json([]); }
 });
 
 /**
  * POST /api/admin/reports/balance-sheet
  *
- * Syncs a balance sheet row.
- * Body: { data: { rows: [...] } }
+ * Syncs a balance sheet row. Accepts either the legacy shape
+ * { data: { rows: [...] } } or a raw Tally snapshot
+ * { balancesheet: { included: [...] } }, which is stored as-is and
+ * normalised on read by the GET endpoint.
  */
 router.post('/balance-sheet', async (req, res) => {
   try {
-    const { data } = req.body;
-    if (!data) return res.status(400).json({ message: 'data required' });
+    const data = req.body?.data ?? req.body;
+    if (!data || !Array.isArray(data.rows) && !Array.isArray(data?.balancesheet?.included)) {
+      return res.status(400).json({ message: 'data required' });
+    }
     const saved = await saveBalanceSheetData(data);
     res.json({ message: 'Balance sheet saved', data: saved });
   } catch (err) {
