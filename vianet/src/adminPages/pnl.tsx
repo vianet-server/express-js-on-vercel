@@ -69,6 +69,7 @@ export function Pnl() {
   const [showMonthPick, setShowMonthPick] = useState(false);
   const [monthPick, setMonthPick] = useState('');
   const [monthlyData, setMonthlyData] = useState<any[]>([]);
+  const [expandedMonthly, setExpandedMonthly] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     api.get('/api/admin/reports/pnl')
@@ -156,9 +157,17 @@ export function Pnl() {
 
   /**
    * Renders one section of the Month-over-Month table (income or expense):
-   * a row per category across all months, followed by indented child
-   * (ledger-level) rows built from each month's `subs` breakdown.
+   * a collapsible row per category across all months; expanding a category
+   * reveals its indented child (ledger-level) rows from each month's `subs`.
    */
+  const toggleMonthlyExpand = (key: string) =>
+    setExpandedMonthly(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
   const renderMonthlyGroup = (type: string) => {
     const totals: Record<string, number> = {};
     const childLabels: Record<string, string[]> = {};
@@ -172,28 +181,40 @@ export function Pnl() {
     const labels = Object.entries(totals).sort((a, b) => b[1] - a[1]).map(e => e[0]);
     return (
       <>
-        {labels.map(label => (
-          <Fragment key={label}>
-            <tr className="border-b last:border-0 hover:bg-muted/30">
-              <td className="py-2.5 pr-4 pl-4 font-medium sticky left-0 bg-background whitespace-nowrap">{label}</td>
-              {monthlyData.map(m => {
-                const row = m.data.find((d: any) => d.label === label && d.type === type);
-                return <td key={m.month} className="py-2.5 px-3 text-right whitespace-nowrap">{row ? `₹${row.amount.toLocaleString()}` : '-'}</td>;
-              })}
-            </tr>
-            {(childLabels[label] ?? []).map(child => (
-              <tr key={`${label}-${child}`} className="border-b last:border-0 hover:bg-muted/30 text-xs text-muted-foreground">
-                <td className="py-1.5 pr-4 pl-8 sticky left-0 bg-background whitespace-nowrap">↳ {child}</td>
+        {labels.map(label => {
+          const expandKey = `${type}:${label}`;
+          const open = expandedMonthly.has(expandKey);
+          const hasChildren = (childLabels[label] ?? []).length > 0;
+          return (
+            <Fragment key={label}>
+              <tr
+                className={`border-b last:border-0 hover:bg-muted/30 ${hasChildren ? 'cursor-pointer select-none' : ''}`}
+                onClick={() => hasChildren && toggleMonthlyExpand(expandKey)}
+              >
+                <td className="py-2.5 pr-4 pl-4 font-medium sticky left-0 bg-background whitespace-nowrap">
+                  {hasChildren && (open ? <ChevronDown size={14} className="mr-1 inline shrink-0" /> : <ChevronRight size={14} className="mr-1 inline shrink-0" />)}
+                  {label}
+                  {hasChildren && <span className="ml-2 text-xs font-normal text-muted-foreground">({childLabels[label].length})</span>}
+                </td>
                 {monthlyData.map(m => {
-                  const sub = m.data
-                    .find((d: any) => d.label === label && d.type === type)
-                    ?.subs?.find((s: any) => s.label === child);
-                  return <td key={m.month} className="py-1.5 px-3 text-right whitespace-nowrap">{sub ? `₹${sub.amount.toLocaleString()}` : '-'}</td>;
+                  const row = m.data.find((d: any) => d.label === label && d.type === type);
+                  return <td key={m.month} className="py-2.5 px-3 text-right whitespace-nowrap">{row ? `₹${row.amount.toLocaleString()}` : '-'}</td>;
                 })}
               </tr>
-            ))}
-          </Fragment>
-        ))}
+              {open && (childLabels[label] ?? []).map(child => (
+                <tr key={`${label}-${child}`} className="border-b last:border-0 hover:bg-muted/30 text-xs text-muted-foreground">
+                  <td className="py-1.5 pr-4 pl-8 sticky left-0 bg-background whitespace-nowrap">↳ {child}</td>
+                  {monthlyData.map(m => {
+                    const sub = m.data
+                      .find((d: any) => d.label === label && d.type === type)
+                      ?.subs?.find((s: any) => s.label === child);
+                    return <td key={m.month} className="py-1.5 px-3 text-right whitespace-nowrap">{sub ? `₹${sub.amount.toLocaleString()}` : '-'}</td>;
+                  })}
+                </tr>
+              ))}
+            </Fragment>
+          );
+        })}
       </>
     );
   };
