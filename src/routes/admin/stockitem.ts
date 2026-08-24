@@ -145,6 +145,22 @@ router.get('/inventory/brands', async (req, res) => {
 });
 
 /**
+ * GET /api/admin/inventory/groups
+ *
+ * Distinct stock groups (category_level_1) from app.stock.
+ */
+router.get('/inventory/groups', async (req, res) => {
+  try {
+    const groups = await dbq.listDistinctGroups();
+    res.json({ data: groups });
+  } catch (err) {
+    console.error('[stockitem] GET /inventory/groups error:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+
+/**
  * GET /api/admin/inventory/stock
  *
  * Paginated stock list joined with app.inventory for brand/model/variant/color/gst.
@@ -168,13 +184,15 @@ router.get('/inventory/stock', async (req, res) => {
     const offset = parseInt(req.query.offset as string) || 0;
     const search = req.query.search || '';
     const brand = req.query.brand || '';
+    const group = req.query.group || '';
 
-    const { rows: dataRows, total } = await dbq.listInventoryStock({ search, brand, limit, offset });
+    const { rows: dataRows, total } = await dbq.listInventoryStock({ search, brand, group, limit, offset });
 
-    const rows = dataRows.map(r => ({
+    const rows = dataRows.map((r: any) => ({
       id: r.id,
       name: r.fullname || r.stockname,
       brand: r.brand || '',
+      group: r.category_level_1 || '',
       model: r.model || '',
       variant: r.varient || '',
       color: r.color || '',

@@ -224,16 +224,16 @@ export function BalanceSheet() {
                 <thead>
                   <tr className="border-b text-left text-muted-foreground">
                     <th className="pb-2 font-medium">Item</th>
-                    <th className="pb-2 font-medium text-right">Amount</th>
-                    <th className="pb-2 font-medium">Type</th>
+                    <th className="pb-2 font-medium text-right pr-4">Amount</th>
+                    <th className="pb-2 font-medium pl-4">Type</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.map((item: any, i: number) => (
                     <tr key={i} className="border-b last:border-0">
                       <td className="py-2.5 font-medium">{item.label}</td>
-                      <td className="py-2.5 text-right">₹{item.amount.toLocaleString()}</td>
-                      <td className="py-2.5">
+                      <td className="py-2.5 text-right pr-4">₹{item.amount.toLocaleString()}</td>
+                      <td className="py-2.5 pl-4">
                         <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${item.type === 'asset' ? 'bg-blue-100 text-blue-700' : item.type === 'liability' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
                           {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
                         </span>
@@ -292,16 +292,16 @@ export function BalanceSheet() {
                   <thead>
                     <tr className="border-b text-left text-muted-foreground">
                       <th className="pb-2 font-medium">Item</th>
-                      <th className="pb-2 font-medium text-right">Amount</th>
-                      <th className="pb-2 font-medium">Type</th>
+                      <th className="pb-2 font-medium text-right pr-4">Amount</th>
+                      <th className="pb-2 font-medium pl-4">Type</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredData.map((item: any, i: number) => (
                       <tr key={i} className="border-b last:border-0">
                         <td className="py-2.5 font-medium">{item.label}</td>
-                        <td className="py-2.5 text-right">₹{item.amount.toLocaleString()}</td>
-                        <td className="py-2.5">
+                        <td className="py-2.5 text-right pr-4">₹{item.amount.toLocaleString()}</td>
+                        <td className="py-2.5 pl-4">
                           <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${item.type === 'asset' ? 'bg-blue-100 text-blue-700' : item.type === 'liability' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
                           {(item.type ?? '').charAt(0).toUpperCase() + (item.type ?? '').slice(1)}
                           </span>

@@ -47,6 +47,8 @@ export function InventoryStock() {
   const [editForm, setEditForm] = useState<StockItem | null>(null);
   const [brands, setBrands] = useState<string[]>([]);
   const [selectedBrand, setSelectedBrand] = useState('all');
+  const [groups, setGroups] = useState<string[]>([]);
+  const [selectedGroup, setSelectedGroup] = useState('all');
 
   interface StockPageResponse {
     rows: StockItem[];
@@ -57,17 +59,17 @@ export function InventoryStock() {
 
   const totalPages = Math.max(1, Math.ceil(pagination.total / pageLimit));
 
-  const fetchPage = useCallback(async (page: number, limit = pageLimit, brand = selectedBrand) => {
+  const fetchPage = useCallback(async (page: number, limit = pageLimit, brand = selectedBrand, group = selectedGroup) => {
     setLoading(true)
     try {
       const offset = page * limit
-      const res = await api.get<StockPageResponse>(`/api/admin/inventory/stock?limit=${limit}&offset=${offset}&brand=${brand}`)
+      const res = await api.get<StockPageResponse>(`/api/admin/inventory/stock?limit=${limit}&offset=${offset}&brand=${brand}&group=${group}`)
       dispatch(setStockPage({ items: res.rows, total: res.total, limit: res.limit, offset: res.offset }))
       return res
     } finally {
       setLoading(false)
     }
-  }, [dispatch, pageLimit, selectedBrand])
+  }, [dispatch, pageLimit, selectedBrand, selectedGroup])
 
   useEffect(() => {
     api.get<any>('/api/admin/inventory/brands')
@@ -77,11 +79,19 @@ export function InventoryStock() {
         setBrands(list);
       })
       .catch(console.error);
+    
+    api.get<any>('/api/admin/inventory/groups')
+      .then(res => {
+        const rawList = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+        const list = rawList.filter((g: any) => typeof g === 'string' && g.trim().length > 0);
+        setGroups(list);
+      })
+      .catch(console.error);
   }, []);
 
   useEffect(() => {
     fetchPage(currentPage)
-  }, [currentPage, pageLimit, fetchPage, selectedBrand])
+  }, [currentPage, pageLimit, fetchPage, selectedBrand, selectedGroup])
 
   const handleLimitChange = (value: string | null) => {
     if (value !== null) {
@@ -140,6 +150,17 @@ export function InventoryStock() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Inventory Stock</h1>
         <div className="flex items-center gap-4">
+          <Select value={selectedGroup} onValueChange={(val) => { setSelectedGroup(val ?? 'all'); setCurrentPage(0); }}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select Group" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Groups</SelectItem>
+              {groups.map(g => (
+                <SelectItem key={g} value={g}>{g}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Select value={selectedBrand} onValueChange={(val) => { setSelectedBrand(val ?? 'all'); setCurrentPage(0); }}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Select Brand" />
@@ -203,6 +224,7 @@ export function InventoryStock() {
                   <thead className="sticky top-0 bg-background z-10 shadow-sm">
                     <tr className="border-b text-left text-muted-foreground">
                       <th className="py-3 px-2 font-medium">Product</th>
+                      <th className="py-3 px-2 font-medium">Group</th>
                       <th className="py-3 px-2 font-medium">Brand</th>
                       <th className="py-3 px-2 font-medium text-right">Stock</th>
                       <th className="py-3 px-2 font-medium text-right">Min</th>
@@ -215,6 +237,7 @@ export function InventoryStock() {
                     {filtered.map(p => (
                       <tr key={p.id} className="border-b last:border-0 cursor-pointer hover:bg-muted/30" onClick={() => navigate(`/admin/inventory/stock/${p.id}`)}>
                         <td className="py-2.5 font-medium">{p.name}</td>
+                        <td className="py-2.5 text-muted-foreground">{p.group}</td>
                         <td className="py-2.5 text-muted-foreground">{p.brand}</td>
                         <td className="py-2.5 text-right">{p.qty}</td>
                         <td className="py-2.5 text-right">{p.min}</td>
@@ -248,6 +271,7 @@ export function InventoryStock() {
                   <thead className="sticky top-0 bg-background z-10 shadow-sm">
                     <tr className="border-b text-left text-muted-foreground">
                       <th className="py-3 font-medium whitespace-nowrap px-2 first:pl-0">Stock Name</th>
+                      <th className="py-3 font-medium whitespace-nowrap px-2">Group</th>
                       <th className="py-3 font-medium whitespace-nowrap px-2">Brand</th>
                       <th className="py-3 font-medium whitespace-nowrap px-2">Model</th>
                       <th className="py-3 font-medium whitespace-nowrap px-2">Variant</th>
@@ -263,6 +287,7 @@ export function InventoryStock() {
                         <ContextMenuTrigger className="contents">
                           <tr className="border-b last:border-0 cursor-pointer hover:bg-muted/30" onClick={() => navigate(`/admin/inventory/stock/${p.id}`)}>
                             <td className="px-2 py-2.5 font-medium first:pl-0">{p.name}</td>
+                            <td className="px-2 py-2.5">{p.group}</td>
                             <td className="px-2 py-2.5">{p.brand}</td>
                             <td className="px-2 py-2.5">{p.model}</td>
                             <td className="px-2 py-2.5">{p.variant}</td>

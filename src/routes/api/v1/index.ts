@@ -81,7 +81,7 @@ router.get('/products/:id', apiKeyAuth('products_read'), async (req, res) => {
  * to that group via inventory_access_group.
  *
  * Auth: apiKeyAuth('products_write').
- * Requires (JSON body): { name, quantity?, price? }
+ * Requires (JSON body): { name, quantity?, price?, category_level_1?, category_level_2? }
  * Returns:
  *   201 { data: { id, name, qty, price, created_at, updated_at } }
  *   400 { message: 'name is required' }
@@ -91,10 +91,10 @@ router.get('/products/:id', apiKeyAuth('products_read'), async (req, res) => {
  */
 router.post('/products', apiKeyAuth('products_write'), async (req, res) => {
   try {
-    const { name, quantity, price } = req.body;
+    const { name, quantity, price, category_level_1, category_level_2 } = req.body;
     if (!name) return res.status(400).json({ message: 'name is required' });
 
-    const data = await createProductV1({ name, quantity, price, accessGroupId: req.apiKey.accessGroupId });
+    const data = await createProductV1({ name, quantity, price, category_level_1, category_level_2, accessGroupId: req.apiKey.accessGroupId });
 
     res.status(201).json({ data });
   } catch (err) {
@@ -111,7 +111,7 @@ router.post('/products', apiKeyAuth('products_write'), async (req, res) => {
  *
  * Auth: apiKeyAuth('products_write').
  * Path params: { id }
- * Requires (JSON body): { name?, quantity?, price? }
+ * Requires (JSON body): { name?, quantity?, price?, category_level_1?, category_level_2? }
  * Returns:
  *   200 { data: updated product }
  *   404 { message: 'Product not found' }
@@ -122,9 +122,9 @@ router.post('/products', apiKeyAuth('products_write'), async (req, res) => {
 router.put('/products/:id', apiKeyAuth('products_write'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, quantity, price } = req.body;
+    const { name, quantity, price, category_level_1, category_level_2 } = req.body;
 
-    const data = await updateProductV1({ id, name, quantity, price, accessGroupId: req.apiKey.accessGroupId });
+    const data = await updateProductV1({ id, name, quantity, price, category_level_1, category_level_2, accessGroupId: req.apiKey.accessGroupId });
     if (!data) {
       return res.status(404).json({ message: 'Product not found' });
     }

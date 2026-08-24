@@ -1,5 +1,5 @@
 const express = require('express');
-const { getPnlData, getOutstandingVouchers, getBalanceSheetData, getDaybook } = require('../../config/dbqueries/admin');
+const { getPnlData, saveMonthlyPnlData, getMonthlyPnlData, getOutstandingVouchers, getBalanceSheetData, saveBalanceSheetData, getDaybook } = require('../../config/dbqueries/admin');
 const adminAuth = require('../../middleware/adminAuth');
 
 const router = express.Router();
@@ -10,6 +10,7 @@ router.use(adminAuth);
  *
  * Profit & Loss rows from the latest pre-computed app.profitloss row.
  * Income/expense is derived from the sign of each amount.
+ * Sorted in descending order of absolute amount.
  *
  * Auth: adminAuth.
  * Query params: none.
@@ -24,15 +25,65 @@ router.get('/pnl', async (req, res) => {
   try {
     const pl = await getPnlData();
     if (!pl) return res.json([]);
-    const rows = (pl.rows || []).map((r: any, i: number) => ({
+    let rows = (pl.rows || []).map((r: any, i: number) => ({
       id: i + 1,
       label: r.name || 'Unknown',
       amount: Math.abs(parseFloat(r.amount) || 0),
       type: (parseFloat(r.amount) || 0) >= 0 ? 'income' : 'expense',
       subs: [],
     }));
+    // Sort in descending order of amount
+    rows.sort((a, b) => b.amount - a.amount);
     res.json(rows);
   } catch { res.json([]); }
+});
+
+/**
+ * GET /api/admin/reports/pnl-monthly
+ *
+ * Fetches historical month-by-month P&L data for comparison.
+ */
+router.get('/pnl-monthly', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 12;
+    const history = await getMonthlyPnlData(limit);
+    if (!history || history.length === 0) return res.json([]);
+    
+    // Format the response. `history` is sorted DESC by month in the query.
+    const result = history.map((h: any) => {
+      let rows = (h.data.rows || []).map((r: any, i: number) => ({
+        id: i + 1,
+        label: r.name || 'Unknown',
+        amount: Math.abs(parseFloat(r.amount) || 0),
+        type: (parseFloat(r.amount) || 0) >= 0 ? 'income' : 'expense',
+      }));
+      rows.sort((a: any, b: any) => b.amount - a.amount);
+      return { month: h.month, data: rows };
+    });
+    
+    res.json(result);
+  } catch (err) {
+    console.error('[reports] GET pnl-monthly error:', err);
+    res.json([]);
+  }
+});
+
+/**
+ * POST /api/admin/reports/pnl-monthly
+ *
+ * Syncs a monthly P&L row. 
+ * Body: { month: "YYYY-MM", data: { rows: [...] } }
+ */
+router.post('/pnl-monthly', async (req, res) => {
+  try {
+    const { month, data } = req.body;
+    if (!month || !data) return res.status(400).json({ message: 'month and data required' });
+    const saved = await saveMonthlyPnlData(month, data);
+    res.json({ message: 'Monthly P&L saved', data: saved });
+  } catch (err) {
+    console.error('[reports] POST pnl-monthly error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
 /**
@@ -113,6 +164,24 @@ router.get('/balance-sheet', async (req, res) => {
     }));
     res.json(rows);
   } catch { res.json([]); }
+});
+
+/**
+ * POST /api/admin/reports/balance-sheet
+ *
+ * Syncs a balance sheet row.
+ * Body: { data: { rows: [...] } }
+ */
+router.post('/balance-sheet', async (req, res) => {
+  try {
+    const { data } = req.body;
+    if (!data) return res.status(400).json({ message: 'data required' });
+    const saved = await saveBalanceSheetData(data);
+    res.json({ message: 'Balance sheet saved', data: saved });
+  } catch (err) {
+    console.error('[reports] POST balance-sheet error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
 /**

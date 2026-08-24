@@ -61,6 +61,7 @@ export function Pnl() {
   const [datewiseCols, setDatewiseCols] = useState<string[]>([]);
   const [showMonthPick, setShowMonthPick] = useState(false);
   const [monthPick, setMonthPick] = useState('');
+  const [monthlyData, setMonthlyData] = useState<any[]>([]);
 
   useEffect(() => {
     api.get('/api/admin/reports/pnl')
@@ -75,6 +76,12 @@ export function Pnl() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
+      
+    api.get('/api/admin/reports/pnl-monthly')
+      .then(res => {
+        setMonthlyData(res || []);
+      })
+      .catch(console.error);
   }, []);
 
   const handleCustomApply = useCallback(() => {
@@ -192,6 +199,7 @@ export function Pnl() {
           <TabsTrigger value="detail">Detail</TabsTrigger>
           <TabsTrigger value="search">Search</TabsTrigger>
           <TabsTrigger value="datewise">Datewise</TabsTrigger>
+          <TabsTrigger value="monthly">Month-over-Month</TabsTrigger>
         </TabsList>
 
         <TabsContent value="summary" className="mt-6">
@@ -337,6 +345,72 @@ export function Pnl() {
               </table>
             </div>
           )}
+        </TabsContent>
+        <TabsContent value="monthly" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Month-over-Month Comparison</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {monthlyData.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-32 text-sm text-muted-foreground gap-2">
+                  <p>No historical monthly data available yet.</p>
+                  <p className="text-xs">Ensure your Tally sync pushes to the /api/admin/reports/pnl-monthly endpoint.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm min-w-[600px]">
+                    <thead>
+                      <tr className="border-b text-left text-muted-foreground">
+                        <th className="pb-2.5 pr-4 font-medium whitespace-nowrap sticky left-0 bg-background">Category</th>
+                        {monthlyData.map(m => (
+                          <th key={m.month} className="pb-2.5 px-3 font-medium text-right whitespace-nowrap">{m.month}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {/* INCOMES */}
+                      <tr className="bg-muted/50">
+                        <td colSpan={monthlyData.length + 1} className="py-2 px-2 font-semibold text-green-700 sticky left-0">Income</td>
+                      </tr>
+                      {(() => {
+                        const totals: Record<string, number> = {};
+                        monthlyData.forEach(m => m.data.filter((d: any) => d.type === 'income').forEach((d: any) => { totals[d.label] = (totals[d.label] || 0) + d.amount; }));
+                        const labels = Object.entries(totals).sort((a, b) => b[1] - a[1]).map(e => e[0]);
+                        return labels.map((label, i) => (
+                          <tr key={`inc-${i}`} className="border-b last:border-0 hover:bg-muted/30">
+                            <td className="py-2.5 pr-4 pl-4 font-medium sticky left-0 bg-background whitespace-nowrap">{label}</td>
+                            {monthlyData.map(m => {
+                              const row = m.data.find((d: any) => d.label === label && d.type === 'income');
+                              return <td key={m.month} className="py-2.5 px-3 text-right whitespace-nowrap">{row ? `₹${row.amount.toLocaleString()}` : '-'}</td>;
+                            })}
+                          </tr>
+                        ));
+                      })()}
+                      {/* EXPENSES */}
+                      <tr className="bg-muted/50">
+                        <td colSpan={monthlyData.length + 1} className="py-2 px-2 font-semibold text-red-700 sticky left-0 border-t">Expenses</td>
+                      </tr>
+                      {(() => {
+                        const totals: Record<string, number> = {};
+                        monthlyData.forEach(m => m.data.filter((d: any) => d.type === 'expense').forEach((d: any) => { totals[d.label] = (totals[d.label] || 0) + d.amount; }));
+                        const labels = Object.entries(totals).sort((a, b) => b[1] - a[1]).map(e => e[0]);
+                        return labels.map((label, i) => (
+                          <tr key={`exp-${i}`} className="border-b last:border-0 hover:bg-muted/30">
+                            <td className="py-2.5 pr-4 pl-4 font-medium sticky left-0 bg-background whitespace-nowrap">{label}</td>
+                            {monthlyData.map(m => {
+                              const row = m.data.find((d: any) => d.label === label && d.type === 'expense');
+                              return <td key={m.month} className="py-2.5 px-3 text-right whitespace-nowrap">{row ? `₹${row.amount.toLocaleString()}` : '-'}</td>;
+                            })}
+                          </tr>
+                        ));
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

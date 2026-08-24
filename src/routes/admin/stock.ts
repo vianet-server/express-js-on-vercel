@@ -16,7 +16,7 @@ function genGuid() { return crypto.randomUUID(); }
  * Create a stock item. Generates a UUID guid, defaults masterid to 0.
  *
  * Auth: adminAuth.
- * Requires (JSON body): { name, quantity?, price? }
+ * Requires (JSON body): { name, quantity?, price?, category_level_1?, category_level_2? }
  * Returns:
  *   201 { message: 'Stock item created', data: created row }
  *   500 on error
@@ -25,8 +25,8 @@ function genGuid() { return crypto.randomUUID(); }
  */
 router.post('/stock-item', async (req, res) => {
   try {
-    const { name, quantity, price } = req.body;
-    const data = await dbq.createStockItemGuid({ name, guid: genGuid(), quantity, price });
+    const { name, quantity, price, category_level_1, category_level_2 } = req.body;
+    const data = await dbq.createStockItemGuid({ name, guid: genGuid(), quantity, price, category_level_1, category_level_2 });
     res.status(201).json({ message: 'Stock item created', data });
   } catch (err) {
     console.error('[stock] stock-item POST error:', err);
@@ -58,7 +58,7 @@ router.get('/stock-item', async (req, res) => {
     const mapped = rows.map((r: any) => ({
       id: r.id,
       name: r.stockname || '',
-      category: '',
+      category: [r.category_level_1, r.category_level_2].filter(Boolean).join(' > '),
       qty: r.quantity || 0,
       value: parseFloat(r.price) || 0,
       status: 'Active',
@@ -76,7 +76,7 @@ router.get('/stock-item', async (req, res) => {
  * Update a stock item by id.
  *
  * Auth: adminAuth.
- * Requires (JSON body): { id, name?, quantity?, price? }
+ * Requires (JSON body): { id, name?, quantity?, price?, category_level_1?, category_level_2? }
  * Returns:
  *   200 { message: 'Stock item updated', data: updated row }
  *   404 when not found
@@ -86,8 +86,8 @@ router.get('/stock-item', async (req, res) => {
  */
 router.put('/stock-item', async (req, res) => {
   try {
-    const { id, name, quantity, price } = req.body;
-    const data = await dbq.updateStockItemById({ id, name, quantity, price });
+    const { id, name, quantity, price, category_level_1, category_level_2 } = req.body;
+    const data = await dbq.updateStockItemById({ id, name, quantity, price, category_level_1, category_level_2 });
     if (!data) return res.status(404).json({ message: 'Stock item not found' });
     res.status(200).json({ message: 'Stock item updated', data });
   } catch (err) {

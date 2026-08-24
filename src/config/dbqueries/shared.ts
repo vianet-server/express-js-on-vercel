@@ -185,37 +185,41 @@ async function updateEmployeeProfileByUserId({ user_id, employee_id, first_name,
 // ===========================================================================
 
 /**
- * Create a stock item with an auto-generated guid and masterid 0.
+ * Create a stock item.
  * @param {object} input
  * @param {string} input.name - stock display name
  * @param {string} input.guid - UUID
  * @param {number} [input.quantity] - stock quantity
  * @param {number} [input.price] - stock price
+ * @param {string} [input.category_level_1] - level 1 category
+ * @param {string} [input.category_level_2] - level 2 category
  * @returns {Promise<object>} created app.stock row (RETURNING *)
  * @route Used by POST /api/admin/stock-item, POST /api/stock/stock-item
  */
-async function createStockItemGuid({ name, guid, quantity, price }) {
+async function createStockItemGuid({ name, guid, quantity, price, category_level_1, category_level_2 }) {
   const result = await neonDb.query(
-    'INSERT INTO app.stock (stockname, guid, quantity, price, masterid, created_at, updated_at) VALUES ($1, $2, $3, $4, 0, NOW(), NOW()) RETURNING *',
-    [name, guid, quantity, price]
+    'INSERT INTO app.stock (stockname, guid, quantity, price, category_level_1, category_level_2, masterid, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, 0, NOW(), NOW()) RETURNING *',
+    [name, guid, quantity, price, category_level_1, category_level_2]
   );
   return result.rows[0];
 }
 
 /**
- * Update a stock item's name/quantity/price by id.
+ * Update a stock item's name/quantity/price/category by id.
  * @param {object} input
  * @param {number} input.id - app.stock.id
  * @param {string} [input.name] - new stockname
  * @param {number} [input.quantity]
  * @param {number} [input.price]
+ * @param {string} [input.category_level_1]
+ * @param {string} [input.category_level_2]
  * @returns {Promise<object|undefined>} updated row, or undefined when id not found
  * @route Used by PUT /api/admin/stock-item, PUT /api/admin/stockitem, PUT /api/stock/stock-item
  */
-async function updateStockItemById({ id, name, quantity, price }) {
+async function updateStockItemById({ id, name, quantity, price, category_level_1, category_level_2 }) {
   const result = await neonDb.query(
-    'UPDATE app.stock SET stockname = $1, quantity = $2, price = $3, updated_at = NOW() WHERE id = $4 RETURNING *',
-    [name, quantity, price, id]
+    'UPDATE app.stock SET stockname = COALESCE($1, stockname), quantity = COALESCE($2, quantity), price = COALESCE($3, price), category_level_1 = COALESCE($4, category_level_1), category_level_2 = COALESCE($5, category_level_2), updated_at = NOW() WHERE id = $6 RETURNING *',
+    [name, quantity, price, category_level_1, category_level_2, id]
   );
   return result.rows[0];
 }

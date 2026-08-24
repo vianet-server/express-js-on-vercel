@@ -215,6 +215,14 @@ async function listDistinctBrands() {
 }
 
 /**
+ * Fetch list of distinct Tally Stock Groups (category_level_1)
+ */
+async function listDistinctGroups() {
+  const result = await neonDb.query('SELECT DISTINCT category_level_1 AS "group" FROM app.stock WHERE category_level_1 IS NOT NULL AND category_level_1 != \'\' ORDER BY category_level_1');
+  return result.rows.map(r => r.group);
+}
+
+/**
  * Paginated stock list joined with app.inventory (the admin inventory table source).
  * @param {object} input
  * @param {string} [input.search] - matches stockname/brand/model/fullname (ILIKE)
@@ -225,7 +233,7 @@ async function listDistinctBrands() {
  *   (fullname, brand, model, varient, color, gst, inv_price) ordered by id DESC
  * @route Used by GET /api/admin/inventory/stock
  */
-async function listInventoryStock({ search, brand, limit, offset }) {
+async function listInventoryStock({ search, brand, group, limit, offset }) {
   const joinClause = 'LEFT JOIN app.inventory inv ON inv.id = s.id';
 
   let countQuery = `SELECT COUNT(*) FROM app.stock s ${joinClause} WHERE 1=1`;
@@ -234,7 +242,7 @@ async function listInventoryStock({ search, brand, limit, offset }) {
   let idx = 1;
 
   if (search) {
-    const clause = ` AND (s.stockname ILIKE $${idx} OR inv.brand ILIKE $${idx} OR inv.model ILIKE $${idx} OR inv.fullname ILIKE $${idx})`;
+    const clause = ` AND (s.stockname ILIKE $${idx} OR inv.brand ILIKE $${idx} OR inv.model ILIKE $${idx} OR inv.fullname ILIKE $${idx} OR s.category_level_1 ILIKE $${idx})`;
     countQuery += clause;
     dataQuery += clause;
     params.push(`%${search}%`);
@@ -246,6 +254,14 @@ async function listInventoryStock({ search, brand, limit, offset }) {
     countQuery += clause;
     dataQuery += clause;
     params.push(brand);
+    idx++;
+  }
+
+  if (group && group !== 'all') {
+    const clause = ` AND s.category_level_1 ILIKE $${idx}`;
+    countQuery += clause;
+    dataQuery += clause;
+    params.push(group);
     idx++;
   }
 
@@ -990,6 +1006,34 @@ async function getPnlData() {
 }
 
 /**
+ * Save monthly P&L data
+ * @param {string} month - YYYY-MM
+ * @param {object} data - JSON payload of P&L
+ */
+async function saveMonthlyPnlData(month, data) {
+  await neonDb.query(
+    `INSERT INTO app.profitloss_monthly (month, data) 
+     VALUES ($1, $2) 
+     ON CONFLICT (month) 
+     DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()`,
+    [month, data]
+  );
+  return { month, data };
+}
+
+/**
+ * Get historical monthly P&L data
+ * @param {number} limit - number of months to fetch
+ */
+async function getMonthlyPnlData(limit = 12) {
+  const result = await neonDb.query(
+    'SELECT month, data FROM app.profitloss_monthly ORDER BY month DESC LIMIT $1',
+    [limit]
+  );
+  return result.rows;
+}
+
+/**
  * Latest 200 vouchers for the outstanding (receivables/payables) report.
  * @returns {Promise<object[]>} voucher rows ordered by date DESC
  * @route Used by GET /api/admin/reports/outstanding
@@ -1012,6 +1056,20 @@ WHERE (e->>'isDeemedPositive') = 'No'), 0) AS amount
 async function getBalanceSheetData() {
   const result = await neonDb.query('SELECT data FROM app.balancesheet ORDER BY id DESC LIMIT 1');
   return result.rows[0]?.data ?? null;
+}
+
+/**
+ * Save pre-computed balance sheet JSON data.
+ * @param {object} data
+ * @returns {Promise<object>} inserted row
+ * @route Used by POST /api/admin/reports/balance-sheet
+ */
+async function saveBalanceSheetData(data) {
+  const result = await neonDb.query(
+    'INSERT INTO app.balancesheet (data) VALUES ($1) RETURNING *',
+    [data]
+  );
+  return result.rows[0];
 }
 
 /**
@@ -1389,6 +1447,7 @@ module.exports = {
   createStockItemLegacy,
   listStockItemsLegacy,
   listDistinctBrands,
+  listDistinctGroups,
   listInventoryStock,
   listInventorySku,
   migratePartnerSku,
@@ -1426,8 +1485,11 @@ module.exports = {
   getAnalyticsSalesByRegion,
   getAnalyticsOrdersByChannel,
   getPnlData,
-  getOutstandingVouchers,
+  saveMonthlyPnlData,
+  getMonthlyPnlData,
   getBalanceSheetData,
+  saveBalanceSheetData,
+  getOutstandingVouchers,
   getDaybook,
   getMarketOverview,
   getMarketSalesTrend,

@@ -152,7 +152,7 @@ async function listProductsV1({ accessGroupId, search, page, limit }) {
     queryParams.push(`%${search}%`);
     idx++;
   }
-  const selectCols = 'SELECT s.id, s.stockname AS name, CAST(s.id AS TEXT) AS sku, s.quantity AS qty, s.price, s.created_at, s.updated_at FROM app.stock s';
+  const selectCols = 'SELECT s.id, s.stockname AS name, CAST(s.id AS TEXT) AS sku, s.quantity AS qty, s.price, s.category_level_1, s.category_level_2, s.created_at, s.updated_at FROM app.stock s';
   const { text, params } = scopedV1Query(accessGroupId, selectCols, queryParams);
   const countResult = await neonDb.query(
     `SELECT COUNT(*)::int AS total FROM app.stock s ${text.replace(selectCols, '')}`,
@@ -175,7 +175,7 @@ async function listProductsV1({ accessGroupId, search, page, limit }) {
  * @route Used by GET /api/v1/products/:id
  */
 async function getProductV1({ accessGroupId, id }) {
-  const selectCols = 'SELECT s.id, s.stockname AS name, CAST(s.id AS TEXT) AS sku, s.quantity AS qty, s.price, s.created_at, s.updated_at FROM app.stock s';
+  const selectCols = 'SELECT s.id, s.stockname AS name, CAST(s.id AS TEXT) AS sku, s.quantity AS qty, s.price, s.category_level_1, s.category_level_2, s.created_at, s.updated_at FROM app.stock s';
   const { text, params } = scopedV1Query(accessGroupId, selectCols);
   const result = await neonDb.query(
     `${text} AND s.id = $${params.length + 1}`,
@@ -185,20 +185,22 @@ async function getProductV1({ accessGroupId, id }) {
 }
 
 /**
- * Create a product. When the key has an access group the product is also mapped
+ * Create a product. When the key has an access group, the product is also mapped
  * to that group via inventory_access_group.
  * @param {object} input
  * @param {string} input.name - product name
  * @param {number} [input.quantity]
  * @param {number} [input.price]
+ * @param {string} [input.category_level_1]
+ * @param {string} [input.category_level_2]
  * @param {number|null} [input.accessGroupId] - access group to map the product to
  * @returns {Promise<object>} created product row { id, name, qty, price, ... }
  * @route Used by POST /api/v1/products
  */
-async function createProductV1({ name, quantity, price, accessGroupId }) {
+async function createProductV1({ name, quantity, price, category_level_1, category_level_2, accessGroupId }) {
   const result = await neonDb.query(
-    'INSERT INTO app.stock (stockname, quantity, price, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW()) RETURNING id, stockname AS name, quantity AS qty, price, created_at, updated_at',
-    [name, quantity || 0, price || 0]
+    'INSERT INTO app.stock (stockname, quantity, price, category_level_1, category_level_2, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING id, stockname AS name, quantity AS qty, price, category_level_1, category_level_2, created_at, updated_at',
+    [name, quantity || 0, price || 0, category_level_1, category_level_2]
   );
   const product = result.rows[0];
   if (accessGroupId) {
@@ -218,14 +220,16 @@ async function createProductV1({ name, quantity, price, accessGroupId }) {
  * @param {string|null} [input.name]
  * @param {number|null} [input.quantity]
  * @param {number|null} [input.price]
+ * @param {string|null} [input.category_level_1]
+ * @param {string|null} [input.category_level_2]
  * @param {number|null} [input.accessGroupId]
  * @returns {Promise<object|undefined>} updated product row, or undefined
  * @route Used by PUT /api/v1/products/:id
  */
-async function updateProductV1({ id, name, quantity, price, accessGroupId }) {
+async function updateProductV1({ id, name, quantity, price, category_level_1, category_level_2, accessGroupId }) {
   const result = await neonDb.query(
-    'UPDATE app.stock SET stockname = COALESCE($1, stockname), quantity = COALESCE($2, quantity), price = COALESCE($3, price), updated_at = NOW() WHERE id = $4 RETURNING id, stockname AS name, quantity AS qty, price, created_at, updated_at',
-    [name ?? null, quantity ?? null, price ?? null, id]
+    'UPDATE app.stock SET stockname = COALESCE($1, stockname), quantity = COALESCE($2, quantity), price = COALESCE($3, price), category_level_1 = COALESCE($4, category_level_1), category_level_2 = COALESCE($5, category_level_2), updated_at = NOW() WHERE id = $6 RETURNING id, stockname AS name, quantity AS qty, price, category_level_1, category_level_2, created_at, updated_at',
+    [name ?? null, quantity ?? null, price ?? null, category_level_1 ?? null, category_level_2 ?? null, id]
   );
   const product = result.rows[0];
   if (product && accessGroupId && (quantity != null || price != null)) {
