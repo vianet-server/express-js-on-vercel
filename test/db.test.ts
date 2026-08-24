@@ -400,10 +400,10 @@ describe('admin stock & inventory helpers', () => {
       .mockResolvedValueOnce(rows({ id: 1, stockname: 'X', brand: 'B' }));
     const out = await admin.listInventoryStock({ search: 'X', brand: 'B', limit: 10, offset: 0 });
     expect(sqlAt(0)).toContain('SELECT COUNT(*) FROM app.stock s');
-    expect(sqlAt(0)).toContain('(s.stockname ILIKE $1 OR inv.brand ILIKE $1 OR inv.model ILIKE $1 OR inv.fullname ILIKE $1)');
+    expect(sqlAt(0)).toContain('(s.stockname ILIKE $1 OR inv.brand ILIKE $1 OR inv.model ILIKE $1 OR inv.fullname ILIKE $1 OR s.category_level_1 ILIKE $1)');
     expect(sqlAt(0)).toContain('AND inv.brand ILIKE $2');
     expect(paramsAt(0)).toEqual(['%X%', 'B']);
-    expect(sqlAt(1)).toContain('ORDER BY s.id DESC LIMIT $3 OFFSET $4');
+    expect(sqlAt(1)).toContain('ORDER BY COALESCE(NULLIF(inv.fullname, \'\'), s.stockname) ASC LIMIT $3 OFFSET $4');
     expect(paramsAt(1)).toEqual(['%X%', 'B', 10, 0]);
     expect(out.total).toBe(2);
     expect(out.rows[0].brand).toBe('B');

@@ -230,7 +230,8 @@ async function listDistinctGroups() {
  * @param {number} input.limit - page size
  * @param {number} input.offset - page offset
  * @returns {Promise<{rows: object[], total: number}>} rows with inventory columns
- *   (fullname, brand, model, varient, color, gst, inv_price) ordered by id DESC
+ *   (fullname, brand, model, varient, color, gst, inv_price) ordered alphabetically
+ *   by display name (fullname, falling back to stockname)
  * @route Used by GET /api/admin/inventory/stock
  */
 async function listInventoryStock({ search, brand, group, limit, offset }) {
@@ -268,7 +269,7 @@ async function listInventoryStock({ search, brand, group, limit, offset }) {
   const countResult = await neonDb.query(countQuery, params);
   const total = parseInt(countResult.rows[0].count);
 
-  dataQuery += ` ORDER BY s.id DESC LIMIT $${idx} OFFSET $${idx + 1}`;
+  dataQuery += ` ORDER BY COALESCE(NULLIF(inv.fullname, ''), s.stockname) ASC LIMIT $${idx} OFFSET $${idx + 1}`;
   params.push(limit, offset);
 
   const result = await neonDb.query(dataQuery, params);
