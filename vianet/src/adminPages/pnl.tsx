@@ -6,7 +6,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Calendar, Download, FileDown, FileSpreadsheet, Search, TrendingUp, TrendingDown, ChevronRight, ChevronDown, Plus, Loader2 } from 'lucide-react';
+import { Calendar, Download, FileDown, FileSpreadsheet, Search, TrendingUp, TrendingDown, ChevronRight, ChevronDown, Plus, Loader2, ChartLine } from 'lucide-react';
+import { Line, LineChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { api } from '@/lib/api';
 
 function DetailSection({ title, items, icon }: { title: string; items: any[]; icon: React.ReactNode }) {
@@ -117,6 +118,41 @@ export function Pnl() {
   const netProfit = totalIncome - totalExpenses;
 
   const filteredData = data.filter((i: any) => i.label.toLowerCase().includes(searchQuery.toLowerCase()));
+
+  const GRAPH_COLORS = ['#2563eb', '#16a34a', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6'];
+
+  /** ₹1.23Cr / ₹45.6L / ₹9,876 compact axis formatter */
+  const formatCompactINR = (v: number) => {
+    if (Math.abs(v) >= 1e7) return `₹${(v / 1e7).toFixed(2)}Cr`;
+    if (Math.abs(v) >= 1e5) return `₹${(v / 1e5).toFixed(1)}L`;
+    return `₹${Math.round(v).toLocaleString('en-IN')}`;
+  };
+
+  /**
+   * Builds month-ASC chart points for one P&L side, keeping only the top
+   * N major categories (by total amount across all months).
+   */
+  const buildGraphSeries = (type: string, topN = 5) => {
+    const totals: Record<string, number> = {};
+    monthlyData.forEach(m => m.data.filter((d: any) => d.type === type).forEach((d: any) => {
+      totals[d.label] = (totals[d.label] || 0) + d.amount;
+    }));
+    const majors = Object.entries(totals).sort((a, b) => b[1] - a[1]).slice(0, topN).map(e => e[0]);
+    const points = [...monthlyData]
+      .sort((a, b) => a.month.localeCompare(b.month))
+      .map(m => {
+        const p: any = { month: m.month };
+        majors.forEach(label => {
+          const row = m.data.find((d: any) => d.label === label && d.type === type);
+          p[label] = Math.round(row?.amount ?? 0);
+        });
+        return p;
+      });
+    return { majors, points };
+  };
+
+  const incomeGraph = buildGraphSeries('income');
+  const expenseGraph = buildGraphSeries('expense');
 
   /**
    * Renders one section of the Month-over-Month table (income or expense):
@@ -250,6 +286,7 @@ export function Pnl() {
           <TabsTrigger value="search">Search</TabsTrigger>
           <TabsTrigger value="datewise">Datewise</TabsTrigger>
           <TabsTrigger value="monthly">Month-over-Month</TabsTrigger>
+          <TabsTrigger value="graph"><ChartLine size={14} className="mr-1 inline" /> Graph</TabsTrigger>
         </TabsList>
 
         <TabsContent value="summary" className="mt-6">
@@ -443,6 +480,62 @@ export function Pnl() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="graph" className="mt-6">
+          {monthlyData.length === 0 ? (
+            <Card>
+              <CardContent className="py-10">
+                <div className="flex flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <ChartLine size={28} />
+                  <p>No historical monthly data available yet.</p>
+                  <p className="text-xs">Ensure your Tally sync pushes to the /api/admin/reports/pnl-monthly endpoint.</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 gap-6">
+              <Card>
+                <CardHeader><CardTitle>Major Income Categories — Monthly Trend</CardTitle></CardHeader>
+                <CardContent>
+                  <div className="h-80 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={incomeGraph.points} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                        <XAxis dataKey="month" fontSize={11} tickLine={false} axisLine={false} />
+                        <YAxis fontSize={11} tickLine={false} axisLine={false} width={72} tickFormatter={(v: number) => formatCompactINR(v)} />
+                        <Tooltip formatter={(v: any) => `₹${Number(v).toLocaleString('en-IN')}`} labelFormatter={(l: any) => `Month: ${l}`} />
+                        <Legend wrapperStyle={{ fontSize: 12 }} />
+                        {incomeGraph.majors.map((label, i) => (
+                          <Line key={label} type="monotone" dataKey={label} stroke={GRAPH_COLORS[i % GRAPH_COLORS.length]} strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                        ))}
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader><CardTitle>Major Expense Categories — Monthly Trend</CardTitle></CardHeader>
+                <CardContent>
+                  <div className="h-80 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={expenseGraph.points} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                        <XAxis dataKey="month" fontSize={11} tickLine={false} axisLine={false} />
+                        <YAxis fontSize={11} tickLine={false} axisLine={false} width={72} tickFormatter={(v: number) => formatCompactINR(v)} />
+                        <Tooltip formatter={(v: any) => `₹${Number(v).toLocaleString('en-IN')}`} labelFormatter={(l: any) => `Month: ${l}`} />
+                        <Legend wrapperStyle={{ fontSize: 12 }} />
+                        {expenseGraph.majors.map((label, i) => (
+                          <Line key={label} type="monotone" dataKey={label} stroke={GRAPH_COLORS[i % GRAPH_COLORS.length]} strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                        ))}
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>
