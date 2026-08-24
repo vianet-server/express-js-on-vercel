@@ -123,7 +123,7 @@ export function InventorySku() {
     count: filtered.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => 56,
-    getItemKey: (index) => filtered[index].sku,
+    getItemKey: (index: number) => filtered[index].sku,
     overscan: 10,
   });
 

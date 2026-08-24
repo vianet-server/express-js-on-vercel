@@ -74,7 +74,7 @@ export function Daybook() {
     count: filtered.length,
     getScrollElement: () => scrollEl,
     estimateSize: () => 56,
-    getItemKey: (index) => (filtered[index] as any)?.id ?? index,
+    getItemKey: (index: number) => (filtered[index] as any)?.id ?? index,
     overscan: 10,
   });
 
@@ -224,7 +224,7 @@ export function Daybook() {
                 <p className="text-sm text-muted-foreground text-center py-8">No transactions found</p>
               ) : (
               <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
-                {virtualizer.getVirtualItems().map((virtualRow) => {
+                {virtualizer.getVirtualItems().map((virtualRow: any) => {
                   const t: any = filtered[virtualRow.index];
                   const rowId = t.id ?? virtualRow.index;
                   const open = openIds.includes(rowId);
