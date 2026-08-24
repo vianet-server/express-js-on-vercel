@@ -372,18 +372,29 @@ async function getInventoryControl() {
 }
 
 /**
- * Single stock detail from app.inventory.
- * @param {number} id - app.inventory.id (= app.stock.id)
- * @returns {Promise<object|undefined>} app.inventory row, or undefined
+ * Single stock detail. Reads app.stock LEFT JOIN app.inventory so items that
+ * exist only in app.stock (no inventory row yet) still resolve.
+ * @param {number} id - app.stock.id (= app.inventory.id)
+ * @returns {Promise<object|undefined>} merged row (stock + inventory columns), or undefined
  * @route Used by GET /api/admin/inventory/stock/:id
  */
 async function getStockDetail(id) {
-  const result = await neonDb.query('SELECT * FROM app.inventory WHERE id = $1', [id]);
+  const result = await neonDb.query(
+    `SELECT s.id, s.stockname, s.quantity, s.price,
+            inv.fullname, inv.brand, inv.model, inv.varient, inv.color,
+            inv.gst, inv.quantity AS inv_quantity, inv.price AS inv_price
+     FROM app.stock s
+     LEFT JOIN app.inventory inv ON inv.id = s.id
+     WHERE s.id = $1`,
+    [id]
+  );
   return result.rows[0];
 }
 
 /**
  * Save stock detail — updates app.inventory and app.stock for the same id.
+ * When no app.inventory row exists yet, one is created (upsert), mirroring
+ * the list page which shows stock-only items via LEFT JOIN.
  * @param {object} input
  * @param {number} input.id - stock id
  * @param {string} [input.name]
@@ -398,11 +409,17 @@ async function getStockDetail(id) {
  * @route Used by POST /api/admin/inventory/stock/:id
  */
 async function saveStockDetail({ id, name, brand, model, variant, color, qty, price, gst }) {
+  const stockCheck = await neonDb.query('SELECT id FROM app.stock WHERE id = $1', [id]);
+  if (!stockCheck.rows[0]) return undefined;
+
   const inventoryResult = await neonDb.query(
-    `UPDATE app.inventory
-     SET fullname = $1, brand = $2, model = $3, varient = $4, color = $5,
-         quantity = $6, price = $7, gst = $8, updated_at = NOW()
-     WHERE id = $9 RETURNING *`,
+    `INSERT INTO app.inventory (id, fullname, brand, model, varient, color, quantity, price, gst, created_at, updated_at)
+     VALUES ($9, $1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+     ON CONFLICT (id) DO UPDATE SET
+       fullname = EXCLUDED.fullname, brand = EXCLUDED.brand, model = EXCLUDED.model,
+       varient = EXCLUDED.varient, color = EXCLUDED.color, quantity = EXCLUDED.quantity,
+       price = EXCLUDED.price, gst = EXCLUDED.gst, updated_at = NOW()
+     RETURNING *`,
     [name, brand, model, variant, color, qty, price, gst, id]
   );
 
