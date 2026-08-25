@@ -4,7 +4,7 @@ export default function RootLayout() {
   return (
     <div className="flex min-h-svh flex-col">
       <header className="flex h-14 items-center gap-6 border-b px-6">
-        <Link to="/" className="text-lg font-bold">creator os</Link>
+        <Link to="/" className="text-lg font-bold">vianet</Link>
         <nav className="flex items-center gap-20 text-sm ml-auto">
           <Link to="/pricing" className="hover:underline">pricing</Link>
           <Link to="/about" className="hover:underline">About</Link>
