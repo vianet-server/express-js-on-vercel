@@ -43,7 +43,7 @@ router.post('/register', async (req, res) => {
     const token = jwt.sign(
       { id: result.id, email: result.email, user_type: 'partner' },
       process.env.JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: '30d' }
     );
     res.status(201).json({ token, message: 'Partner registered', email: result.email, user_type: 'partner' });
   } catch (err) {
@@ -84,7 +84,7 @@ router.post('/login', async (req, res) => {
     const token = jwt.sign(
       { id: user.id, email: user.email, user_type: user.user_type },
       process.env.JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: '30d' }
     );
     res.json({ token, message: 'login successful', email: user.email, user_type: user.user_type });
   } catch (err) {

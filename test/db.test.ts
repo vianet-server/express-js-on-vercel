@@ -444,22 +444,32 @@ describe('admin stock & inventory helpers', () => {
     expect(out).toEqual({ totalItems: 42, accessGroups: [{ id: 1, name: 'G' }] });
   });
 
-  it('getStockDetail selects from app.inventory by id', async () => {
-    mockNeonDb.query.mockResolvedValueOnce(row({ id: 5 }));
+  it('getStockDetail joins stock with inventory so stock-only items resolve', async () => {
+    mockNeonDb.query.mockResolvedValueOnce(row({ id: 5, stockname: 'X' }));
     await admin.getStockDetail(5);
-    expect(sqlAt(0)).toBe('SELECT * FROM app.inventory WHERE id = $1');
+    expect(sqlAt(0)).toContain('FROM app.stock s LEFT JOIN app.inventory inv ON inv.id = s.id');
+    expect(sqlAt(0)).toContain('WHERE s.id = $1');
     expect(paramsAt(0)).toEqual([5]);
   });
 
-  it('saveStockDetail updates inventory then stock and returns the inventory row', async () => {
+  it('saveStockDetail rejects unknown stock ids', async () => {
+    mockNeonDb.query.mockResolvedValueOnce(rows());
+    const out = await admin.saveStockDetail({ id: 999, name: 'N' });
+    expect(out).toBeUndefined();
+    expect(mockNeonDb.query).toHaveBeenCalledTimes(1);
+  });
+
+  it('saveStockDetail upserts inventory then updates stock and returns the inventory row', async () => {
     mockNeonDb.query
+      .mockResolvedValueOnce(row({ id: 5 }))
       .mockResolvedValueOnce(row({ id: 5, fullname: 'N' }))
       .mockResolvedValueOnce(rows());
     const out = await admin.saveStockDetail({ id: 5, name: 'N', brand: 'B', model: 'M', variant: 'V', color: 'C', qty: 2, price: 3, gst: 18 });
-    expect(sqlAt(0)).toContain('UPDATE app.inventory');
-    expect(paramsAt(0)).toEqual(['N', 'B', 'M', 'V', 'C', 2, 3, 18, 5]);
-    expect(sqlAt(1)).toContain('UPDATE app.stock');
-    expect(paramsAt(1)).toEqual(['N', 2, 3, 5]);
+    expect(sqlAt(1)).toContain('INSERT INTO app.inventory');
+    expect(sqlAt(1)).toContain('ON CONFLICT (id) DO UPDATE');
+    expect(paramsAt(1)).toEqual(['N', 'B', 'M', 'V', 'C', 2, 3, 18, 5]);
+    expect(sqlAt(2)).toContain('UPDATE app.stock');
+    expect(paramsAt(2)).toEqual(['N', 2, 3, 5]);
     expect(out).toEqual({ id: 5, fullname: 'N' });
   });
 });

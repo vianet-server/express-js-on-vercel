@@ -97,7 +97,7 @@ router.post('/signup-with-token', async (req, res) => {
     const authToken = jwt.sign(
       { id: result.id, email: result.email, user_type: result.user_type },
       process.env.JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: '30d' }
     );
     sendWelcomeEmail({ to: result.email }).catch((err) =>
       console.error('[auth] welcome email error:', err?.message || err)
@@ -142,7 +142,7 @@ router.post('/login', async (req, res) => {
     const token = jwt.sign(
       { id: user.id, email: user.email, user_type: user.user_type },
       process.env.JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: '30d' }
     );
     res.json({ token, message: 'login successful', email: user.email, user_type: user.user_type });
   } catch (err) {

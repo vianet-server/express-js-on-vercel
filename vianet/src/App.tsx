@@ -6,6 +6,8 @@ import EmployLayout from './layouts/EmployLayout';
 import {
   About,
   Support,
+  PrivacyPolicy,
+  TermsOfService,
   Login,
   Signup,
   AppLogin,
@@ -71,6 +73,8 @@ const router = createBrowserRouter([
       { index: true, element: <Navigate to="/app/login" replace /> },
       { path: 'about', element: <About /> },
       { path: 'support', element: <Support /> },
+      { path: 'privacy-policy', element: <PrivacyPolicy /> },
+      { path: 'terms-of-service', element: <TermsOfService /> },
     ],
   },
   {

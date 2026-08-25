@@ -1,5 +1,7 @@
 export { About } from './pages/About';
 export { Support } from './pages/support';
+export { PrivacyPolicy } from './pages/privacy-policy';
+export { TermsOfService } from './pages/terms-of-service';
 export { Login } from './pages/auth/login';
 export { Signup } from './pages/auth/signup';
 export { Home } from './pages/home';
