@@ -8,6 +8,8 @@ const employeeRoutes = require('./routes/employee/index');
 
 const app = express();
 
+const cache = require('./config/cache');
+
 // Inventory unification (Option B): make app.inventory the single source of
 // truth. Idempotent — extends app.inventory from app.stock and backfills rows.
 // Fire-and-forget so a DB hiccup never blocks server boot. Skipped under Jest.
@@ -33,6 +35,17 @@ app.use(express.json());
  */
 app.get('/api', (req, res) => {
   res.send('hi');
+});
+
+/**
+ * GET /api/health/redis
+ *
+ * Reports whether the Redis read-through cache is enabled and connected.
+ * Used to verify up_REDIS_URL is correctly set in the deployment environment.
+ * Returns: { enabled: boolean, status: string }
+ */
+app.get('/api/health/redis', (req, res) => {
+  res.json(cache.checkRedis());
 });
 
 /**

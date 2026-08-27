@@ -10,6 +10,7 @@
  */
 const { neonDb } = require('../db');
 const shared = require('./shared');
+const cache = require('../cache');
 
 /**
  * Look up an employee login user (user_type 'employee' OR 'admin').
@@ -27,5 +28,5 @@ async function findEmployeeLoginUser(email) {
 
 module.exports = {
   ...shared,
-  findEmployeeLoginUser,
+  ...cache.wrapExports({ findEmployeeLoginUser }, { findEmployeeLoginUser: { role: 'read', tables: ['app.users'] } }),
 };

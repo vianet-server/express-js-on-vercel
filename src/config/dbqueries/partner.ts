@@ -10,6 +10,7 @@
  */
 const { neonDb } = require('../db');
 const shared = require('./shared');
+const cache = require('../cache');
 
 /**
  * Look up a partner login user (user_type 'partner' only).
@@ -27,5 +28,5 @@ async function findPartnerLoginUser(email) {
 
 module.exports = {
   ...shared,
-  findPartnerLoginUser,
+  ...cache.wrapExports({ findPartnerLoginUser }, { findPartnerLoginUser: { role: 'read', tables: ['app.users'] } }),
 };

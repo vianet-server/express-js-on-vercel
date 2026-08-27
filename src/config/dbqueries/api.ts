@@ -11,6 +11,7 @@
  */
 const { neonDb } = require('../db');
 const shared = require('./shared');
+const cache = require('../cache');
 
 // ===========================================================================
 // Public stock item list (group-scoped for non-admin users)
@@ -357,20 +358,41 @@ async function logApiUsage({ keyid, endpoint, method, status }) {
   );
 }
 
+const API_META = {
+  // reads
+  listStockItemsForUser:  { role: 'read',  tables: ['app.inventory', 'app.inventory_access_group', 'app.users'] },
+  listOwnApiKeys:        { role: 'read',  tables: ['app.api'] },
+  listProductsV1:        { role: 'read',  tables: ['app.inventory', 'app.inventory_access_group'] },
+  getProductV1:          { role: 'read',  tables: ['app.inventory', 'app.inventory_access_group'] },
+  listSalesVouchersV1:   { role: 'read',  tables: ['app.vouchers', 'app.inventory_access_group'] },
+  findApiKey:            { role: 'read',  tables: ['app.api', 'app.access_groups'] },
+  // writes
+  createOwnApiKey:       { role: 'write', tables: ['app.api'] },
+  updateOwnApiKey:       { role: 'write', tables: ['app.api'] },
+  deleteOwnApiKey:       { role: 'write', tables: ['app.api'] },
+  createProductV1:       { role: 'write', tables: ['app.inventory', 'app.inventory_access_group'] },
+  updateProductV1:       { role: 'write', tables: ['app.inventory', 'app.inventory_access_group'] },
+  touchApiKey:           { role: 'write', tables: ['app.api'] },
+  logApiUsage:           { role: 'write', tables: ['api_key_log'] },
+  ensureLogTable:        { role: 'write', tables: [] },
+};
+
 module.exports = {
   ...shared,
-  listStockItemsForUser,
-  createOwnApiKey,
-  listOwnApiKeys,
-  updateOwnApiKey,
-  deleteOwnApiKey,
-  listProductsV1,
-  getProductV1,
-  createProductV1,
-  updateProductV1,
-  listSalesVouchersV1,
-  ensureLogTable,
-  findApiKey,
-  touchApiKey,
-  logApiUsage,
+  ...cache.wrapExports({
+    listStockItemsForUser,
+    createOwnApiKey,
+    listOwnApiKeys,
+    updateOwnApiKey,
+    deleteOwnApiKey,
+    listProductsV1,
+    getProductV1,
+    createProductV1,
+    updateProductV1,
+    listSalesVouchersV1,
+    ensureLogTable,
+    findApiKey,
+    touchApiKey,
+    logApiUsage,
+  }, API_META),
 };

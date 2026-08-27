@@ -9,6 +9,7 @@
  * (status codes, JSON mapping) stays in the route handlers.
  */
 const { neonDb } = require('../db');
+const cache = require('../cache');
 
 // ===========================================================================
 // App users & access groups (auth flows)
@@ -539,7 +540,43 @@ async function getFirstUser() {
   return result.rows[0];
 }
 
-module.exports = {
+const SHARED_META = {
+  // reads
+  findUserByEmail:           { role: 'read',  tables: ['app.users'] },
+  getUserBriefById:          { role: 'read',  tables: ['app.users'] },
+  getMinAccessGroupId:       { role: 'read',  tables: ['app.access_groups'] },
+  findPartnerProfile:        { role: 'read',  tables: ['partner_profiles'] },
+  findEmployeeProfile:       { role: 'read',  tables: ['employee_profiles'] },
+  listLedgers:               { role: 'read',  tables: ['app.ledger'] },
+  listVouchers:             { role: 'read',  tables: ['app.vouchers'] },
+  listGodowns:              { role: 'read',  tables: ['godowns'] },
+  listInventoryRecords:      { role: 'read',  tables: ['inventory'] },
+  getFirstUser:             { role: 'read',  tables: ['app.users'] },
+  // writes
+  createUser:               { role: 'write', tables: ['app.users'] },
+  createUserNoName:         { role: 'write', tables: ['app.users'] },
+  createPartnerProfile:     { role: 'write', tables: ['partner_profiles'] },
+  updatePartnerProfileByUserId: { role: 'write', tables: ['partner_profiles'] },
+  createEmployeeProfile:    { role: 'write', tables: ['employee_profiles'] },
+  updateEmployeeProfileByUserId: { role: 'write', tables: ['employee_profiles'] },
+  createStockItemGuid:      { role: 'write', tables: ['app.inventory'] },
+  updateStockItemById:      { role: 'write', tables: ['app.inventory'] },
+  deleteStockItemById:      { role: 'write', tables: ['app.inventory', 'app.inventory_access_group'] },
+  createLedger:             { role: 'write', tables: ['app.ledger'] },
+  updateLedger:             { role: 'write', tables: ['app.ledger'] },
+  deleteLedger:             { role: 'write', tables: ['app.ledger'] },
+  createVoucher:            { role: 'write', tables: ['app.vouchers'] },
+  updateVoucher:            { role: 'write', tables: ['app.vouchers'] },
+  deleteVoucher:            { role: 'write', tables: ['app.vouchers'] },
+  createGodown:             { role: 'write', tables: ['godowns'] },
+  updateGodown:             { role: 'write', tables: ['godowns'] },
+  deleteGodown:             { role: 'write', tables: ['godowns'] },
+  createInventoryRecord:    { role: 'write', tables: ['inventory'] },
+  updateInventoryRecord:    { role: 'write', tables: ['inventory'] },
+  deleteInventoryRecord:    { role: 'write', tables: ['inventory'] },
+};
+
+module.exports = cache.wrapExports({
   findUserByEmail,
   getUserBriefById,
   getMinAccessGroupId,
@@ -571,4 +608,4 @@ module.exports = {
   updateInventoryRecord,
   deleteInventoryRecord,
   getFirstUser,
-};
+}, SHARED_META);

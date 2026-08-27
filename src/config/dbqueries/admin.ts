@@ -11,6 +11,7 @@
  */
 const { neonDb } = require('../db');
 const shared = require('./shared');
+const cache = require('../cache');
 
 // ===========================================================================
 // Admin login
@@ -379,6 +380,19 @@ async function ensureInventoryUnification() {
       category_level_2  = COALESCE(app.inventory.category_level_2, EXCLUDED.category_level_2)
   `);
   await neonDb.query('CREATE INDEX IF NOT EXISTS idx_inventory_id ON app.inventory (id)').catch(() => {});
+  // Speed up the heavy admin inventory list: partial expression index that serves
+  // both the `isblocked IS NOT TRUE` filter and the `ORDER BY COALESCE(...)` +
+  // LIMIT/OFFSET pagination, turning a seqscan+sort into an index scan.
+  await neonDb.query(
+    `CREATE INDEX IF NOT EXISTS idx_inventory_list
+       ON app.inventory (COALESCE(NULLIF(fullname, ''), stockname))
+       WHERE isblocked IS NOT TRUE`
+  ).catch(() => {});
+  await neonDb.query(
+    `CREATE INDEX IF NOT EXISTS idx_inventory_brand_active
+       ON app.inventory (brand)
+       WHERE isblocked IS NOT TRUE`
+  ).catch(() => {});
 }
 
 /**
@@ -797,6 +811,50 @@ async function deleteAccessGroup(id) {
     console.warn('[api] cleanup users:', e.message);
   }
   await neonDb.query('DELETE FROM app.access_groups WHERE id = $1', [id]);
+}
+
+/**
+ * Persist an email marketing campaign into app.email_marketing.
+ * Resolves the access group name to its numeric id; inserts the rest of the
+ * campaign fields (brand, schedule, include_value, include_detailed).
+ * last_sent starts NULL and is updated when the campaign is actually sent.
+ * @param {object} input
+ * @param {string} input.name
+ * @param {string} [input.email]
+ * @param {string} [input.accessGroupName]
+ * @param {string} [input.brand]
+ * @param {string} [input.schedule]
+ * @param {boolean} [input.includePrice]
+ * @param {boolean} [input.includeDetailed]
+ * @returns {Promise<{id: number}>} inserted row id
+ * @route Used by POST /api/admin/email-marketing
+ */
+async function saveEmailMarketing({ name, email, accessGroupName, brand, schedule, includePrice, includeDetailed }) {
+  let accessGroupId = null;
+  if (accessGroupName) {
+    const row = await findAccessGroupId(accessGroupName);
+    accessGroupId = row?.id ?? null;
+  }
+  const result = await neonDb.query(
+    `INSERT INTO app.email_marketing (ename, email, access_group_id, include_value, brand, schedule, include_detailed, last_sent)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+    [name, email || null, accessGroupId, includePrice ?? false, brand || null, schedule || null, includeDetailed ?? false, null]
+  );
+  return result.rows[0];
+}
+
+/**
+ * Stamp last_sent = NOW() for a campaign (called when it is actually sent).
+ * @param {number} id - app.email_marketing.id
+ * @returns {Promise<{id: number}|undefined>} updated row id, or undefined if missing
+ * @route Used by PUT /api/admin/email-marketing/:id/sent
+ */
+async function updateEmailMarketingLastSent(id) {
+  const result = await neonDb.query(
+    'UPDATE app.email_marketing SET last_sent = NOW() WHERE id = $1 RETURNING id',
+    [id]
+  );
+  return result.rows[0];
 }
 
 /**
@@ -1475,81 +1533,165 @@ async function listSalesmanChart() {
   return result.rows;
 }
 
+const ADMIN_META = {
+  loginUser: { role: 'read', tables: ['app.users'] },
+  createAccessControlUser: { role: 'write', tables: ['app.users'] },
+  ensureUserColumns: { role: 'write', tables: [] },
+  listAccessControlUsers: { role: 'read', tables: ['app.users', 'app.access_groups'] },
+  updateAccessControlUser: { role: 'write', tables: ['app.users'] },
+  deleteAccessControlUser: { role: 'write', tables: ['app.users'] },
+  listStockItemsAdmin: { role: 'read', tables: ['app.inventory'] },
+  createStockItemLegacy: { role: 'write', tables: ['app.inventory'] },
+  listStockItemsLegacy: { role: 'read', tables: ['app.inventory'] },
+  listDistinctBrands: { role: 'read', tables: ['app.inventory'] },
+  listDistinctGroups: { role: 'read', tables: ['app.inventory'] },
+  listInventoryStock: { role: 'read', tables: ['app.inventory'] },
+  listInventorySku: { role: 'read', tables: ['app.inventory', 'app.inventory_access_group', 'app.access_groups'] },
+  migratePartnerSku: { role: 'write', tables: [] },
+  ensureInventoryUnification: { role: 'write', tables: [] },
+  getInventoryControl: { role: 'read', tables: ['app.inventory_access_group', 'app.access_groups', 'app.inventory'] },
+  getStockDetail: { role: 'read', tables: ['app.inventory'] },
+  saveStockDetail: { role: 'write', tables: ['app.inventory'] },
+  getAccessGroupDetail: { role: 'read', tables: ['app.access_groups'] },
+  findStockId: { role: 'read', tables: ['app.inventory'] },
+  findAccessGroupId: { role: 'read', tables: ['app.access_groups'] },
+  upsertStockGroupMapping: { role: 'write', tables: ['app.inventory_access_group'] },
+  updateStockGroupMapping: { role: 'write', tables: ['app.inventory_access_group'] },
+  updateStockGst: { role: 'write', tables: ['app.inventory'] },
+  removeStockGroupMapping: { role: 'write', tables: ['app.inventory_access_group'] },
+  getAccessGroupStocks: { role: 'read', tables: ['app.inventory', 'app.inventory_access_group', 'app.access_groups'] },
+  ensureApiColumns: { role: 'write', tables: [] },
+  findAccessGroupByName: { role: 'read', tables: ['app.access_groups'] },
+  getAccessGroupName: { role: 'read', tables: ['app.access_groups'] },
+  createApiKey: { role: 'write', tables: ['app.api'] },
+  listApiKeys: { role: 'read', tables: ['app.api'] },
+  updateApiKey: { role: 'write', tables: ['app.api'] },
+  deleteApiKey: { role: 'write', tables: ['app.api'] },
+  listAccessGroupOptions: { role: 'read', tables: ['app.access_groups'] },
+  createAccessGroup: { role: 'write', tables: ['app.access_groups'] },
+  deleteAccessGroup: { role: 'write', tables: ['app.access_groups'] },
+  saveEmailMarketing: { role: 'write', tables: ['app.email_marketing', 'app.access_groups'] },
+  updateEmailMarketingLastSent: { role: 'write', tables: ['app.email_marketing'] },
+  getApiUsage: { role: 'read', tables: ['api_key_log', 'app.api'] },
+  getDashboardStats: { role: 'read', tables: ['app.inventory', 'app.stock', 'app.access_groups', 'app.users', 'app.vouchers', 'app.ledger', 'godowns', 'partner_profiles', 'employee_profiles'] },
+  getTopSalesmen: { role: 'read', tables: ['app.vouchers', 'app.ledger'] },
+  getDashboardMonthlyTrend: { role: 'read', tables: ['app.vouchers', 'app.ledger'] },
+  getProductShare: { role: 'read', tables: ['app.inventory_access_group', 'app.inventory', 'app.access_groups'] },
+  getAnalyticsStats: { role: 'read', tables: ['app.vouchers', 'app.inventory', 'app.inventory_access_group', 'app.access_groups', 'app.ledger', 'app.stock', 'partner_profiles', 'employee_profiles', 'app.users', 'godowns'] },
+  getAnalyticsMonthlyTrend: { role: 'read', tables: ['app.vouchers', 'app.ledger'] },
+  getAnalyticsCategoryData: { role: 'read', tables: ['app.vouchers', 'app.inventory'] },
+  getAnalyticsTopCustomers: { role: 'read', tables: ['app.vouchers'] },
+  getAnalyticsDailySales: { role: 'read', tables: ['app.vouchers'] },
+  getAnalyticsSalesByRegion: { role: 'read', tables: ['app.vouchers'] },
+  getAnalyticsOrdersByChannel: { role: 'read', tables: ['app.vouchers'] },
+  getPnlData: { role: 'read', tables: ['app.ledger', 'app.vouchers', 'app.pnl'] },
+  savePnlData: { role: 'write', tables: ['app.ledger', 'app.vouchers'] },
+  saveMonthlyPnlData: { role: 'write', tables: ['app.ledger', 'app.vouchers'] },
+  getMonthlyPnlData: { role: 'read', tables: ['app.ledger', 'app.vouchers', 'app.pnl'] },
+  getBalanceSheetData: { role: 'read', tables: ['app.ledger', 'app.vouchers', 'app.balance_sheet'] },
+  saveBalanceSheetData: { role: 'write', tables: ['app.ledger', 'app.vouchers'] },
+  getOutstandingVouchers: { role: 'read', tables: ['app.vouchers', 'app.ledger'] },
+  getDaybook: { role: 'read', tables: ['app.ledger', 'app.vouchers'] },
+  getMarketOverview: { role: 'read', tables: ['app.inventory'] },
+  getMarketSalesTrend: { role: 'read', tables: ['app.vouchers', 'app.inventory'] },
+  getMarketCategoryData: { role: 'read', tables: ['app.inventory'] },
+  getMarketCandlestick: { role: 'read', tables: ['app.vouchers', 'app.inventory'] },
+  listPartners: { role: 'read', tables: ['partner_profiles'] },
+  getPartnerById: { role: 'read', tables: ['partner_profiles', 'app.users'] },
+  updatePartnerUserEmail: { role: 'write', tables: ['partner_profiles', 'app.users'] },
+  deletePartnerById: { role: 'write', tables: ['partner_profiles'] },
+  listEmployees: { role: 'read', tables: ['employee_profiles'] },
+  getEmployeeById: { role: 'read', tables: ['employee_profiles', 'app.users'] },
+  updateEmployeeUserEmail: { role: 'write', tables: ['employee_profiles', 'app.users'] },
+  deleteEmployeeById: { role: 'write', tables: ['employee_profiles'] },
+  listRecentUsers: { role: 'read', tables: ['app.users'] },
+  countUsersByType: { role: 'read', tables: ['app.users'] },
+  getUserProfileById: { role: 'read', tables: ['app.users', 'partner_profiles', 'employee_profiles'] },
+  listPublicTables: { role: 'read', tables: [] },
+  getMasterCounts: { role: 'read', tables: ['app.users', 'app.access_groups', 'app.inventory', 'godowns', 'app.stock'] },
+  listSalesmen: { role: 'read', tables: ['app.users'] },
+  listSalesmanChart: { role: 'read', tables: ['app.vouchers', 'app.users'] },
+};
+
 module.exports = {
   ...shared,
-  loginUser,
-  createAccessControlUser,
-  ensureUserColumns,
-  listAccessControlUsers,
-  updateAccessControlUser,
-  deleteAccessControlUser,
-  listStockItemsAdmin,
-  createStockItemLegacy,
-  listStockItemsLegacy,
-  listDistinctBrands,
-  listDistinctGroups,
-  listInventoryStock,
-  listInventorySku,
-  migratePartnerSku,
-  ensureInventoryUnification,
-  getInventoryControl,
-  getStockDetail,
-  saveStockDetail,
-  getAccessGroupDetail,
-  findStockId,
-  findAccessGroupId,
-  upsertStockGroupMapping,
-  updateStockGroupMapping,
-  updateStockGst,
-  removeStockGroupMapping,
-  getAccessGroupStocks,
-  ensureApiColumns,
-  findAccessGroupByName,
-  getAccessGroupName,
-  createApiKey,
-  listApiKeys,
-  updateApiKey,
-  deleteApiKey,
-  listAccessGroupOptions,
-  createAccessGroup,
-  deleteAccessGroup,
-  getApiUsage,
-  getDashboardStats,
-  getTopSalesmen,
-  getDashboardMonthlyTrend,
-  getProductShare,
-  getAnalyticsStats,
-  getAnalyticsMonthlyTrend,
-  getAnalyticsCategoryData,
-  getAnalyticsTopCustomers,
-  getAnalyticsDailySales,
-  getAnalyticsSalesByRegion,
-  getAnalyticsOrdersByChannel,
-  getPnlData,
-  savePnlData,
-  saveMonthlyPnlData,
-  getMonthlyPnlData,
-  getBalanceSheetData,
-  saveBalanceSheetData,
-  getOutstandingVouchers,
-  getDaybook,
-  getMarketOverview,
-  getMarketSalesTrend,
-  getMarketCategoryData,
-  getMarketCandlestick,
-  listPartners,
-  getPartnerById,
-  updatePartnerUserEmail,
-  deletePartnerById,
-  listEmployees,
-  getEmployeeById,
-  updateEmployeeUserEmail,
-  deleteEmployeeById,
-  listRecentUsers,
-  countUsersByType,
-  getUserProfileById,
-  listPublicTables,
-  getMasterCounts,
-  listSalesmen,
-  listSalesmanChart,
+  ...cache.wrapExports({
+    loginUser,
+    createAccessControlUser,
+    ensureUserColumns,
+    listAccessControlUsers,
+    updateAccessControlUser,
+    deleteAccessControlUser,
+    listStockItemsAdmin,
+    createStockItemLegacy,
+    listStockItemsLegacy,
+    listDistinctBrands,
+    listDistinctGroups,
+    listInventoryStock,
+    listInventorySku,
+    migratePartnerSku,
+    ensureInventoryUnification,
+    getInventoryControl,
+    getStockDetail,
+    saveStockDetail,
+    getAccessGroupDetail,
+    findStockId,
+    findAccessGroupId,
+    upsertStockGroupMapping,
+    updateStockGroupMapping,
+    updateStockGst,
+    removeStockGroupMapping,
+    getAccessGroupStocks,
+    ensureApiColumns,
+    findAccessGroupByName,
+    getAccessGroupName,
+    createApiKey,
+    listApiKeys,
+    updateApiKey,
+    deleteApiKey,
+    listAccessGroupOptions,
+    createAccessGroup,
+    deleteAccessGroup,
+    saveEmailMarketing,
+    updateEmailMarketingLastSent,
+    getApiUsage,
+    getDashboardStats,
+    getTopSalesmen,
+    getDashboardMonthlyTrend,
+    getProductShare,
+    getAnalyticsStats,
+    getAnalyticsMonthlyTrend,
+    getAnalyticsCategoryData,
+    getAnalyticsTopCustomers,
+    getAnalyticsDailySales,
+    getAnalyticsSalesByRegion,
+    getAnalyticsOrdersByChannel,
+    getPnlData,
+    savePnlData,
+    saveMonthlyPnlData,
+    getMonthlyPnlData,
+    getBalanceSheetData,
+    saveBalanceSheetData,
+    getOutstandingVouchers,
+    getDaybook,
+    getMarketOverview,
+    getMarketSalesTrend,
+    getMarketCategoryData,
+    getMarketCandlestick,
+    listPartners,
+    getPartnerById,
+    updatePartnerUserEmail,
+    deletePartnerById,
+    listEmployees,
+    getEmployeeById,
+    updateEmployeeUserEmail,
+    deleteEmployeeById,
+    listRecentUsers,
+    countUsersByType,
+    getUserProfileById,
+    listPublicTables,
+    getMasterCounts,
+    listSalesmen,
+    listSalesmanChart,
+  }, ADMIN_META),
 };

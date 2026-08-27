@@ -16,8 +16,9 @@
  * - /dashboard        -> dashboard.js        (mounted at /api/admin/dashboard)
  * - /analytics        -> analytics.js        (mounted at /api/admin/analytics)
  * - /reports          -> reports.js          (mounted at /api/admin/reports)
- * - /settings         -> settings.js         (mounted at /api/admin/settings)
- * - /market           -> market.js           (mounted at /api/admin/market)
+ * - /settings        -> settings.js        (mounted at /api/admin/settings)
+ * - /market          -> market.js           (mounted at /api/admin/market)
+ * - /email           -> email.js            (mounted at /api/admin/email-marketing)
  *
  * Frontend callers: vianet/src/adminPages/*.tsx (via useAdminQuery / api wrapper).
  */
@@ -36,6 +37,7 @@ const analyticsRouter = require('./analytics');
 const reportsRouter = require('./reports');
 const settingsRouter = require('./settings');
 const marketRouter = require('./market');
+const emailRouter = require('./email');
 
 const router = express.Router();
 
@@ -52,5 +54,6 @@ router.use('/analytics', analyticsRouter);
 router.use('/reports', reportsRouter);
 router.use('/settings', settingsRouter);
 router.use('/market', marketRouter);
+router.use(emailRouter);
 
 module.exports = router;
