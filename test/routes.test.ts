@@ -147,7 +147,7 @@ describe('adminAuth guard', () => {
     when(/FROM app\.sales_records WHERE sales_date = CURRENT_DATE AND salesman IS NOT NULL/, row({ name: 'Sales', amount: '100' }));
     when(/FROM app\.sales_records WHERE sales_date = CURRENT_DATE$/, row({ total: '100', orders: '2' }));
     when(/FROM app\.sales_records WHERE sales_date = CURRENT_DATE - 1$/, row({ total: '50' }));
-    when(/FROM app\.stock$/, row({ total: '25.5' }));
+    when(/FROM app\.inventory WHERE isblocked IS NOT TRUE/, row({ total: '25.5' }));
     const res = await request(app).get('/api/admin/dashboard/stats').set(adminBearer());
     expect(res.status).toBe(200);
     expect(res.body.todaySale).toBe(100);
@@ -265,7 +265,7 @@ describe('auth() guard', () => {
 
 describe('GET /api/stock/stock-item', () => {
   it('returns a non-admin list with computed gst', async () => {
-    when(/FROM app\.stock s INNER JOIN app\.inventory_access_group iag/, rows({ id: 1, name: 'N', gst: '18', })
+    when(/FROM app\.inventory inv\s+INNER JOIN app\.inventory_access_group iag/, rows({ id: 1, name: 'N', gst: '18', })
     );
     const res = await request(app).get('/api/stock/stock-item').set(userBearer());
     expect(res.status).toBe(200);
@@ -282,7 +282,7 @@ describe('GET /api/stock/stock-item', () => {
   });
 
   it('lets an admin list stock even when no access-group rows exist', async () => {
-    when(/SELECT s\.\* FROM app\.stock s/, rows({ id: 1, stockname: 'X', gst: '18' }));
+    when(/FROM app\.inventory inv WHERE 1=1/, rows({ id: 1, stockname: 'X', gst: '18' }));
     const res = await request(app).get('/api/stock/stock-item').set(adminBearer());
     expect(res.status).toBe(200);
     expect(res.body.noAccess).toBeUndefined();
@@ -476,7 +476,7 @@ describe('GET /api/admin/reports/balance-sheet', () => {
 // =============================================================================
 
 describe('GET /api/admin/reports/pnl-monthly', () => {
-  it('maps row children into signed subs', async () => {
+  it('maps row children into signed subs, dropping zero-amount sub-ledgers', async () => {
     when(/FROM app\.profitloss_monthly/, rows(
       {
         month: '2026-01',
@@ -496,9 +496,9 @@ describe('GET /api/admin/reports/pnl-monthly', () => {
 
     const sales = res.body[0].data[0];
     expect(sales).toMatchObject({ label: 'Sales Accounts', amount: 195418003.99, type: 'income' });
+    // "SAMPLE" (amount 0) must not be returned at all
     expect(sales.subs).toEqual([
       { label: 'Sales', amount: 192973332.99 },
-      { label: 'SAMPLE', amount: 0 },
     ]);
 
     const indirect = res.body[0].data.find((d: any) => d.label === 'Indirect Expenses');
@@ -525,5 +525,24 @@ describe('GET /api/admin/reports/pnl-monthly', () => {
     expect(res.body[0].month).toBe('2026-01');
     expect(res.body[0].data[0]).toMatchObject({ label: 'Sales Accounts', amount: 18276224.43, type: 'income' });
     expect(res.body[0].data[0].subs).toEqual([{ label: 'Sales', amount: 18276224.43 }]);
+  });
+});
+
+// =============================================================================
+// inventory/stock qty = quantity + vquantity (live Tally adjustments)
+// =============================================================================
+
+describe('GET /api/admin/inventory/stock', () => {
+  it('returns qty as quantity + vquantity, matching the SKU/app definition', async () => {
+    when(/FROM app\.inventory inv/, rows({
+      id: 1, stockname: 'Widget', fullname: 'Widget', brand: 'Acme', category_level_1: 'Gadgets',
+      model: 'M1', varient: 'V1', color: 'Red', quantity: 10, vquantity: 3, inv_price: 100, gst: 18,
+      min_stock: 2, max_stock: 50, count: 1,
+    }));
+    const res = await request(app).get('/api/admin/inventory/stock?limit=500&offset=0&brand=all&group=all').set(adminBearer());
+    expect(res.status).toBe(200);
+    expect(res.body.total).toBe(1);
+    expect(res.body.rows[0]).toMatchObject({ id: 1, name: 'Widget', qty: 13 });
+    expect(res.body.rows[0].qty).toBe(13);
   });
 });

@@ -1,4 +1,4 @@
-import { LayoutDashboard, BarChart3, TrendingUp, FileSpreadsheet, DollarSign, ChartPie, BookOpen, UserCircle, Settings, Code2, RefreshCw, Package, Sliders, Barcode, Gauge, LogOut, Receipt, Users, UserCheck, Plus } from "lucide-react"
+import { LayoutDashboard, BarChart3, TrendingUp, FileSpreadsheet, DollarSign, ChartPie, BookOpen, UserCircle, Settings, Code2, RefreshCw, Package, Sliders, Barcode, Gauge, LogOut, Receipt, Users, UserCheck, Plus, Mail } from "lucide-react"
 import { Link, useLocation } from "react-router-dom"
 
 import {
@@ -48,6 +48,9 @@ const tallyItems = [
   { title: "Masters", url: "/admin/stock/masters", icon: Users },
   { title: "Salesman", url: "/admin/stock/salesman", icon: UserCheck },
   { title: "Sync", url: "/admin/sync", icon: RefreshCw },
+]
+const marketingItems = [
+  { title: "Email", url: "/admin/email", icon: Mail },
 ]
 
 export function AdminSidebar() {
@@ -130,6 +133,25 @@ export function AdminSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
         <SidebarGroup>
+          <SidebarGroupLabel>Marketing</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {marketingItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    render={<Link to={item.url} />}
+                    isActive={location.pathname === item.url}
+                    tooltip={item.title}
+                  >
+                    <item.icon />
+                    <span>{item.title}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
           <SidebarGroupLabel>Tally</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -188,22 +210,13 @@ export function AdminSidebar() {
       <SidebarFooter className="border-t p-2">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton render={<Link to="/admin/stock/stock-item?create=true" />} tooltip="Create Stock">
-              <Plus className="size-4" />
-              <span>Create Stock</span>
-            </SidebarMenuButton>
+            
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton render={<Link to="/admin/stock/voucher?create=true" />} tooltip="Create Voucher">
-              <Plus className="size-4" />
-              <span>Create Voucher</span>
-            </SidebarMenuButton>
+            
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton render={<Link to="/admin/stock/ledger?create=true" />} tooltip="Create Ledger">
-              <Plus className="size-4" />
-              <span>Create Ledger</span>
-            </SidebarMenuButton>
+            
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton render={<Link to="/admin/login" />} onClick={logout} tooltip="Logout">

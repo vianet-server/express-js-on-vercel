@@ -185,7 +185,7 @@ async function updateEmployeeProfileByUserId({ user_id, employee_id, first_name,
 // ===========================================================================
 
 /**
- * Create a stock item.
+ * Create a stock item. Writes to app.inventory (the unified item table).
  * @param {object} input
  * @param {string} input.name - stock display name
  * @param {string} input.guid - UUID
@@ -193,22 +193,22 @@ async function updateEmployeeProfileByUserId({ user_id, employee_id, first_name,
  * @param {number} [input.price] - stock price
  * @param {string} [input.category_level_1] - level 1 category
  * @param {string} [input.category_level_2] - level 2 category
- * @returns {Promise<object>} created app.stock row (RETURNING *)
+ * @returns {Promise<object>} created app.inventory row (RETURNING *)
  * @route Used by POST /api/admin/stock-item, POST /api/stock/stock-item
  */
 async function createStockItemGuid({ name, guid, quantity, price, category_level_1, category_level_2 }) {
   const result = await neonDb.query(
-    'INSERT INTO app.stock (stockname, guid, quantity, price, category_level_1, category_level_2, masterid, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, 0, NOW(), NOW()) RETURNING *',
+    'INSERT INTO app.inventory (fullname, stockname, guid, quantity, price, category_level_1, category_level_2, created_at, updated_at) VALUES ($1, $1, $2, $3, $4, $5, $6, NOW(), NOW()) RETURNING *',
     [name, guid, quantity, price, category_level_1, category_level_2]
   );
   return result.rows[0];
 }
 
 /**
- * Update a stock item's name/quantity/price/category by id.
+ * Update a stock item's name/quantity/price/category by id (app.inventory).
  * @param {object} input
- * @param {number} input.id - app.stock.id
- * @param {string} [input.name] - new stockname
+ * @param {number} input.id - app.inventory.id
+ * @param {string} [input.name] - new name (updates fullname + stockname)
  * @param {number} [input.quantity]
  * @param {number} [input.price]
  * @param {string} [input.category_level_1]
@@ -218,21 +218,23 @@ async function createStockItemGuid({ name, guid, quantity, price, category_level
  */
 async function updateStockItemById({ id, name, quantity, price, category_level_1, category_level_2 }) {
   const result = await neonDb.query(
-    'UPDATE app.stock SET stockname = COALESCE($1, stockname), quantity = COALESCE($2, quantity), price = COALESCE($3, price), category_level_1 = COALESCE($4, category_level_1), category_level_2 = COALESCE($5, category_level_2), updated_at = NOW() WHERE id = $6 RETURNING *',
+    'UPDATE app.inventory SET fullname = COALESCE($1, fullname), stockname = COALESCE($1, stockname), quantity = COALESCE($2, quantity), price = COALESCE($3, price), category_level_1 = COALESCE($4, category_level_1), category_level_2 = COALESCE($5, category_level_2), updated_at = NOW() WHERE id = $6 RETURNING *',
     [name, quantity, price, category_level_1, category_level_2, id]
   );
   return result.rows[0];
 }
 
 /**
- * Delete a stock item by id.
- * @param {number} id - app.stock.id
+ * Delete a stock item by id. Also removes its access-group mappings so no
+ * orphaned app.inventory_access_group rows remain.
+ * @param {number} id - app.inventory.id
  * @returns {Promise<object|undefined>} deleted row { id }, or undefined when not found
  * @route Used by DELETE /api/admin/stock-item, DELETE /api/admin/stockitem, DELETE /api/stock/stock-item
  */
 async function deleteStockItemById(id) {
-  const result = await neonDb.query('DELETE FROM app.stock WHERE id = $1 RETURNING id', [id]);
-  return result.rows[0];
+  await neonDb.query('DELETE FROM app.inventory_access_group WHERE inventoryid = $1', [id]).catch(() => {});
+  const result = await neonDb.query('DELETE FROM app.inventory WHERE id = $1 RETURNING id', [id]);
+  return (result.rows || [])[0];
 }
 
 // ===========================================================================

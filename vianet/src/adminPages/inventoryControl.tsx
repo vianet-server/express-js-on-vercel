@@ -126,10 +126,10 @@ export function InventoryControl() {
       </div>
 
       <Tabs orientation="vertical" defaultValue="overview" className="flex gap-6">
-        <TabsList className="flex-col w-48 h-fit min-h-40">
-          <TabsTrigger value="overview" className="justify-start w-full gap-2"><Package size={14} /> Overview</TabsTrigger>
+        <TabsList className="flex-col w-48 h-fit min-h-10">
+      
           <TabsTrigger value="access-group" className="justify-start w-full gap-2"><UserCog size={14} /> Access Group</TabsTrigger>
-          <TabsTrigger value="detail" className="justify-start w-full gap-2"><Settings size={14} /> Detail</TabsTrigger>
+          
         </TabsList>
 
         <TabsContent value="overview" className="flex-1 mt-0 flex flex-col gap-6">
@@ -228,37 +228,7 @@ export function InventoryControl() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader><CardTitle>Permission Matrix</CardTitle></CardHeader>
-            <CardContent>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-muted-foreground">
-                    <th className="pb-2 font-medium">Group</th>
-                    <th className="pb-2 font-medium text-center">View</th>
-                    <th className="pb-2 font-medium text-center">Edit</th>
-                    <th className="pb-2 font-medium text-center">Approve</th>
-                    <th className="pb-2 font-medium text-center">Configure</th>
-                    <th className="pb-2 font-medium text-center">Export</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(accessGroups ?? []).map((g, i) => (
-                    <tr key={i} className="border-b last:border-0">
-                      <td className="py-2.5 font-medium">{g.name}</td>
-                      {['view', 'edit', 'approve', 'configure', 'export'].map(p => (
-                        <td key={p} className="py-2.5 text-center">
-                          {g.permissions?.includes(p)
-                            ? <CheckCircle size={14} className="text-green-600 inline" />
-                            : <X size={14} className="text-muted-foreground/40 inline" />}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </CardContent>
-          </Card>
+         
 
           <Card>
             <CardHeader><CardTitle>Access Group Settings</CardTitle></CardHeader>

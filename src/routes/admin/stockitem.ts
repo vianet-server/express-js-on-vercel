@@ -40,9 +40,8 @@ router.post('/stockitem', async (req, res) => {
 /**
  * GET /api/admin/stockitem
  *
- * List stock items, optionally filtered by name (contains) or sku (exact).
- * NOTE: filters reference columns `name`/`sku` which do not exist on app.stock,
- * so only the unfiltered query works in practice.
+ * List stock items, optionally filtered by name (contains) or sku (exact id).
+ * Reads app.inventory (the unified item table).
  *
  * Auth: adminAuth.
  * Query params: { name?, sku? }
@@ -198,7 +197,7 @@ router.get('/inventory/stock', async (req, res) => {
       model: r.model || '',
       variant: r.varient || '',
       color: r.color || '',
-      qty: parseFloat(r.quantity) || 0,
+      qty: (parseFloat(r.quantity) || 0) + (parseFloat(r.vquantity) || 0),
       price: parseFloat(r.inv_price) || 0,
       gst: parseFloat(r.gst) || 0,
       min: parseFloat(r.min_stock ?? r.min) || 0,
@@ -342,8 +341,8 @@ router.get('/inventory/stock/:id', async (req, res) => {
 /**
  * POST /api/admin/inventory/stock/:id
  *
- * Save stock detail — updates both app.inventory (fullname/brand/model/varient/color/
- * quantity/price/gst) and app.stock (stockname/quantity/price) for the same id.
+ * Save stock detail — upserts app.inventory (fullname/brand/model/varient/color/
+ * quantity/price/gst) for the given id.
  *
  * Auth: adminAuth.
  * Path params: { id }

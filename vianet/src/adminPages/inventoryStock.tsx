@@ -10,10 +10,10 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Edit3, ExternalLink, Check, X, Loader2 } from 'lucide-react';
+import { Search, Edit3, ExternalLink, Check, X, Loader2, RefreshCw } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { setStockPage, updateStockItem } from '@/store/slices/inventorySlice';
+import { setStockPage, updateStockItem, resetStockPagination } from '@/store/slices/inventorySlice';
 
 interface StockItem {
   id: number; name: string; brand: string; group: string; model: string; variant: string; color: string;
@@ -102,8 +102,11 @@ export function InventoryStock() {
   }, []);
 
   useEffect(() => {
+    // Wipe persisted rows so the previous visit's data is never shown as
+    // current while the fresh fetch is in flight (loader shows instead).
+    dispatch(resetStockPagination());
     fetchAll()
-  }, [fetchAll])
+  }, [fetchAll, dispatch])
 
   const filtered = items.filter(p =>
     (p.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
@@ -163,6 +166,9 @@ export function InventoryStock() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Inventory Stock</h1>
         <div className="flex items-center gap-4">
+          <Button variant="secondary" size="sm" onClick={() => fetchAll()} disabled={loading}>
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
+          </Button>
           <Select value={selectedGroup} onValueChange={(val) => { setSelectedGroup(val ?? 'all'); }}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Select Group" />

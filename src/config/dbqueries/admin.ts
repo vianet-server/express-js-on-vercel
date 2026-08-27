@@ -87,7 +87,7 @@ async function listAccessControlUsers({ email, user_type, limit, offset }) {
 
   const where = filters.length ? ' WHERE ' + filters.join(' AND ') : '';
 
-  const countResult = await neonDb.query('SELECT COUNT(*) FROM app.users u' + where, params);
+  const countResult = await neonDb.query('SELECT COUNT(*) FROM app.users u' + where, [...params]);
   const total = parseInt(countResult.rows[0].count);
 
   const dataQuery = `SELECT u.id, u.email, u.user_type, u.is_active, u.created_at, u.updated_at, u.access_group_id, g.name AS access_group_name FROM app.users u LEFT JOIN app.access_groups g ON g.id = u.access_group_id${where} ORDER BY u.created_at DESC LIMIT $${idx} OFFSET $${idx + 1}`;
@@ -134,26 +134,26 @@ async function deleteAccessControlUser(id) {
 /**
  * Paginated stock item list with optional name search (legacy admin list endpoint).
  * @param {object} input
- * @param {string} [input.name] - stockname filter (ILIKE contains)
+ * @param {string} [input.name] - name filter (ILIKE contains)
  * @param {number} input.limit - page size
  * @param {number} input.offset - page offset
- * @returns {Promise<{rows: object[], total: number}>} app.stock rows ordered by id DESC
+ * @returns {Promise<{rows: object[], total: number}>} app.inventory rows ordered by id DESC
  * @route Used by GET /api/admin/stock-item
  */
 async function listStockItemsAdmin({ name, limit, offset }) {
-  let countQuery = 'SELECT COUNT(*) FROM app.stock WHERE 1=1';
-  let dataQuery = 'SELECT * FROM app.stock WHERE 1=1';
+  let countQuery = 'SELECT COUNT(*) FROM app.inventory WHERE 1=1 AND isblocked IS NOT TRUE';
+  let dataQuery = 'SELECT * FROM app.inventory WHERE 1=1 AND isblocked IS NOT TRUE';
   const params: any[] = [];
   let idx = 1;
 
   if (name) {
-    const clause = ` AND stockname ILIKE $${idx++}`;
+    const clause = ` AND COALESCE(fullname, stockname) ILIKE $${idx++}`;
     countQuery += clause;
     dataQuery += clause;
     params.push(`%${name}%`);
   }
 
-  const countResult = await neonDb.query(countQuery, params);
+  const countResult = await neonDb.query(countQuery, [...params]);
   const total = parseInt(countResult.rows[0].count);
 
   dataQuery += ` ORDER BY id DESC LIMIT $${idx} OFFSET $${idx + 1}`;
@@ -166,15 +166,15 @@ async function listStockItemsAdmin({ name, limit, offset }) {
 /**
  * Create a stock item WITHOUT a guid (legacy /stockitem endpoint).
  * @param {object} input
- * @param {string} input.name - stockname
+ * @param {string} input.name - item name
  * @param {number} [input.quantity]
  * @param {number} [input.price]
- * @returns {Promise<object>} created app.stock row
+ * @returns {Promise<object>} created app.inventory row
  * @route Used by POST /api/admin/stockitem
  */
 async function createStockItemLegacy({ name, quantity, price }) {
   const result = await neonDb.query(
-    'INSERT INTO app.stock (stockname, quantity, price, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW()) RETURNING *',
+    'INSERT INTO app.inventory (fullname, stockname, quantity, price, created_at, updated_at) VALUES ($1, $1, $2, $3, NOW(), NOW()) RETURNING *',
     [name, quantity, price]
   );
   return result.rows[0];
@@ -182,20 +182,18 @@ async function createStockItemLegacy({ name, quantity, price }) {
 
 /**
  * List stock items with optional filters (legacy /stockitem endpoint).
- * NOTE: the name/sku filters reference columns that do not exist on app.stock,
- * so the filters only work when left empty.
  * @param {object} [input]
- * @param {string} [input.name] - `name` column filter (contains)
- * @param {string} [input.sku] - `sku` column filter (exact)
- * @returns {Promise<object[]>} app.stock rows
+ * @param {string} [input.name] - name filter (contains)
+ * @param {string} [input.sku] - id filter (exact)
+ * @returns {Promise<object[]>} app.inventory rows
  * @route Used by GET /api/admin/stockitem
  */
 async function listStockItemsLegacy({ name, sku }: any = {}) {
-  let query = 'SELECT * FROM app.stock WHERE 1=1';
+  let query = 'SELECT * FROM app.inventory WHERE 1=1 AND isblocked IS NOT TRUE';
   const params: any[] = [];
   let idx = 1;
-  if (name) { query += ` AND name ILIKE $${idx++}`; params.push(`%${name}%`); }
-  if (sku) { query += ` AND sku = $${idx++}`; params.push(sku); }
+  if (name) { query += ` AND COALESCE(fullname, stockname) ILIKE $${idx++}`; params.push(`%${name}%`); }
+  if (sku) { query += ` AND id = $${idx++}`; params.push(isNaN(Number(sku)) ? sku : Number(sku)); }
   const result = await neonDb.query(query, params);
   return result.rows;
 }
@@ -210,7 +208,7 @@ async function listStockItemsLegacy({ name, sku }: any = {}) {
  * @route Used by GET /api/admin/inventory/brands
  */
 async function listDistinctBrands() {
-  const result = await neonDb.query('SELECT DISTINCT brand FROM app.inventory WHERE brand IS NOT NULL AND brand != \'\' ORDER BY brand');
+  const result = await neonDb.query('SELECT DISTINCT brand FROM app.inventory WHERE brand IS NOT NULL AND brand != \'\' AND isblocked IS NOT TRUE ORDER BY brand');
   return result.rows.map(r => r.brand);
 }
 
@@ -218,32 +216,31 @@ async function listDistinctBrands() {
  * Fetch list of distinct Tally Stock Groups (category_level_1)
  */
 async function listDistinctGroups() {
-  const result = await neonDb.query('SELECT DISTINCT category_level_1 AS "group" FROM app.stock WHERE category_level_1 IS NOT NULL AND category_level_1 != \'\' ORDER BY category_level_1');
+  const result = await neonDb.query('SELECT DISTINCT category_level_1 AS "group" FROM app.inventory WHERE category_level_1 IS NOT NULL AND category_level_1 != \'\' AND isblocked IS NOT TRUE ORDER BY category_level_1');
   return result.rows.map(r => r.group);
 }
 
 /**
- * Paginated stock list joined with app.inventory (the admin inventory table source).
+ * Paginated inventory list (the admin inventory table source). Reads
+ * app.inventory directly; column aliases preserve the legacy stock-join shape.
  * @param {object} input
- * @param {string} [input.search] - matches stockname/brand/model/fullname (ILIKE)
+ * @param {string} [input.search] - matches stockname/brand/model/fullname/category (ILIKE)
  * @param {string} [input.brand] - brand filter; 'all' disables the filter
  * @param {number} input.limit - page size
  * @param {number} input.offset - page offset
  * @returns {Promise<{rows: object[], total: number}>} rows with inventory columns
- *   (fullname, brand, model, varient, color, gst, inv_price) ordered alphabetically
- *   by display name (fullname, falling back to stockname)
+ *   (stockname, fullname, brand, model, varient, color, gst, price, inv_price) ordered
+ *   alphabetically by display name (fullname, falling back to stockname)
  * @route Used by GET /api/admin/inventory/stock
  */
 async function listInventoryStock({ search, brand, group, limit, offset }) {
-  const joinClause = 'LEFT JOIN app.inventory inv ON inv.id = s.id';
-
-  let countQuery = `SELECT COUNT(*) FROM app.stock s ${joinClause} WHERE 1=1`;
-  let dataQuery = `SELECT s.*, inv.fullname, inv.brand, inv.model, inv.varient, inv.color, inv.gst, inv.price AS inv_price FROM app.stock s ${joinClause} WHERE 1=1`;
+  let countQuery = 'SELECT COUNT(*) FROM app.inventory inv WHERE 1=1 AND inv.isblocked IS NOT TRUE';
+  let dataQuery = `SELECT inv.*, COALESCE(inv.fullname, inv.stockname) AS display_name, COALESCE(inv.price, 0) AS inv_price FROM app.inventory inv WHERE 1=1 AND inv.isblocked IS NOT TRUE`;
   const params: any[] = [];
   let idx = 1;
 
   if (search) {
-    const clause = ` AND (s.stockname ILIKE $${idx} OR inv.brand ILIKE $${idx} OR inv.model ILIKE $${idx} OR inv.fullname ILIKE $${idx} OR s.category_level_1 ILIKE $${idx})`;
+    const clause = ` AND (inv.stockname ILIKE $${idx} OR inv.brand ILIKE $${idx} OR inv.model ILIKE $${idx} OR inv.fullname ILIKE $${idx} OR inv.category_level_1 ILIKE $${idx})`;
     countQuery += clause;
     dataQuery += clause;
     params.push(`%${search}%`);
@@ -259,17 +256,17 @@ async function listInventoryStock({ search, brand, group, limit, offset }) {
   }
 
   if (group && group !== 'all') {
-    const clause = ` AND s.category_level_1 ILIKE $${idx}`;
+    const clause = ` AND inv.category_level_1 ILIKE $${idx}`;
     countQuery += clause;
     dataQuery += clause;
     params.push(group);
     idx++;
   }
 
-  const countResult = await neonDb.query(countQuery, params);
+  const countResult = await neonDb.query(countQuery, [...params]);
   const total = parseInt(countResult.rows[0].count);
 
-  dataQuery += ` ORDER BY COALESCE(NULLIF(inv.fullname, ''), s.stockname) ASC LIMIT $${idx} OFFSET $${idx + 1}`;
+  dataQuery += ` ORDER BY COALESCE(NULLIF(inv.fullname, ''), inv.stockname) ASC LIMIT $${idx} OFFSET $${idx + 1}`;
   params.push(limit, offset);
 
   const result = await neonDb.query(dataQuery, params);
@@ -277,70 +274,41 @@ async function listInventoryStock({ search, brand, group, limit, offset }) {
 }
 
 /**
- * SKU listing with per-access-group pricing aggregated as a JSON array per stock.
- * Adapts the query when app.inventory has brand/model columns.
+ * SKU listing with per-access-group pricing aggregated as a JSON array per item.
  * @param {object} [input]
  * @param {string} [input.brand] - brand filter (ILIKE contains)
  * @returns {Promise<object[]>} rows [{ id, name, sku, qty, price, brand, model, accessGroups }]
  * @route Used by GET /api/admin/inventory/sku
  */
 async function listInventorySku({ brand }: any = {}) {
-  const brandFilter = brand;
-  let hasInvTable = false;
-  try {
-    const schemaCheck = await neonDb.query(
-      "SELECT column_name FROM information_schema.columns WHERE table_schema='app' AND table_name='inventory' AND column_name IN ('brand','model')"
-    );
-    hasInvTable = schemaCheck.rows.length === 2;
-  } catch {}
-
-  let sql = '';
   const params: any[] = [];
-
-  if (hasInvTable) {
-    let whereClause = '';
-    if (brandFilter && brandFilter !== 'all') {
-      whereClause = 'WHERE inv.brand ILIKE $1';
-      params.push(`%${brandFilter}%`);
-    }
-    sql = `
-        SELECT s.id, s.stockname AS name, CAST(s.id AS TEXT) AS sku, s.quantity AS qty, s.price,
-               COALESCE(inv.brand,'') AS brand,
-               COALESCE(inv.model,'') AS model,
-               COALESCE(
-                 json_agg(
-                   json_build_object('group', g.name, 'qty', COALESCE(iag.quantity,0) + COALESCE(inv.quantity,0), 'price', iag.oprice, 'partnerSkuName', iag.partner_sku_name)
-                   ORDER BY g.name
-                 ) FILTER (WHERE g.id IS NOT NULL),
-                 '[]'
-               ) AS accessGroups
-        FROM app.stock s
-        LEFT JOIN app.inventory inv ON inv.id = s.id
-        LEFT JOIN app.inventory_access_group iag ON iag.inventoryid = s.id
-        LEFT JOIN app.access_groups g ON g.id = iag.accessgroupid
-        ${whereClause}
-        GROUP BY s.id, s.stockname, s.quantity, s.price, inv.brand, inv.model
-        ORDER BY s.id
-      `;
-  } else {
-    sql = `
-        SELECT s.id, s.stockname AS name, CAST(s.id AS TEXT) AS sku, s.quantity AS qty, s.price,
-               '' AS brand,
-               '' AS model,
-               COALESCE(
-                 json_agg(
-                   json_build_object('group', g.name, 'qty', iag.quantity, 'price', iag.oprice, 'partnerSkuName', iag.partner_sku_name)
-                   ORDER BY g.name
-                 ) FILTER (WHERE g.id IS NOT NULL),
-                 '[]'
-               ) AS accessGroups
-        FROM app.stock s
-        LEFT JOIN app.inventory_access_group iag ON iag.inventoryid = s.id
-        LEFT JOIN app.access_groups g ON g.id = iag.accessgroupid
-        GROUP BY s.id, s.stockname, s.quantity, s.price
-        ORDER BY s.id
-      `;
+  let whereClause = 'WHERE s.isblocked IS NOT TRUE';
+  if (brand && brand !== 'all') {
+    whereClause += ' AND s.brand ILIKE $1';
+    params.push(`%${brand}%`);
   }
+  const sql = `
+      SELECT s.id,
+             COALESCE(s.fullname, s.stockname) AS name,
+             CAST(s.id AS TEXT) AS sku,
+             (COALESCE(s.quantity,0) + COALESCE(s.vquantity,0)) AS qty,
+             s.price,
+             COALESCE(s.brand,'') AS brand,
+             COALESCE(s.model,'') AS model,
+             COALESCE(
+               json_agg(
+                 json_build_object('group', g.name, 'qty', COALESCE(iag.quantity,0) + COALESCE(s.quantity,0), 'price', iag.oprice, 'partnerSkuName', iag.partner_sku_name)
+                 ORDER BY g.name
+               ) FILTER (WHERE g.id IS NOT NULL),
+               '[]'
+             ) AS accessGroups
+      FROM app.inventory s
+      LEFT JOIN app.inventory_access_group iag ON iag.inventoryid = s.id
+      LEFT JOIN app.access_groups g ON g.id = iag.accessgroupid
+      ${whereClause}
+      GROUP BY s.id
+      ORDER BY s.id
+    `;
   const result = await neonDb.query(sql, params);
   return result.rows;
 }
@@ -357,13 +325,70 @@ async function migratePartnerSku() {
 }
 
 /**
+ * Inventory unification (Option B): makes app.inventory the single source of
+ * truth for item data. Idempotent — extends app.inventory with the columns that
+ * previously only existed on app.stock, and backfills missing rows/fields from
+ * app.stock (id-to-id 1:1). app.stock stays untouched as the Tally-sync target.
+ * Runs automatically at server startup.
+ * @returns {Promise<void>}
+ * @route Called by src/index.ts at startup; also in migrations/unify_inventory.sql
+ */
+async function ensureInventoryUnification() {
+  await neonDb.query(`
+    ALTER TABLE app.inventory
+      ADD COLUMN IF NOT EXISTS stockname        TEXT,
+      ADD COLUMN IF NOT EXISTS guid             TEXT,
+      ADD COLUMN IF NOT EXISTS masterid         BIGINT,
+      ADD COLUMN IF NOT EXISTS costing_meth     TEXT,
+      ADD COLUMN IF NOT EXISTS unit             TEXT,
+      ADD COLUMN IF NOT EXISTS data             JSONB,
+      ADD COLUMN IF NOT EXISTS category_level_1 TEXT,
+      ADD COLUMN IF NOT EXISTS category_level_2 TEXT
+  `);
+  await neonDb.query(`
+    INSERT INTO app.inventory (
+      id, fullname, quantity, price,
+      stockname, guid, masterid, costing_meth, unit, data,
+      category_level_1, category_level_2, updated_at
+    )
+    OVERRIDING SYSTEM VALUE
+    SELECT
+      s.id,
+      COALESCE(s.stockname, '') AS fullname,
+      s.quantity,
+      s.price,
+      s.stockname,
+      s.guid,
+      s.masterid,
+      s.costing_meth,
+      s.unit,
+      s.data,
+      s.category_level_1,
+      s.category_level_2,
+      NOW()
+    FROM app.stock s
+    ON CONFLICT (id) DO UPDATE SET
+      fullname          = COALESCE(NULLIF(app.inventory.fullname, ''), EXCLUDED.fullname),
+      stockname         = COALESCE(app.inventory.stockname, EXCLUDED.stockname),
+      guid              = COALESCE(app.inventory.guid, EXCLUDED.guid),
+      masterid          = COALESCE(app.inventory.masterid, EXCLUDED.masterid),
+      costing_meth      = COALESCE(app.inventory.costing_meth, EXCLUDED.costing_meth),
+      unit              = COALESCE(app.inventory.unit, EXCLUDED.unit),
+      data              = COALESCE(app.inventory.data, EXCLUDED.data),
+      category_level_1  = COALESCE(app.inventory.category_level_1, EXCLUDED.category_level_1),
+      category_level_2  = COALESCE(app.inventory.category_level_2, EXCLUDED.category_level_2)
+  `);
+  await neonDb.query('CREATE INDEX IF NOT EXISTS idx_inventory_id ON app.inventory (id)').catch(() => {});
+}
+
+/**
  * Inventory control overview: total stock items + all access groups.
  * @returns {Promise<{totalItems: number, accessGroups: object[]}>}
  *   accessGroups rows [{ id, name, created_at }]
  * @route Used by GET /api/admin/inventory/control
  */
 async function getInventoryControl() {
-  const countResult = await neonDb.query('SELECT COUNT(*) AS items FROM app.stock');
+  const countResult = await neonDb.query('SELECT COUNT(*) AS items FROM app.inventory WHERE isblocked IS NOT TRUE');
   const groupsResult = await neonDb.query('SELECT id, name, created_at FROM app.access_groups ORDER BY name');
   return {
     totalItems: parseInt(countResult.rows[0].items),
@@ -372,31 +397,29 @@ async function getInventoryControl() {
 }
 
 /**
- * Single stock detail. Reads app.stock LEFT JOIN app.inventory so items that
- * exist only in app.stock (no inventory row yet) still resolve.
- * @param {number} id - app.stock.id (= app.inventory.id)
- * @returns {Promise<object|undefined>} merged row (stock + inventory columns), or undefined
+ * Single stock detail. Reads app.inventory (the unified item table).
+ * @param {number} id - app.inventory.id
+ * @returns {Promise<object|undefined>} merged row, or undefined
  * @route Used by GET /api/admin/inventory/stock/:id
  */
 async function getStockDetail(id) {
   const result = await neonDb.query(
-    `SELECT s.id, s.stockname, s.quantity, s.price,
-            inv.fullname, inv.brand, inv.model, inv.varient, inv.color,
-            inv.gst, inv.quantity AS inv_quantity, inv.price AS inv_price
-     FROM app.stock s
-     LEFT JOIN app.inventory inv ON inv.id = s.id
-     WHERE s.id = $1`,
+    `SELECT id, stockname,
+            COALESCE(fullname, stockname) AS name,
+            fullname, brand, model, varient, color, gst,
+            quantity AS qty, quantity AS inv_quantity,
+            price, price AS inv_price
+     FROM app.inventory
+     WHERE id = $1 AND isblocked IS NOT TRUE`,
     [id]
   );
   return result.rows[0];
 }
 
 /**
- * Save stock detail — updates app.inventory and app.stock for the same id.
- * When no app.inventory row exists yet, one is created (upsert), mirroring
- * the list page which shows stock-only items via LEFT JOIN.
+ * Save stock detail — upserts the app.inventory row for the given id.
  * @param {object} input
- * @param {number} input.id - stock id
+ * @param {number} input.id - inventory item id
  * @param {string} [input.name]
  * @param {string} [input.brand]
  * @param {string} [input.model]
@@ -405,29 +428,17 @@ async function getStockDetail(id) {
  * @param {number} [input.qty]
  * @param {number} [input.price]
  * @param {number} [input.gst]
- * @returns {Promise<object|undefined>} updated app.inventory row, or undefined when id missing
+ * @returns {Promise<object>} upserted app.inventory row
  * @route Used by POST /api/admin/inventory/stock/:id
  */
 async function saveStockDetail({ id, name, brand, model, variant, color, qty, price, gst }) {
-  const stockCheck = await neonDb.query('SELECT id FROM app.stock WHERE id = $1', [id]);
-  if (!stockCheck.rows[0]) return undefined;
-
   const inventoryResult = await neonDb.query(
-    `INSERT INTO app.inventory (id, fullname, brand, model, varient, color, quantity, price, gst, created_at, updated_at)
-     VALUES ($9, $1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
-     ON CONFLICT (id) DO UPDATE SET
-       fullname = EXCLUDED.fullname, brand = EXCLUDED.brand, model = EXCLUDED.model,
-       varient = EXCLUDED.varient, color = EXCLUDED.color, quantity = EXCLUDED.quantity,
-       price = EXCLUDED.price, gst = EXCLUDED.gst, updated_at = NOW()
+    `UPDATE app.inventory
+     SET   fullname = $1, brand = $2, model = $3, varient = $4, color = $5,
+           quantity = $6, price = $7, gst = $8, updated_at = NOW()
+     WHERE id = $9
      RETURNING *`,
     [name, brand, model, variant, color, qty, price, gst, id]
-  );
-
-  await neonDb.query(
-    `UPDATE app.stock
-     SET stockname = $1, quantity = $2, price = $3, updated_at = NOW()
-     WHERE id = $4`,
-    [name, qty, price, id]
   );
 
   return inventoryResult.rows[0];
@@ -450,7 +461,7 @@ async function getAccessGroupDetail({ sku, group }) {
   const stockId = isNaN(Number(sku)) ? sku : Number(sku);
 
   const itemResult = await neonDb.query(
-    "SELECT id, stockname AS name, CAST(id AS TEXT) AS sku, quantity AS qty, price FROM app.stock WHERE id = $1",
+    "SELECT id, COALESCE(fullname, stockname) AS name, CAST(id AS TEXT) AS sku, (COALESCE(quantity,0) + COALESCE(vquantity,0)) AS qty, price FROM app.inventory WHERE id = $1 AND isblocked IS NOT TRUE",
     [stockId]
   );
   const item = itemResult.rows[0];
@@ -476,13 +487,13 @@ async function getAccessGroupDetail({ sku, group }) {
   `, [item.id]);
 
   const groupStocks = await neonDb.query(`
-    SELECT s.id, s.stockname AS name, COALESCE(inv.brand,'') AS brand, COALESCE(inv.model,'') AS model,
+    SELECT inv.id, COALESCE(inv.fullname, inv.stockname) AS name,
+           COALESCE(inv.brand,'') AS brand, COALESCE(inv.model,'') AS model,
            iag.quantity AS qty, iag.oprice AS price
-    FROM app.stock s
-    JOIN app.inventory_access_group iag ON iag.inventoryid = s.id
-    LEFT JOIN app.inventory inv ON inv.id = iag.inventoryid
-    WHERE iag.accessgroupid = $1
-    ORDER BY s.stockname
+    FROM app.inventory inv
+    JOIN app.inventory_access_group iag ON iag.inventoryid = inv.id
+    WHERE iag.accessgroupid = $1 AND inv.isblocked IS NOT TRUE
+    ORDER BY COALESCE(inv.fullname, inv.stockname)
   `, [groupRow ? groupRow.id : 0]);
 
   return { item, groupRow, iaRow, allAgRows: allAg.rows, groupStocksRows: groupStocks.rows };
@@ -495,7 +506,7 @@ async function getAccessGroupDetail({ sku, group }) {
  * @route Used by POST/PUT/DELETE /api/admin/inventory/sku/:sku/access-group/:group, POST /api/admin/inventory/access/upload
  */
 async function findStockId(sku) {
-  const result = await neonDb.query('SELECT id FROM app.stock WHERE id = $1', [isNaN(Number(sku)) ? sku : Number(sku)]);
+  const result = await neonDb.query('SELECT id FROM app.inventory WHERE id = $1 AND isblocked IS NOT TRUE', [isNaN(Number(sku)) ? sku : Number(sku)]);
   return result.rows[0];
 }
 
@@ -602,9 +613,9 @@ async function getAccessGroupStocks(name) {
 
   const rows = await neonDb.query(`
     SELECT
-      s.id,
-      CAST(s.id AS TEXT) AS sku,
-      s.stockname AS name,
+      inv.id,
+      CAST(inv.id AS TEXT) AS sku,
+      COALESCE(inv.fullname, inv.stockname) AS name,
       COALESCE(inv.brand, '') AS brand,
       COALESCE(inv.model, '') AS model,
       COALESCE(inv.varient, '') AS variant,
@@ -613,11 +624,10 @@ async function getAccessGroupStocks(name) {
       iag.oprice AS price,
       inv.gst,
       '' AS hsn
-    FROM app.stock s
-    JOIN app.inventory_access_group iag ON iag.inventoryid = s.id
-    LEFT JOIN app.inventory inv ON inv.id = iag.inventoryid
-    WHERE iag.accessgroupid = $1
-    ORDER BY s.stockname
+    FROM app.inventory inv
+    JOIN app.inventory_access_group iag ON iag.inventoryid = inv.id
+    WHERE iag.accessgroupid = $1 AND inv.isblocked IS NOT TRUE
+    ORDER BY COALESCE(inv.fullname, inv.stockname)
   `, [group.id]);
 
   return { group, rows: rows.rows };
@@ -820,7 +830,7 @@ async function getDashboardStats() {
   const ts = await neonDb.query("SELECT COALESCE(SUM(bill_amt),0) AS total, COUNT(*) AS orders FROM app.sales_records WHERE sales_date = CURRENT_DATE");
   const ys = await neonDb.query("SELECT COALESCE(SUM(bill_amt),0) AS total FROM app.sales_records WHERE sales_date = CURRENT_DATE - 1");
   const sm = await neonDb.query("SELECT salesman AS name, SUM(bill_amt) AS amount FROM app.sales_records WHERE sales_date = CURRENT_DATE AND salesman IS NOT NULL AND salesman != '' GROUP BY salesman ORDER BY amount DESC LIMIT 1");
-  const sv = await neonDb.query("SELECT COALESCE(SUM(quantity * price),0) AS total FROM app.stock");
+  const sv = await neonDb.query("SELECT COALESCE(SUM(quantity * price),0) AS total FROM app.inventory WHERE isblocked IS NOT TRUE");
   return {
     today: ts.rows[0],
     yesterday: ys.rows[0],
@@ -855,7 +865,7 @@ async function getDashboardMonthlyTrend() {
  * @route Used by GET /api/admin/dashboard/product-share
  */
 async function getProductShare() {
-  const result = await neonDb.query("SELECT stockname AS name, COALESCE(quantity, 0) AS value FROM app.stock ORDER BY quantity DESC LIMIT 10");
+  const result = await neonDb.query("SELECT COALESCE(fullname, stockname) AS name, COALESCE(quantity, 0) AS value FROM app.inventory WHERE isblocked IS NOT TRUE ORDER BY quantity DESC LIMIT 10");
   return result.rows;
 }
 
@@ -1193,8 +1203,8 @@ async function getMarketOverview() {
     neonDb.query("SELECT COALESCE(SUM(bill_amt),0) AS total FROM app.sales_records WHERE sales_date >= CURRENT_DATE - 60 AND sales_date < CURRENT_DATE - 30"),
     neonDb.query("SELECT COALESCE(SUM(bill_amt),0) AS vol FROM app.sales_records WHERE sales_date = CURRENT_DATE"),
     neonDb.query("SELECT COALESCE(SUM(bill_amt),0) AS vol FROM app.sales_records WHERE sales_date = CURRENT_DATE - 1"),
-    neonDb.query("SELECT stockname, quantity, price, (COALESCE(quantity,0) * COALESCE(price,0)) AS total_value FROM app.stock ORDER BY total_value DESC LIMIT 10"),
-    neonDb.query("SELECT COUNT(*) AS cnt FROM app.stock"),
+    neonDb.query("SELECT COALESCE(fullname, stockname) AS stockname, quantity, price, (COALESCE(quantity,0) * COALESCE(price,0)) AS total_value FROM app.inventory WHERE isblocked IS NOT TRUE ORDER BY total_value DESC LIMIT 10"),
+    neonDb.query("SELECT COUNT(*) AS cnt FROM app.inventory WHERE isblocked IS NOT TRUE"),
     neonDb.query("SELECT COALESCE(NULLIF(parent, ''), 'Other') AS region, SUM(bill_amt) AS sales FROM app.sales_records WHERE sales_date >= CURRENT_DATE - 30 GROUP BY region ORDER BY sales DESC LIMIT 5"),
   ]);
   return { now30, prev30, todaySales, yesterdaySales, topProducts, stockCount, regionData };
@@ -1219,7 +1229,7 @@ async function getMarketSalesTrend() {
  */
 async function getMarketCategoryData() {
   const result = await neonDb.query(
-    "SELECT stockname, quantity, price, (COALESCE(quantity,0) * COALESCE(price,0)) AS total FROM app.stock ORDER BY total DESC LIMIT 10"
+    "SELECT COALESCE(fullname, stockname) AS stockname, quantity, price, (COALESCE(quantity,0) * COALESCE(price,0)) AS total FROM app.inventory WHERE isblocked IS NOT TRUE ORDER BY total DESC LIMIT 10"
   );
   return result.rows;
 }
@@ -1416,7 +1426,7 @@ async function listPublicTables() {
  */
 async function getMasterCounts() {
   const [stock, ledger, voucher, godown] = await Promise.all([
-    neonDb.query("SELECT COUNT(*) FROM app.stock"),
+    neonDb.query("SELECT COUNT(*) FROM app.inventory WHERE isblocked IS NOT TRUE"),
     neonDb.query("SELECT COUNT(*) FROM app.ledger"),
     neonDb.query("SELECT COUNT(*) FROM app.vouchers"),
     neonDb.query("SELECT COUNT(*) FROM godowns"),
@@ -1481,6 +1491,7 @@ module.exports = {
   listInventoryStock,
   listInventorySku,
   migratePartnerSku,
+  ensureInventoryUnification,
   getInventoryControl,
   getStockDetail,
   saveStockDetail,

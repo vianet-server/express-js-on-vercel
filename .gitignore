@@ -11,3 +11,6 @@ user-template.json
 .env.vianet-dev
 .env*
 private
+tmp-inspect.cjs
+tmp-pnl-analysis.cjs
+migrations/unify_inventory.sql

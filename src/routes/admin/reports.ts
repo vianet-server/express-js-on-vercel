@@ -72,6 +72,9 @@ router.get('/pnl-monthly', async (req, res) => {
     // Format the response. `history` is sorted DESC by month in the query.
     // Tolerates two stored shapes for `data`: { rows: [...] } and the
     // double-wrapped sync payload { month: "...", data: { rows: [...] } }.
+    // Zero-amount sub-ledgers (e.g. "Audit Fees", "Rent A/c") are Tally
+    // ledgers exported under a group even with no activity — strip them so
+    // they never reach the UI.
     const result = history.map((h: any) => {
       const payload = Array.isArray(h.data?.rows) ? h.data : h.data?.data;
       let rows = (payload?.rows || []).map((r: any, i: number) => ({
@@ -79,10 +82,12 @@ router.get('/pnl-monthly', async (req, res) => {
         label: r.name || 'Unknown',
         amount: Math.abs(parseFloat(r.amount) || 0),
         type: (parseFloat(r.amount) || 0) >= 0 ? 'income' : 'expense',
-        subs: (Array.isArray(r.children) ? r.children : []).map((c: any) => ({
-          label: c.name || 'Unknown',
-          amount: parseFloat(c.amount) || 0,
-        })),
+        subs: (Array.isArray(r.children) ? r.children : [])
+          .filter((c: any) => (parseFloat(c.amount) || 0) !== 0)
+          .map((c: any) => ({
+            label: c.name || 'Unknown',
+            amount: parseFloat(c.amount) || 0,
+          })),
       }));
       rows.sort((a: any, b: any) => b.amount - a.amount);
       return { month: h.month, data: rows };

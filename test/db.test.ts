@@ -140,10 +140,10 @@ describe('shared query helpers', () => {
     expect(paramsAt(0)).toEqual(['E2', 'A', null, null, null, 2]);
   });
 
-  it('createStockItemGuid inserts with guid and masterid 0', async () => {
+  it('createStockItemGuid inserts into app.inventory with guid', async () => {
     mockNeonDb.query.mockResolvedValueOnce(row({ id: 1, stockname: 'N' }));
     const out = await shared.createStockItemGuid({ name: 'N', guid: 'g', quantity: 5, price: 10 });
-    expect(sqlAt(0)).toContain('INSERT INTO app.stock (stockname, guid, quantity, price, masterid, created_at, updated_at)');
+    expect(sqlAt(0)).toContain('INSERT INTO app.inventory (fullname, stockname, guid, quantity, price, category_level_1, category_level_2, created_at, updated_at)');
     expect(paramsAt(0)).toEqual(['N', 'g', 5, 10]);
     expect(out.id).toBe(1);
   });
@@ -151,15 +151,19 @@ describe('shared query helpers', () => {
   it('updateStockItemById updates by id', async () => {
     mockNeonDb.query.mockResolvedValueOnce(row({ id: 1, stockname: 'N' }));
     await shared.updateStockItemById({ id: 1, name: 'N', quantity: 2, price: 3 });
-    expect(sqlAt(0)).toBe('UPDATE app.stock SET stockname = $1, quantity = $2, price = $3, updated_at = NOW() WHERE id = $4 RETURNING *');
-    expect(paramsAt(0)).toEqual(['N', 2, 3, 1]);
+    expect(sqlAt(0)).toContain('UPDATE app.inventory SET fullname = COALESCE($1, fullname), stockname = COALESCE($1, stockname)');
+    expect(paramsAt(0)).toEqual(['N', 2, 3, undefined, undefined, 1]);
   });
 
-  it('deleteStockItemById deletes by id', async () => {
-    mockNeonDb.query.mockResolvedValueOnce(row({ id: 1 }));
-    await shared.deleteStockItemById(1);
-    expect(sqlAt(0)).toBe('DELETE FROM app.stock WHERE id = $1 RETURNING id');
-    expect(paramsAt(0)).toEqual([1]);
+  it('deleteStockItemById removes mappings then deletes by id', async () => {
+    mockNeonDb.query
+      .mockResolvedValueOnce(rows())
+      .mockResolvedValueOnce(row({ id: 1 }));
+    const out = await shared.deleteStockItemById(1);
+    expect(sqlAt(0)).toBe('DELETE FROM app.inventory_access_group WHERE inventoryid = $1');
+    expect(sqlAt(1)).toBe('DELETE FROM app.inventory WHERE id = $1 RETURNING id');
+    expect(paramsAt(1)).toEqual([1]);
+    expect(out).toEqual({ id: 1 });
   });
 
   it('createLedger wraps address/mobile in arrays', async () => {
@@ -366,25 +370,25 @@ describe('admin stock & inventory helpers', () => {
       .mockResolvedValueOnce(rows({ count: '3' }))
       .mockResolvedValueOnce(rows({ id: 9, stockname: 'X' }));
     const out = await admin.listStockItemsAdmin({ name: 'X', limit: 10, offset: 0 });
-    expect(sqlAt(0)).toBe('SELECT COUNT(*) FROM app.stock WHERE 1=1 AND stockname ILIKE $1');
+    expect(sqlAt(0)).toBe('SELECT COUNT(*) FROM app.inventory WHERE 1=1 AND isblocked IS NOT TRUE AND COALESCE(fullname, stockname) ILIKE $1');
     expect(paramsAt(0)).toEqual(['%X%']);
     expect(sqlAt(1)).toContain('ORDER BY id DESC LIMIT $2 OFFSET $3');
     expect(paramsAt(1)).toEqual(['%X%', 10, 0]);
     expect(out.total).toBe(3);
   });
 
-  it('createStockItemLegacy inserts without guid', async () => {
+  it('createStockItemLegacy inserts into app.inventory without guid', async () => {
     mockNeonDb.query.mockResolvedValueOnce(row({ id: 1, stockname: 'N' }));
     await admin.createStockItemLegacy({ name: 'N', quantity: 2, price: 3 });
-    expect(sqlAt(0)).toContain('INSERT INTO app.stock (stockname, quantity, price, created_at, updated_at)');
+    expect(sqlAt(0)).toContain('INSERT INTO app.inventory (fullname, stockname, quantity, price, created_at, updated_at)');
     expect(paramsAt(0)).toEqual(['N', 2, 3]);
   });
 
   it('listStockItemsLegacy applies name and sku filters', async () => {
     mockNeonDb.query.mockResolvedValueOnce(rows());
-    await admin.listStockItemsLegacy({ name: 'N', sku: 's' });
-    expect(sqlAt(0)).toBe('SELECT * FROM app.stock WHERE 1=1 AND name ILIKE $1 AND sku = $2');
-    expect(paramsAt(0)).toEqual(['%N%', 's']);
+    await admin.listStockItemsLegacy({ name: 'N', sku: '7' });
+    expect(sqlAt(0)).toBe('SELECT * FROM app.inventory WHERE 1=1 AND isblocked IS NOT TRUE AND COALESCE(fullname, stockname) ILIKE $1 AND id = $2');
+    expect(paramsAt(0)).toEqual(['%N%', 7]);
   });
 
   it('listDistinctBrands maps rows to brand strings', async () => {
@@ -399,34 +403,30 @@ describe('admin stock & inventory helpers', () => {
       .mockResolvedValueOnce(rows({ count: '2' }))
       .mockResolvedValueOnce(rows({ id: 1, stockname: 'X', brand: 'B' }));
     const out = await admin.listInventoryStock({ search: 'X', brand: 'B', limit: 10, offset: 0 });
-    expect(sqlAt(0)).toContain('SELECT COUNT(*) FROM app.stock s');
-    expect(sqlAt(0)).toContain('(s.stockname ILIKE $1 OR inv.brand ILIKE $1 OR inv.model ILIKE $1 OR inv.fullname ILIKE $1 OR s.category_level_1 ILIKE $1)');
+    expect(sqlAt(0)).toContain('SELECT COUNT(*) FROM app.inventory inv');
+    expect(sqlAt(0)).toContain('(inv.stockname ILIKE $1 OR inv.brand ILIKE $1 OR inv.model ILIKE $1 OR inv.fullname ILIKE $1 OR inv.category_level_1 ILIKE $1)');
     expect(sqlAt(0)).toContain('AND inv.brand ILIKE $2');
     expect(paramsAt(0)).toEqual(['%X%', 'B']);
-    expect(sqlAt(1)).toContain('ORDER BY COALESCE(NULLIF(inv.fullname, \'\'), s.stockname) ASC LIMIT $3 OFFSET $4');
+    expect(sqlAt(1)).toContain('ORDER BY COALESCE(NULLIF(inv.fullname, \'\'), inv.stockname) ASC LIMIT $3 OFFSET $4');
     expect(paramsAt(1)).toEqual(['%X%', 'B', 10, 0]);
     expect(out.total).toBe(2);
     expect(out.rows[0].brand).toBe('B');
   });
 
-  it('listInventorySku uses the joined query when schema has brand/model columns', async () => {
-    mockNeonDb.query
-      .mockResolvedValueOnce(rows({ column_name: 'brand' }, { column_name: 'model' }))
-      .mockResolvedValueOnce(rows({ id: 1, name: 'X' }));
+  it('listInventorySku reads app.inventory with per-group aggregation', async () => {
+    mockNeonDb.query.mockResolvedValueOnce(rows({ id: 1, name: 'X' }));
     const out = await admin.listInventorySku({ brand: 'B' });
-    expect(sqlAt(0)).toContain('information_schema.columns');
-    expect(sqlAt(1)).toContain('json_agg');
-    expect(sqlAt(1)).toContain('WHERE inv.brand ILIKE $1');
-    expect(paramsAt(1)).toEqual(['%B%']);
+    expect(sqlAt(0)).toContain('FROM app.inventory s');
+    expect(sqlAt(0)).toContain('json_agg');
+    expect(sqlAt(0)).toContain('WHERE s.isblocked IS NOT TRUE AND s.brand ILIKE $1');
+    expect(paramsAt(0)).toEqual(['%B%']);
     expect(out[0].name).toBe('X');
   });
 
-  it('listInventorySku falls back to the plain query when schema lacks columns', async () => {
-    mockNeonDb.query
-      .mockResolvedValueOnce(rows())
-      .mockResolvedValueOnce(rows({ id: 1, name: 'X' }));
+  it('listInventorySku lists all items when no brand filter', async () => {
+    mockNeonDb.query.mockResolvedValueOnce(rows({ id: 1, name: 'X' }));
     const out = await admin.listInventorySku({});
-    expect(sqlAt(1)).not.toContain('json_agg');
+    expect(sqlAt(0)).toContain('json_agg');
     expect(out).toHaveLength(1);
   });
 
@@ -444,32 +444,21 @@ describe('admin stock & inventory helpers', () => {
     expect(out).toEqual({ totalItems: 42, accessGroups: [{ id: 1, name: 'G' }] });
   });
 
-  it('getStockDetail joins stock with inventory so stock-only items resolve', async () => {
+  it('getStockDetail reads the unified app.inventory row', async () => {
     mockNeonDb.query.mockResolvedValueOnce(row({ id: 5, stockname: 'X' }));
     await admin.getStockDetail(5);
-    expect(sqlAt(0)).toContain('FROM app.stock s LEFT JOIN app.inventory inv ON inv.id = s.id');
-    expect(sqlAt(0)).toContain('WHERE s.id = $1');
+    expect(sqlAt(0)).toContain('FROM app.inventory');
+    expect(sqlAt(0)).toContain('WHERE id = $1');
     expect(paramsAt(0)).toEqual([5]);
   });
 
-  it('saveStockDetail rejects unknown stock ids', async () => {
-    mockNeonDb.query.mockResolvedValueOnce(rows());
-    const out = await admin.saveStockDetail({ id: 999, name: 'N' });
-    expect(out).toBeUndefined();
-    expect(mockNeonDb.query).toHaveBeenCalledTimes(1);
-  });
-
-  it('saveStockDetail upserts inventory then updates stock and returns the inventory row', async () => {
-    mockNeonDb.query
-      .mockResolvedValueOnce(row({ id: 5 }))
-      .mockResolvedValueOnce(row({ id: 5, fullname: 'N' }))
-      .mockResolvedValueOnce(rows());
+  it('saveStockDetail updates the inventory row by id and returns it', async () => {
+    mockNeonDb.query.mockResolvedValueOnce(row({ id: 5, fullname: 'N' }));
     const out = await admin.saveStockDetail({ id: 5, name: 'N', brand: 'B', model: 'M', variant: 'V', color: 'C', qty: 2, price: 3, gst: 18 });
-    expect(sqlAt(1)).toContain('INSERT INTO app.inventory');
-    expect(sqlAt(1)).toContain('ON CONFLICT (id) DO UPDATE');
-    expect(paramsAt(1)).toEqual(['N', 'B', 'M', 'V', 'C', 2, 3, 18, 5]);
-    expect(sqlAt(2)).toContain('UPDATE app.stock');
-    expect(paramsAt(2)).toEqual(['N', 2, 3, 5]);
+    expect(sqlAt(0)).toContain('UPDATE app.inventory');
+    expect(sqlAt(0)).toContain('WHERE id = $9');
+    expect(paramsAt(0)).toEqual(['N', 'B', 'M', 'V', 'C', 2, 3, 18, 5]);
+    expect(mockNeonDb.query).toHaveBeenCalledTimes(1);
     expect(out).toEqual({ id: 5, fullname: 'N' });
   });
 });
@@ -487,7 +476,7 @@ describe('admin access-group mapping helpers', () => {
       .mockResolvedValueOnce(rows({ group: 'Retail', qty: 2, price: 3 }))
       .mockResolvedValueOnce(rows({ id: 7, name: 'N' }));
     const out = await admin.getAccessGroupDetail({ sku: '7', group: 'Retail' });
-    expect(sqlAt(0)).toContain('FROM app.stock WHERE id = $1');
+    expect(sqlAt(0)).toContain('FROM app.inventory WHERE id = $1');
     expect(paramsAt(0)).toEqual([7]);
     expect(sqlAt(1)).toBe('SELECT id, name FROM app.access_groups WHERE name = $1');
     expect(out.item).toEqual({ id: 7, name: 'N', sku: '7', qty: 2, price: 3 });
@@ -507,7 +496,7 @@ describe('admin access-group mapping helpers', () => {
   it('findStockId coerces numeric sku', async () => {
     mockNeonDb.query.mockResolvedValueOnce(row({ id: 5 }));
     await admin.findStockId('5');
-    expect(sqlAt(0)).toBe('SELECT id FROM app.stock WHERE id = $1');
+    expect(sqlAt(0)).toBe('SELECT id FROM app.inventory WHERE id = $1 AND isblocked IS NOT TRUE');
     expect(paramsAt(0)).toEqual([5]);
   });
 
@@ -696,7 +685,7 @@ describe('admin dashboard & analytics helpers', () => {
       .mockResolvedValueOnce(row({ total: '25.5' }));
     const out = await admin.getDashboardStats();
     expect(sqlAt(0)).toContain('FROM app.sales_records WHERE sales_date = CURRENT_DATE');
-    expect(sqlAt(3)).toContain('FROM app.stock');
+    expect(sqlAt(3)).toContain('FROM app.inventory');
     expect(out).toEqual({
       today: { total: '100', orders: '2' },
       yesterday: { total: '50' },
@@ -843,7 +832,7 @@ describe('admin market helpers', () => {
     expect(out).toHaveProperty('topProducts');
     expect(out).toHaveProperty('stockCount');
     expect(out).toHaveProperty('regionData');
-    expect(out.now30.orders).toBe(1);
+    expect(out.now30.rows[0].orders).toBe(1);
   });
 
   it('getMarketSalesTrend groups by sales_date', async () => {
@@ -1010,7 +999,8 @@ describe('public api query helpers', () => {
   it('listStockItemsForUser uses the admin query for admins', async () => {
     mockNeonDb.query.mockResolvedValueOnce(rows({ id: 1 }));
     const out = await api.listStockItemsForUser({ isAdmin: true, userId: 1, name: 'X' });
-    expect(sqlAt(0)).toBe('SELECT s.* FROM app.stock s WHERE 1=1 AND s.stockname ILIKE $1');
+    expect(sqlAt(0)).toContain('SELECT inv.*, COALESCE(inv.fullname, inv.stockname) AS name FROM app.inventory inv WHERE 1=1');
+    expect(sqlAt(0)).toContain('AND COALESCE(inv.fullname, inv.stockname) ILIKE $1');
     expect(paramsAt(0)).toEqual(['%X%']);
     expect(out).toHaveLength(1);
   });
@@ -1018,9 +1008,10 @@ describe('public api query helpers', () => {
   it('listStockItemsForUser joins access groups for non-admins', async () => {
     mockNeonDb.query.mockResolvedValueOnce(rows({ id: 1 }));
     const out = await api.listStockItemsForUser({ isAdmin: false, userId: 7, name: 'X' });
-    expect(sqlAt(0)).toContain('FROM app.stock s INNER JOIN app.inventory_access_group iag');
+    expect(sqlAt(0)).toContain('FROM app.inventory inv');
+    expect(sqlAt(0)).toContain('INNER JOIN app.inventory_access_group iag ON iag.inventoryid = inv.id');
     expect(sqlAt(0)).toContain('u.id = $1');
-    expect(sqlAt(0)).toContain('s.stockname ILIKE $2');
+    expect(sqlAt(0)).toContain('COALESCE(inv.fullname, inv.stockname) ILIKE $2');
     expect(paramsAt(0)).toEqual([7, '%X%']);
     expect(out).toHaveLength(1);
   });
@@ -1056,11 +1047,11 @@ describe('public api query helpers', () => {
       .mockResolvedValueOnce(row({ total: 3 }))
       .mockResolvedValueOnce(rows({ id: 1, name: 'X' }));
     const out = await api.listProductsV1({ accessGroupId: 2, search: 'X', page: 2, limit: 10 });
-    expect(sqlAt(0)).toContain('SELECT COUNT(*)::int AS total FROM app.stock s');
+    expect(sqlAt(0)).toContain('SELECT COUNT(*)::int AS total FROM app.inventory s');
     expect(sqlAt(0)).toContain('INNER JOIN app.inventory_access_group iag ON iag.inventoryid = s.id AND iag.accessgroupid = $1');
-    expect(paramsAt(0)).toEqual([2]);
-    expect(sqlAt(1)).toContain('(s.stockname ILIKE $2 OR CAST(s.id AS TEXT) ILIKE $2)');
-    expect(sqlAt(1)).toContain('ORDER BY s.stockname LIMIT $3 OFFSET $4');
+    expect(paramsAt(0)).toEqual([2, '%X%']);
+    expect(sqlAt(1)).toContain('(COALESCE(s.fullname, s.stockname) ILIKE $2 OR CAST(s.id AS TEXT) ILIKE $2)');
+    expect(sqlAt(1)).toContain('ORDER BY COALESCE(s.fullname, s.stockname) LIMIT $3 OFFSET $4');
     expect(paramsAt(1)).toEqual([2, '%X%', 10, 10]);
     expect(out.total).toBe(3);
     expect(out.rows).toHaveLength(1);
@@ -1080,7 +1071,7 @@ describe('public api query helpers', () => {
       .mockResolvedValueOnce(row({ id: 1, name: 'X', qty: 2, price: 3 }))
       .mockResolvedValueOnce(rows());
     const out = await api.createProductV1({ name: 'X', quantity: 2, price: 3, accessGroupId: 2 });
-    expect(sqlAt(0)).toContain('INSERT INTO app.stock (stockname, quantity, price, created_at, updated_at)');
+    expect(sqlAt(0)).toContain('INSERT INTO app.inventory (fullname, stockname, quantity, price, category_level_1, category_level_2, created_at, updated_at)');
     expect(paramsAt(0)).toEqual(['X', 2, 3]);
     expect(sqlAt(1)).toContain('INSERT INTO app.inventory_access_group');
     expect(paramsAt(1)).toEqual([1, 2, 2, 3]);
@@ -1092,8 +1083,9 @@ describe('public api query helpers', () => {
       .mockResolvedValueOnce(row({ id: 1 }))
       .mockResolvedValueOnce(rows());
     await api.updateProductV1({ id: 1, name: 'X', quantity: 5, price: 6, accessGroupId: 2 });
-    expect(sqlAt(0)).toContain('UPDATE app.stock SET stockname = COALESCE($1, stockname)');
-    expect(paramsAt(0)).toEqual(['X', 5, 6, 1]);
+    expect(sqlAt(0)).toContain('UPDATE app.inventory');
+    expect(sqlAt(0)).toContain('fullname = COALESCE($1, fullname), stockname = COALESCE($1, stockname)');
+    expect(paramsAt(0)).toEqual(['X', 5, 6, null, null, 1]);
     expect(sqlAt(1)).toContain('UPDATE app.inventory_access_group');
     expect(paramsAt(1)).toEqual([5, 6, 1, 2]);
   });

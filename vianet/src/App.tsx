@@ -11,7 +11,7 @@ import {
   Login,
   Signup,
   AppLogin,
-
+  Email,
   EmployLogin,
   EmploySignup,
   Home,
@@ -154,6 +154,7 @@ const router = createBrowserRouter([
       { path: 'dashboard', element: <Dashboard /> },
       { path: 'analytics', element: <Analytics /> },
       { path: 'market', element: <Market /> },
+      { path: 'email', element: <Email /> },
       { path: 'balance-sheet', element: <BalanceSheet /> },
       { path: 'outstanding', element: <Outstanding /> },
       { path: 'pnl', element: <Pnl /> },

@@ -24,3 +24,4 @@ export {
   EmploySocialUpload,
   EmploySetting,
 } from './employPages';
+export { Email } from './adminPages/email';

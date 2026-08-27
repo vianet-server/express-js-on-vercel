@@ -1,0 +1,8 @@
+No tests found, exiting with code 1
+Run with `--passWithNoTests` to exit with code 0
+In D:\vercel\express\express-js-on-vercel
+  4 files checked.
+  testMatch: **/*.test.ts - 4 matches
+  testPathIgnorePatterns: \\node_modules\\ - 4 matches
+  testRegex:  - 0 matches
+Pattern: ;|findstr|/n|Test Suites:\|Tests:\|FAIL|output.txt - 0 matches

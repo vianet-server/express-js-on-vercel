@@ -1,5 +1,5 @@
 export { EmployLogin } from './auth/employlogin'
-export { EmploySignup } from './auth/employsignup'
+export { EmploySignup  } from './auth/employsignup'
 export { EmployHome } from './home'
 export { EmployDashboard } from './dashboard'
 export { EmployNotification } from './notification'

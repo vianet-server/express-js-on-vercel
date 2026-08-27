@@ -8,6 +8,15 @@ const employeeRoutes = require('./routes/employee/index');
 
 const app = express();
 
+// Inventory unification (Option B): make app.inventory the single source of
+// truth. Idempotent — extends app.inventory from app.stock and backfills rows.
+// Fire-and-forget so a DB hiccup never blocks server boot. Skipped under Jest.
+if (!process.env.JEST_WORKER_ID) {
+  require('./config/dbqueries/admin').ensureInventoryUnification().catch(
+    (err: any) => console.error('[startup] inventory unification failed:', err.message)
+  );
+}
+
 app.use(cors({
   origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
   credentials: true,

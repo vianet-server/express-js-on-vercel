@@ -20,30 +20,32 @@ const shared = require('./shared');
  * Build the optional inventory_access_group INNER JOIN used to scope v1 queries
  * to the API key's access group.
  * @param {number|null} accessGroupId - app.access_groups.id (null = unscoped)
- * @param {string} baseQuery - the SELECT ... FROM app.stock s text
+ * @param {string} baseQuery - the SELECT ... FROM app.inventory s text
  * @param {any[]} [params] - existing query params
  * @returns {{ text: string, params: any[] }} final query text + params
  */
 function scopedV1Query(accessGroupId, baseQuery, params: any[] = []) {
   let idx = params.length + 1;
+  let text = baseQuery;
   if (accessGroupId) {
-    return {
-      text: `${baseQuery} INNER JOIN app.inventory_access_group iag ON iag.inventoryid = s.id AND iag.accessgroupid = $${idx++}`,
-      params: [...params, accessGroupId],
-    };
+    text += ` INNER JOIN app.inventory_access_group iag ON iag.inventoryid = s.id AND iag.accessgroupid = $${idx++}`;
   }
-  return { text: baseQuery, params };
+  text += ' WHERE s.isblocked IS NOT TRUE';
+  return {
+    text,
+    params: accessGroupId ? [...params, accessGroupId] : params,
+  };
 }
 
 /**
  * List stock items for the public app catalog. Admins see all rows; other users
- * only see stock mapped to their access group (via inventory_access_group +
- * app.inventory), enriched with brand/model/varient/color/gst and group price/qty.
+ * only see inventory mapped to their access group (via inventory_access_group),
+ * enriched with brand/model/varient/color/gst and group price/qty.
  * @param {object} input
  * @param {boolean} input.isAdmin - true when the caller is an admin
  * @param {number} input.userId - caller's app.users.id (unused for admin)
- * @param {string} [input.name] - stockname filter (case-insensitive contains)
- * @returns {Promise<object[]>} stock rows (shape differs for admin vs user)
+ * @param {string} [input.name] - name filter (case-insensitive contains)
+ * @returns {Promise<object[]>} inventory rows (shape differs for admin vs user)
  * @route Used by GET /api/stock/stock-item
  */
 async function listStockItemsForUser({ isAdmin, userId, name }) {
@@ -51,12 +53,19 @@ async function listStockItemsForUser({ isAdmin, userId, name }) {
   let idx = 1;
   let query;
   if (isAdmin) {
-    query = 'SELECT s.* FROM app.stock s WHERE 1=1';
+    query = 'SELECT inv.*, COALESCE(inv.fullname, inv.stockname) AS name FROM app.inventory inv WHERE 1=1 AND inv.isblocked IS NOT TRUE';
   } else {
-    query = `SELECT s.id, s.guid, s.stockname, s.data, s.costing_meth, s.unit, s.masterid, COALESCE(inv.fullname, s.stockname) AS name, inv.brand, inv.model, inv.varient, inv.color, inv.gst, iag.oprice AS price, (COALESCE(inv.quantity, 0) + COALESCE(inv.vquantity, 0) + COALESCE(iag.quantity, 0)) AS quantity FROM app.stock s INNER JOIN app.inventory_access_group iag ON iag.inventoryid = s.id INNER JOIN app.users u ON u.id = $${idx++} AND u.access_group_id = iag.accessgroupid INNER JOIN app.inventory inv ON inv.id = iag.inventoryid`;
+    query = `SELECT inv.id, inv.guid, inv.stockname, inv.data, inv.costing_meth, inv.unit, inv.masterid,
+                    COALESCE(inv.fullname, inv.stockname) AS name, inv.brand, inv.model, inv.varient, inv.color, inv.gst,
+                    iag.oprice AS price,
+                    (COALESCE(inv.quantity, 0) + COALESCE(inv.vquantity, 0) + COALESCE(iag.quantity, 0)) AS quantity
+             FROM app.inventory inv
+             INNER JOIN app.inventory_access_group iag ON iag.inventoryid = inv.id
+             INNER JOIN app.users u ON u.id = $${idx++} AND u.access_group_id = iag.accessgroupid
+             WHERE 1=1 AND inv.isblocked IS NOT TRUE`;
     params.push(userId);
   }
-  if (name) { query += ` AND s.stockname ILIKE $${idx++}`; params.push(`%${name}%`); }
+  if (name) { query += ` AND COALESCE(inv.fullname, inv.stockname) ILIKE $${idx++}`; params.push(`%${name}%`); }
   const result = await neonDb.query(query, params);
   return result.rows;
 }
@@ -144,24 +153,22 @@ async function deleteOwnApiKey(id) {
  */
 async function listProductsV1({ accessGroupId, search, page, limit }) {
   const offset = (page - 1) * limit;
-  let baseWhere = 'WHERE 1=1';
-  const queryParams: any[] = [];
-  let idx = 1;
+  const selectCols = 'SELECT s.id, COALESCE(s.fullname, s.stockname) AS name, CAST(s.id AS TEXT) AS sku, (COALESCE(s.quantity, 0) + COALESCE(s.vquantity, 0)) AS qty, s.price, s.category_level_1, s.category_level_2, s.created_at, s.updated_at FROM app.inventory s';
+  let { text, params } = scopedV1Query(accessGroupId, selectCols);
+  let idx = params.length + 1;
   if (search) {
-    baseWhere += ` AND (s.stockname ILIKE $${idx} OR CAST(s.id AS TEXT) ILIKE $${idx})`;
-    queryParams.push(`%${search}%`);
+    text += ` AND (COALESCE(s.fullname, s.stockname) ILIKE $${idx} OR CAST(s.id AS TEXT) ILIKE $${idx})`;
+    params.push(`%${search}%`);
     idx++;
   }
-  const selectCols = 'SELECT s.id, s.stockname AS name, CAST(s.id AS TEXT) AS sku, s.quantity AS qty, s.price, s.category_level_1, s.category_level_2, s.created_at, s.updated_at FROM app.stock s';
-  const { text, params } = scopedV1Query(accessGroupId, selectCols, queryParams);
   const countResult = await neonDb.query(
-    `SELECT COUNT(*)::int AS total FROM app.stock s ${text.replace(selectCols, '')}`,
-    params
+    `SELECT COUNT(*)::int AS total FROM app.inventory s ${text.replace(selectCols, '')}`,
+    [...params]
   );
   const total = countResult.rows[0]?.total || 0;
   const dataResult = await neonDb.query(
-    `${text} ${baseWhere} ORDER BY s.stockname LIMIT $${idx} OFFSET $${idx + 1}`,
-    [...params, ...(search ? [`%${search}%`] : []), limit, offset]
+    `${text} ORDER BY COALESCE(s.fullname, s.stockname) LIMIT $${idx} OFFSET $${idx + 1}`,
+    [...params, limit, offset]
   );
   return { rows: dataResult.rows, total };
 }
@@ -175,7 +182,7 @@ async function listProductsV1({ accessGroupId, search, page, limit }) {
  * @route Used by GET /api/v1/products/:id
  */
 async function getProductV1({ accessGroupId, id }) {
-  const selectCols = 'SELECT s.id, s.stockname AS name, CAST(s.id AS TEXT) AS sku, s.quantity AS qty, s.price, s.category_level_1, s.category_level_2, s.created_at, s.updated_at FROM app.stock s';
+  const selectCols = 'SELECT s.id, COALESCE(s.fullname, s.stockname) AS name, CAST(s.id AS TEXT) AS sku, (COALESCE(s.quantity, 0) + COALESCE(s.vquantity, 0)) AS qty, s.price, s.category_level_1, s.category_level_2, s.created_at, s.updated_at FROM app.inventory s';
   const { text, params } = scopedV1Query(accessGroupId, selectCols);
   const result = await neonDb.query(
     `${text} AND s.id = $${params.length + 1}`,
@@ -199,7 +206,9 @@ async function getProductV1({ accessGroupId, id }) {
  */
 async function createProductV1({ name, quantity, price, category_level_1, category_level_2, accessGroupId }) {
   const result = await neonDb.query(
-    'INSERT INTO app.stock (stockname, quantity, price, category_level_1, category_level_2, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING id, stockname AS name, quantity AS qty, price, category_level_1, category_level_2, created_at, updated_at',
+    `INSERT INTO app.inventory (fullname, stockname, quantity, price, category_level_1, category_level_2, created_at, updated_at)
+     VALUES ($1, $1, $2, $3, $4, $5, NOW(), NOW())
+     RETURNING id, COALESCE(fullname, stockname) AS name, quantity AS qty, price, category_level_1, category_level_2, created_at, updated_at`,
     [name, quantity || 0, price || 0, category_level_1, category_level_2]
   );
   const product = result.rows[0];
@@ -228,7 +237,13 @@ async function createProductV1({ name, quantity, price, category_level_1, catego
  */
 async function updateProductV1({ id, name, quantity, price, category_level_1, category_level_2, accessGroupId }) {
   const result = await neonDb.query(
-    'UPDATE app.stock SET stockname = COALESCE($1, stockname), quantity = COALESCE($2, quantity), price = COALESCE($3, price), category_level_1 = COALESCE($4, category_level_1), category_level_2 = COALESCE($5, category_level_2), updated_at = NOW() WHERE id = $6 RETURNING id, stockname AS name, quantity AS qty, price, category_level_1, category_level_2, created_at, updated_at',
+    `UPDATE app.inventory
+     SET fullname = COALESCE($1, fullname), stockname = COALESCE($1, stockname),
+         quantity = COALESCE($2, quantity), price = COALESCE($3, price),
+         category_level_1 = COALESCE($4, category_level_1), category_level_2 = COALESCE($5, category_level_2),
+         updated_at = NOW()
+     WHERE id = $6
+     RETURNING id, COALESCE(fullname, stockname) AS name, quantity AS qty, price, category_level_1, category_level_2, created_at, updated_at`,
     [name ?? null, quantity ?? null, price ?? null, category_level_1 ?? null, category_level_2 ?? null, id]
   );
   const product = result.rows[0];
