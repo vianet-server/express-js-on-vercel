@@ -1,69 +1,96 @@
+import { lazy, Suspense, type ComponentType } from 'react';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
-import AppLayout from './layouts/AppLayout';
-import RootLayout from './layouts/RootLayout';
-import AuthLayout from './layouts/AuthLayout';
-import EmployLayout from './layouts/EmployLayout';
-import {
-  About,
-  Support,
-  PrivacyPolicy,
-  TermsOfService,
-  Login,
-  Signup,
-  AppLogin,
-  Email,
-  EmployLogin,
-  EmploySignup,
-  Home,
-  Inbox,
-  UserProfile,
-  ImportProduct,
-  NotFound,
-  AppStocks,
-  AppDeals,
-  AppInventory,
-  AppSetting,
-  EmployHome,
-  EmployDashboard,
-  EmployNotification,
-  EmployTallyStock,
-  EmployTallyLedger,
-  EmployTallyVoucher,
-  EmployTallyGodown,
-  EmploySocialHome,
-  EmploySocialAnalytics,
-  EmploySocialUpload,
-  EmploySetting,
-} from './pages';
-import AdminLayout from './layouts/AdminLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
-import {
-  Dashboard,
-  AdminLogin,
-  Analytics,
-  Market,
-  BalanceSheet,
-  Outstanding,
-  Pnl,
-  Daybook,
-  InventoryStock,
-  InventoryStockDetail,
-  InventoryControl,
-  InventorySku,
-  AccessGroupStocks,
-  Voucher,
-  Ledger,
-  StockItem,
-  Masters,
-  Salesman,
-  Profile,
-  Settings,
-  SettingsControl,
-  Api,
-  Sync,
-  AdminUsers,
-} from './adminPages';
 
+// ---------------------------------------------------------
+// 1. Fallback Loading UI (Shown while components load)
+// ---------------------------------------------------------
+const FullPageLoader = () => (
+  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+    <h2>Loading...</h2>
+  </div>
+);
+
+// ---------------------------------------------------------
+// 2. Lazy Load Layouts
+// ---------------------------------------------------------
+const RootLayout = lazy(() => import('./layouts/RootLayout'));
+const AppLayout = lazy(() => import('./layouts/AppLayout'));
+const AuthLayout = lazy(() => import('./layouts/AuthLayout'));
+const EmployLayout = lazy(() => import('./layouts/EmployLayout'));
+const AdminLayout = lazy(() => import('./layouts/AdminLayout'));
+
+// ---------------------------------------------------------
+// 3. Lazy Load Standard Pages (from './pages' barrel)
+// ---------------------------------------------------------
+const lazyPage = (name: keyof typeof import('./pages')) => 
+  lazy(() => import('./pages').then((module) => ({ default: module[name] as ComponentType<any> })));
+
+const About = lazyPage('About');
+const Support = lazyPage('Support');
+const PrivacyPolicy = lazyPage('PrivacyPolicy');
+const TermsOfService = lazyPage('TermsOfService');
+const Login = lazyPage('Login');
+const Signup = lazyPage('Signup');
+const AppLogin = lazyPage('AppLogin');
+const Email = lazyPage('Email');
+const EmployLogin = lazyPage('EmployLogin');
+const EmploySignup = lazyPage('EmploySignup');
+const Home = lazyPage('Home');
+const Inbox = lazyPage('Inbox');
+const UserProfile = lazyPage('UserProfile');
+const ImportProduct = lazyPage('ImportProduct');
+const NotFound = lazyPage('NotFound');
+const AppStocks = lazyPage('AppStocks');
+const AppDeals = lazyPage('AppDeals');
+const AppInventory = lazyPage('AppInventory');
+const AppSetting = lazyPage('AppSetting');
+const EmployHome = lazyPage('EmployHome');
+const EmployDashboard = lazyPage('EmployDashboard');
+const EmployNotification = lazyPage('EmployNotification');
+const EmployTallyStock = lazyPage('EmployTallyStock');
+const EmployTallyLedger = lazyPage('EmployTallyLedger');
+const EmployTallyVoucher = lazyPage('EmployTallyVoucher');
+const EmployTallyGodown = lazyPage('EmployTallyGodown');
+const EmploySocialHome = lazyPage('EmploySocialHome');
+const EmploySocialAnalytics = lazyPage('EmploySocialAnalytics');
+const EmploySocialUpload = lazyPage('EmploySocialUpload');
+const EmploySetting = lazyPage('EmploySetting');
+
+// ---------------------------------------------------------
+// 4. Lazy Load Admin Pages (from './adminPages' barrel)
+// ---------------------------------------------------------
+const lazyAdminPage = (name: keyof typeof import('./adminPages')) => 
+  lazy(() => import('./adminPages').then((module) => ({ default: module[name] as ComponentType<any> })));
+
+const Dashboard = lazyAdminPage('Dashboard');
+const AdminLogin = lazyAdminPage('AdminLogin');
+const Analytics = lazyAdminPage('Analytics');
+const Market = lazyAdminPage('Market');
+const BalanceSheet = lazyAdminPage('BalanceSheet');
+const Outstanding = lazyAdminPage('Outstanding');
+const Pnl = lazyAdminPage('Pnl');
+const Daybook = lazyAdminPage('Daybook');
+const InventoryStock = lazyAdminPage('InventoryStock');
+const InventoryStockDetail = lazyAdminPage('InventoryStockDetail');
+const InventoryControl = lazyAdminPage('InventoryControl');
+const InventorySku = lazyAdminPage('InventorySku');
+const AccessGroupStocks = lazyAdminPage('AccessGroupStocks');
+const Voucher = lazyAdminPage('Voucher');
+const Ledger = lazyAdminPage('Ledger');
+const StockItem = lazyAdminPage('StockItem');
+const Masters = lazyAdminPage('Masters');
+const Salesman = lazyAdminPage('Salesman');
+const Profile = lazyAdminPage('Profile');
+const Settings = lazyAdminPage('Settings');
+const SettingsControl = lazyAdminPage('SettingsControl');
+const Api = lazyAdminPage('Api');
+const Sync = lazyAdminPage('Sync');
+const AdminUsers = lazyAdminPage('AdminUsers');
+
+// ---------------------------------------------------------
+// 5. Router Configuration
+// ---------------------------------------------------------
 const router = createBrowserRouter([
   {
     path: '/',
@@ -181,5 +208,9 @@ const router = createBrowserRouter([
 ]);
 
 export default function App() {
-  return <RouterProvider router={router} />;
+  return (
+    <Suspense fallback={<FullPageLoader />}>
+      <RouterProvider router={router} />
+    </Suspense>
+  );
 }

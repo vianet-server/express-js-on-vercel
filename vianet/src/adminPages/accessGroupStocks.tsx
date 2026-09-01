@@ -200,7 +200,7 @@ export function AccessGroupStocks() {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={exportExcel}>
-            <Download size={14} /> Export
+            <Download size={14} /> sidnosnd
           </Button>
           <Button onClick={() => setAddOpen(true)}>
             <Plus size={14} /> Add Stock

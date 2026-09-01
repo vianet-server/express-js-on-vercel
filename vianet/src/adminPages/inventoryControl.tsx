@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ShieldCheck, Package, Settings, AlertTriangle, CheckCircle, ToggleLeft, ToggleRight, UserCheck, Users, UserCog, Hash, Loader2, Copy, Check, Trash2, Info } from 'lucide-react';
+import { Pencil,ShieldCheck, Package, Settings, AlertTriangle, CheckCircle, ToggleLeft, ToggleRight, UserCheck, Users, UserCog, Hash, Loader2, Copy, Check, Trash2, Info } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setAllAccessGroups } from '@/store/slices/inventorySlice';
@@ -120,87 +120,16 @@ export function InventoryControl() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Inventory Control</h1>
         <div className="flex items-center gap-2">
-          <Button variant="default" onClick={handleOpenAdd}><UserCheck size={14} /> Add Group</Button>
-          <Button variant="secondary"><Settings size={14} /> Configure</Button>
+          <Button variant="default" onClick={handleOpenAdd}><UserCheck size={14} />create new access group</Button>
         </div>
       </div>
 
       <Tabs orientation="vertical" defaultValue="overview" className="flex gap-6">
-        <TabsList className="flex-col w-48 h-fit min-h-10">
-      
-          <TabsTrigger value="access-group" className="justify-start w-full gap-2"><UserCog size={14} /> Access Group</TabsTrigger>
-          
-        </TabsList>
-
-        <TabsContent value="overview" className="flex-1 mt-0 flex flex-col gap-6">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Active Rules</CardTitle></CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-2">
-                  <ShieldCheck size={20} className="text-green-600" />
-                  <div className="text-2xl font-bold">{(settings ?? []).filter((s: any) => s.defaultEnabled).length}</div>
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">of {(settings ?? []).length} control rules</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Categories</CardTitle></CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-2">
-                  <Package size={20} className="text-blue-600" />
-                  <div className="text-2xl font-bold">{(categories ?? []).length}</div>
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">{(categories ?? []).filter((c: any) => c.status === 'Active').length} active</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Access Groups</CardTitle></CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-2">
-                  <Users size={20} className="text-purple-600" />
-                  <div className="text-2xl font-bold">{(accessGroups ?? []).length}</div>
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">{(accessGroups ?? []).filter((g: any) => g.status === 'Active').length} active</div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card>
-            <CardHeader><CardTitle>Control Settings</CardTitle></CardHeader>
-            <CardContent>
-              <div className="flex flex-col">
-                {settings.map((s, i) => (
-                  <div key={s.id} className={`flex items-center justify-between py-3 ${i < settings.length - 1 ? 'border-b' : ''}`}>
-                    <div className="flex items-start gap-3">
-                      <div className={`flex size-9 items-center justify-center rounded-lg ${s.defaultEnabled ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>
-                        <AlertTriangle size={16} />
-                      </div>
-                      <div>
-                        <div className="text-sm font-medium">{s.label}</div>
-                        <div className="text-xs text-muted-foreground">{s.description}</div>
-                      </div>
-                    </div>
-                    <Button
-                      variant={s.defaultEnabled ? 'default' : 'secondary'}
-                      size="sm"
-                      onClick={() => toggleSetting(s.id)}
-                      className="gap-1.5 text-xs"
-                    >
-                      {s.defaultEnabled ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
-                      {s.defaultEnabled ? 'Active' : 'Disabled'}
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
+        
         <TabsContent value="access-group" className="flex-1 mt-0 flex flex-col gap-6">
           <Card>
             <CardHeader>
-              <CardTitle>Access Groups</CardTitle>
+              <CardTitle>Acccess Groups <Pencil /> </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex flex-col">
