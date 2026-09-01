@@ -38,6 +38,7 @@ const reportsRouter = require('./reports');
 const settingsRouter = require('./settings');
 const marketRouter = require('./market');
 const emailRouter = require('./email');
+const semanticRouter = require('./semantic');
 
 const router = express.Router();
 
@@ -55,5 +56,6 @@ router.use('/reports', reportsRouter);
 router.use('/settings', settingsRouter);
 router.use('/market', marketRouter);
 router.use(emailRouter);
+router.use('/semantic', semanticRouter);
 
 module.exports = router;
