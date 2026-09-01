@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ShieldCheck, Package, Settings, AlertTriangle, CheckCircle, ToggleLeft, ToggleRight, UserCheck, Users, UserCog, X, Hash, Loader2, Copy, Check, Trash2, Info } from 'lucide-react';
+import { ShieldCheck, Package, Settings, AlertTriangle, CheckCircle, ToggleLeft, ToggleRight, UserCheck, Users, UserCog, Hash, Loader2, Copy, Check, Trash2, Info } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setAllAccessGroups } from '@/store/slices/inventorySlice';

@@ -1,4 +1,4 @@
-import { LayoutDashboard, BarChart3, TrendingUp, FileSpreadsheet, DollarSign, ChartPie, BookOpen, UserCircle, Settings, Code2, RefreshCw, Package, Sliders, Barcode, Gauge, LogOut, Receipt, Users, UserCheck, Plus, Mail } from "lucide-react"
+import { LayoutDashboard, BarChart3, TrendingUp, FileSpreadsheet, DollarSign, ChartPie, BookOpen, UserCircle, Settings, Code2, RefreshCw, Package, Sliders, Barcode, Gauge, LogOut, Receipt, Users, UserCheck, Mail } from "lucide-react"
 import { Link, useLocation } from "react-router-dom"
 
 import {
