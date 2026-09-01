@@ -1,16 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Pencil,ShieldCheck, Package, Settings, AlertTriangle, CheckCircle, ToggleLeft, ToggleRight, UserCheck, Users, UserCog, Hash, Loader2, Copy, Check, Trash2, Info } from 'lucide-react';
+import { AlertTriangle, UserCheck, Trash2, Info, Users, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setAllAccessGroups } from '@/store/slices/inventorySlice';
+import { Badge } from '@/components/ui/badge';
+import { AccessGroupList, GroupSettingsTable, ControlSettings, CreateGroupDialog } from './components/inventoryControl';
 
 interface Category {
   category: string; items: number; value: number; status: string;
@@ -127,223 +125,36 @@ export function InventoryControl() {
       <Tabs orientation="vertical" defaultValue="overview" className="flex gap-6">
         
         <TabsContent value="access-group" className="flex-1 mt-0 flex flex-col gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Acccess Groups <Pencil /> </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col">
-                {(accessGroups ?? []).map((g, i) => (
-                  <div key={g.id} className={`flex items-center justify-between py-3 ${i < (accessGroups ?? []).length - 1 ? 'border-b' : ''}`}>
-                    <div className="flex items-start gap-3 cursor-pointer" onClick={() => setDetailGroup(g)}>
-                      <div className="flex size-9 items-center justify-center rounded-lg bg-purple-100 text-purple-700">
-                        <Users size={16} />
-                      </div>
-                      <div>
-                        <div className="text-sm font-medium hover:underline">{g.name}</div>
-                        {g.group_key && <div className="text-xs text-muted-foreground">Key: {g.group_key}</div>}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Badge variant="default" className="text-[10px]">Active</Badge>
-                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => navigate(`/admin/inventory/access-group/${encodeURIComponent(g.name)}`)}>Stocks</Button>
-                      <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-red-600" onClick={() => setDeleteTarget(g)}>
-                        <Trash2 size={14} />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <AccessGroupList
+            groups={accessGroups ?? []}
+            onDetail={setDetailGroup}
+            onNavigate={(name) => navigate(`/admin/inventory/access-group/${encodeURIComponent(name)}`)}
+            onDelete={setDeleteTarget}
+          />
 
-         
-
-          <Card>
-            <CardHeader><CardTitle>Access Group Settings</CardTitle></CardHeader>
-            <CardContent>
-              <div className="flex flex-col">
-                {grpSettings.map((g, i) => (
-                  <div key={g.group} className={`flex items-center justify-between py-3 ${i < grpSettings.length - 1 ? 'border-b' : ''}`}>
-                    <div className="flex items-start gap-3">
-                      <div className={`flex size-9 items-center justify-center rounded-lg ${g.active ? 'bg-purple-100 text-purple-700' : 'bg-muted text-muted-foreground'}`}>
-                        <Users size={16} />
-                      </div>
-                      <div>
-                        <div className="text-sm font-medium">{g.group}</div>
-                        <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                          <Hash size={10} /> Max Qty: <span className="font-medium">{(g.maxQty ?? 0).toLocaleString()}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Badge variant={g.allowDiscount ? 'default' : 'secondary'} className="text-[10px]">{g.allowDiscount ? 'Discount Allowed' : 'No Discount'}</Badge>
-                      <Badge variant={g.autoApprove ? 'default' : 'outline'} className="text-[10px]">{g.autoApprove ? 'Auto Approve' : 'Manual'}</Badge>
-                      <Button
-                        variant={g.active ? 'default' : 'secondary'}
-                        size="sm"
-                        onClick={() => toggleGroup(g.group)}
-                        className="gap-1.5 text-xs"
-                      >
-                        {g.active ? 'Active' : 'Disabled'}
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader><CardTitle>Stock Access Limits per Group</CardTitle></CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left text-muted-foreground">
-                      <th className="pb-2 font-medium">Access Group</th>
-                      <th className="pb-2 font-medium">Accessible Stocks</th>
-                      <th className="pb-2 font-medium text-right">Max Qty Allowed</th>
-                      <th className="pb-2 font-medium">Restrictions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {grpSettings.map((g) => {
-                      const restrictions: string[] = [];
-                      if (!g.allowDiscount) restrictions.push('No Discount');
-                      if (!g.autoApprove) restrictions.push('Manual Approval');
-                      if (!g.active) restrictions.push('Disabled');
-                      return (
-                        <tr key={g.group} className="border-b last:border-0">
-                          <td className="py-2.5 font-medium flex items-center gap-2">
-                            <div className={`flex size-7 items-center justify-center rounded-md ${g.active ? 'bg-purple-100 text-purple-700' : 'bg-muted text-muted-foreground'}`}><Users size={13} /></div>
-                            {g.group}
-                          </td>
-                           <td className="py-2.5 text-muted-foreground">{(g.accessibleStockCount ?? 0)} of {(categories ?? []).length} categories</td>
-                          <td className="py-2.5 text-right font-medium">{(g.maxQty ?? 0).toLocaleString()} units</td>
-                          <td className="py-2.5">
-                            <div className="flex gap-1 flex-wrap">
-                              {restrictions.length > 0 ? restrictions.map(r => (
-                                <Badge key={r} variant="secondary" className="text-[10px]">{r}</Badge>
-                              )) : <Badge variant="outline" className="text-[10px]">No Restrictions</Badge>}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
+          <GroupSettingsTable
+            grpSettings={grpSettings}
+            categories={categories}
+            onToggleGroup={toggleGroup}
+          />
         </TabsContent>
 
         <TabsContent value="detail" className="flex-1 mt-0 flex flex-col gap-6">
-          <Card>
-            <CardHeader><CardTitle>Control Settings</CardTitle></CardHeader>
-            <CardContent>
-              <div className="flex flex-col">
-                {settings.map((s, i) => (
-                  <div key={s.id} className={`flex items-center justify-between py-3 ${i < settings.length - 1 ? 'border-b' : ''}`}>
-                    <div className="flex items-start gap-3">
-                      <div className={`flex size-9 items-center justify-center rounded-lg ${s.defaultEnabled ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>
-                        <AlertTriangle size={16} />
-                      </div>
-                      <div>
-                        <div className="text-sm font-medium">{s.label}</div>
-                        <div className="text-xs text-muted-foreground">{s.description}</div>
-                      </div>
-                    </div>
-                    <Button
-                      variant={s.defaultEnabled ? 'default' : 'secondary'}
-                      size="sm"
-                      onClick={() => toggleSetting(s.id)}
-                      className="gap-1.5 text-xs"
-                    >
-                      {s.defaultEnabled ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
-                      {s.defaultEnabled ? 'Active' : 'Disabled'}
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader><CardTitle>Categories</CardTitle></CardHeader>
-            <CardContent>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-muted-foreground">
-                    <th className="pb-2 font-medium">Category</th>
-                    <th className="pb-2 font-medium text-right">Item Count</th>
-                    <th className="pb-2 font-medium text-right">Stock Value</th>
-                    <th className="pb-2 font-medium">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {categories.map((c, i) => (
-                    <tr key={i} className="border-b last:border-0">
-                      <td className="py-2.5 font-medium">{c.category}</td>
-                      <td className="py-2.5 text-right">{c.items}</td>
-                       <td className="py-2.5 text-right">\u20b9{(c.value ?? 0).toLocaleString()}</td>
-                      <td className="py-2.5">
-                        <Badge variant={c.status === 'Active' ? 'default' : c.status === 'Inactive' ? 'secondary' : 'outline'}>{c.status}</Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </CardContent>
-          </Card>
+          <ControlSettings settings={settings} onToggle={toggleSetting} />
         </TabsContent>
       </Tabs>
 
-      <Dialog open={showAddGroup} onOpenChange={setShowAddGroup}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Create Access Group</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-4 py-2">
-            {createdLink ? (
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center gap-2 rounded-lg border p-3 bg-green-50">
-                  <CheckCircle size={18} className="text-green-600" />
-                  <span className="text-sm font-medium text-green-800">Access group created!</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Input value={window.location.origin + createdLink} readOnly className="text-xs" />
-                  <Button variant="secondary" size="sm" className="gap-1.5 shrink-0" onClick={copyLink}>
-                    {copied ? <Check size={14} /> : <Copy size={14} />}
-                    {copied ? 'Copied' : 'Copy'}
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="flex flex-col gap-1.5">
-                  <Label>Group Name <span className="text-red-500">*</span></Label>
-                  <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Warehouse Mgrs" />
-                </div>
-              </>
-            )}
-          </div>
-          {!createdLink && (
-            <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={() => setShowAddGroup(false)}>Cancel</Button>
-              <Button onClick={handleCreateGroup} disabled={!form.name.trim() || submitting}>
-                {submitting ? <Loader2 size={14} className="animate-spin" /> : <UserCheck size={14} />}
-                {submitting ? 'Creating...' : 'Create Group'}
-              </Button>
-            </DialogFooter>
-          )}
-          {createdLink && (
-            <DialogFooter>
-              <Button variant="outline" onClick={() => { setShowAddGroup(false); setCreatedLink(''); }}>Close</Button>
-            </DialogFooter>
-          )}
-        </DialogContent>
-      </Dialog>
+      <CreateGroupDialog
+        open={showAddGroup}
+        onOpenChange={setShowAddGroup}
+        form={form}
+        onFormChange={setForm}
+        onSubmit={handleCreateGroup}
+        submitting={submitting}
+        createdLink={createdLink}
+        onCopyLink={copyLink}
+        copied={copied}
+      />
 
       <Dialog open={!!deleteTarget} onOpenChange={open => !open && setDeleteTarget(null)}>
         <DialogContent className="max-w-sm">

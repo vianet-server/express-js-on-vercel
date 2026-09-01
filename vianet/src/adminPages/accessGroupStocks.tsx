@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Download, Loader2, Plus, Trash2, Save, Search } from 'lucide-react';
+import { ArrowLeft, Download, Loader2, Plus } from 'lucide-react';
 import { api } from '@/lib/api';
+import { StockGrid, AddStockDialog } from './components/accessGroupStocks';
 
 interface StockItem {
   id: number;
@@ -208,109 +207,36 @@ export function AccessGroupStocks() {
         </div>
       </div>
 
-      <div className="border rounded-lg overflow-hidden">
-        <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-muted/50 text-xs font-semibold text-muted-foreground border-b">
-          <div className="col-span-3">Stock Name</div>
-          <div className="col-span-1 font-mono">SKU</div>
-          <div className="col-span-2">Brand / Model</div>
-          <div className="col-span-1 text-right">Qty</div>
-          <div className="col-span-2 text-right">Price</div>
-          <div className="col-span-1 text-right">GST</div>
-          <div className="col-span-2 text-center"></div>
-        </div>
-        {items.map((item) => {
-          const isEditing = editing[item.id] != null;
-          const edit = editing[item.id];
-          return (
-            <div key={item.id} className="grid grid-cols-12 gap-2 px-3 py-2.5 text-sm border-b last:border-0 items-center hover:bg-muted/30 transition-colors">
-              <div className="col-span-3 font-medium truncate cursor-pointer hover:underline" onClick={() => startEdit(item)}>{item.name}</div>
-              <div className="col-span-1 text-muted-foreground font-mono text-xs truncate">{item.sku || '-'}</div>
-              <div className="col-span-2 text-muted-foreground truncate">{item.brand}{item.brand && item.model ? ' / ' : ''}{item.model}</div>
-              <div className="col-span-1 text-right">
-                {isEditing ? (
-                  <div className="flex items-center justify-end gap-1">
-                    <Button variant="outline" size="icon" className="size-5" onClick={() => setEditing(prev => ({ ...prev, [item.id]: { ...prev[item.id], qty: Math.max(0, edit.qty - 1) } }))}>-</Button>
-                    <Input type="number" className="w-12 h-7 text-xs text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" value={edit.qty} onChange={e => setEditing(prev => ({ ...prev, [item.id]: { ...prev[item.id], qty: Math.max(0, parseInt(e.target.value) || 0) } }))} />
-                    <Button variant="outline" size="icon" className="size-5" onClick={() => setEditing(prev => ({ ...prev, [item.id]: { ...prev[item.id], qty: edit.qty + 1 } }))}>+</Button>
-                  </div>
-                ) : (
-                  <span className="font-semibold cursor-pointer hover:underline" onClick={() => startEdit(item)}>{Number(item.qty).toLocaleString()}</span>
-                )}
-              </div>
-              <div className="col-span-2 text-right">
-                {isEditing ? (
-                  <div className="flex items-center justify-end gap-1">
-                    <Button variant="outline" size="icon" className="size-5" onClick={() => setEditing(prev => ({ ...prev, [item.id]: { ...prev[item.id], price: Math.max(0, edit.price - 1) } }))}>-</Button>
-                    <Input type="number" className="w-16 h-7 text-xs text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" value={edit.price} onChange={e => setEditing(prev => ({ ...prev, [item.id]: { ...prev[item.id], price: Math.max(0, parseFloat(e.target.value) || 0) } }))} />
-                    <Button variant="outline" size="icon" className="size-5" onClick={() => setEditing(prev => ({ ...prev, [item.id]: { ...prev[item.id], price: edit.price + 1 } }))}>+</Button>
-                  </div>
-                ) : (
-                  <span className="font-semibold cursor-pointer hover:underline" onClick={() => startEdit(item)}>{Number(item.price).toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</span>
-                )}
-              </div>
-              <div className="col-span-1 text-right">
-                {isEditing ? (
-                  <Input type="number" className="w-14 h-7 text-xs text-right" value={edit.gst} onChange={e => setEditing(prev => ({ ...prev, [item.id]: { ...prev[item.id], gst: parseFloat(e.target.value) || 0 } }))} />
-                ) : (
-                  <span className="cursor-pointer hover:underline text-muted-foreground" onClick={() => startEdit(item)}>{item.gst != null ? `${item.gst}%` : '-'}</span>
-                )}
-              </div>
-              <div className="col-span-2 flex items-center justify-center gap-1">
-                <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-red-600" onClick={() => removeItem(item)} title="Remove"><Trash2 size={13} /></Button>
-                {isEditing && (
-                  <>
-                    <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-foreground" onClick={() => cancelEdit(item.id)} title="Cancel">X</Button>
-                    <Button size="icon" className="size-7" onClick={() => saveItem(item)} disabled={saving === item.id} title="Save">
-                      {saving === item.id ? <Loader2 className="animate-spin size-3" /> : <Save size={12} />}
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <StockGrid
+        items={items}
+        editing={editing}
+        onEdit={startEdit}
+        onCancelEdit={cancelEdit}
+        onSave={saveItem}
+        onRemove={removeItem}
+        onEditingChange={(id, field, value) => setEditing(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }))}
+        saving={saving}
+      />
 
       {items.length === 0 && (
         <div className="text-center text-muted-foreground py-12">No stocks assigned to this access group.</div>
       )}
 
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent style={{ maxWidth: '70vw' }} className="max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Add Stock to {decodedName}</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-4">
-            <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input className="pl-9" placeholder="Search stock by name, brand... (Enter to search)" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyDown={handleSearchKeyDown} autoFocus />
-            </div>
-            {searching && <div className="text-sm text-muted-foreground text-center py-2"><Loader2 className="animate-spin inline size-4 mr-1" />Searching...</div>}
-            {!searching && submittedQuery && filtered.length === 0 && (
-              <div className="text-sm text-muted-foreground text-center py-4">No stocks found.</div>
-            )}
-            {filtered.length > 0 && (
-              <div className="text-xs text-muted-foreground mb-1">{filtered.length} result{filtered.length !== 1 ? 's' : ''}</div>
-            )}
-            {filtered.map((stock) => (
-              <div key={stock.id} className="flex flex-wrap items-center gap-2 border rounded-lg p-3">
-                <div className="flex-1 min-w-0 basis-full sm:basis-0">
-                  <div className="text-sm font-medium truncate">{stock.name}</div>
-                  {stock.brand && <div className="text-xs text-muted-foreground">{stock.brand}{stock.model ? ` / ${stock.model}` : ''}</div>}
-                </div>
-                <Input type="number" placeholder="Qty" className="w-16 h-8 text-xs" value={adding === stock.id ? (newQty || '') : ''} onChange={e => setNewQty(e.target.value)} />
-                <Input type="number" placeholder="Price" className="w-20 h-8 text-xs" value={adding === stock.id ? (newPrice || '') : ''} onChange={e => setNewPrice(e.target.value)} />
-                <Button size="sm" className="h-8 text-xs" disabled={adding === stock.id} onClick={() => addStockAccess(stock)}>
-                  {adding === stock.id ? <Loader2 className="animate-spin size-3" /> : <Plus size={12} />} Add
-                </Button>
-              </div>
-            ))}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAddOpen(false)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AddStockDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        onSearchKeyDown={handleSearchKeyDown}
+        searchResults={filtered}
+        searching={searching}
+        newQty={newQty}
+        onNewQtyChange={setNewQty}
+        newPrice={newPrice}
+        onNewPriceChange={setNewPrice}
+        adding={adding}
+        onAddStock={addStockAccess}
+      />
     </div>
   );
 }

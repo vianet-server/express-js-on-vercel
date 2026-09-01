@@ -1,58 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Calendar, Download, FileDown, FileSpreadsheet, Search, Plus, ChevronRight, ChevronDown, Loader2 } from 'lucide-react';
+import { Calendar, Download, FileDown, FileSpreadsheet, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
-
-function DetailSection({ title, items, typeColor }: { title: string; items: any[]; typeColor: string }) {
-  const [openIds, setOpenIds] = useState<number[]>([]);
-
-  const toggle = (id: number) => {
-    setOpenIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-  };
-
-  return (
-    <div className="mb-6 last:mb-0">
-      <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-        <span className={`size-3 rounded-full inline-block ${typeColor}`} />
-        {title}
-      </h3>
-      {items.map((item: any) => {
-        const open = openIds.includes(item.id);
-        return (
-          <Collapsible key={item.id} open={open} onOpenChange={() => toggle(item.id)}>
-            <div className="flex items-center justify-between border-b py-2.5 px-2 hover:bg-muted/30 rounded-sm cursor-pointer">
-              <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium flex-1 text-left">
-                {open ? <ChevronDown size={14} className="shrink-0" /> : <ChevronRight size={14} className="shrink-0" />}
-                {item.label}
-              </CollapsibleTrigger>
-              <span className="text-sm font-medium">₹{item.amount.toLocaleString()}</span>
-            </div>
-            <CollapsibleContent>
-              <div className="ml-7 pl-3 border-l-2 border-muted">
-                {(item.subs ?? []).map((sub: any, i: number) => (
-                  <div key={i} className="flex items-center justify-between py-2 text-sm text-muted-foreground border-b last:border-0">
-                    <span>{sub.label}</span>
-                    <span>₹{sub.amount.toLocaleString()}</span>
-                  </div>
-                ))}
-                <div className="flex items-center justify-between py-2 text-sm font-medium border-t">
-                  <span>Total</span>
-                  <span>₹{(item.subs ?? []).reduce((s: number, s2: any) => s + s2.amount, 0).toLocaleString()}</span>
-                </div>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        );
-      })}
-    </div>
-  );
-}
+import { SummaryCards, SummaryTable, DetailTab, SearchTab, DatewiseTab } from './components/balanceSheet';
 
 export function BalanceSheet() {
   const [data, setData] = useState<any[]>([]);
@@ -203,175 +157,32 @@ export function BalanceSheet() {
         </TabsList>
 
         <TabsContent value="summary" className="mt-6">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Total Assets</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-bold text-blue-600">₹{totalAssets.toLocaleString()}</div></CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Total Liabilities</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-bold text-amber-600">₹{totalLiabilities.toLocaleString()}</div></CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Total Equity</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-bold text-green-600">₹{totalEquity.toLocaleString()}</div></CardContent>
-            </Card>
-          </div>
-          <Card className="mt-4">
-            <CardHeader><CardTitle>Balance Overview</CardTitle></CardHeader>
-            <CardContent>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-muted-foreground">
-                    <th className="pb-2 font-medium w-1/2">Item</th>
-                    <th className="pb-2 font-medium text-right pr-6 w-1/4">Amount</th>
-                    <th className="pb-2 font-medium pl-6 w-1/4">Type</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.length === 0 ? (
-                    <tr>
-                      <td colSpan={3} className="py-8 text-center text-muted-foreground">
-                        No balance sheet data found. Please run your Tally sync tool and ensure it exports the Balance Sheet.
-                      </td>
-                    </tr>
-                  ) : (
-                    data.map((item: any, i: number) => (
-                      <tr key={i} className="border-b last:border-0">
-                        <td className="py-2.5 font-medium">{item.label}</td>
-                        <td className="py-2.5 text-right pr-6">₹{item.amount.toLocaleString()}</td>
-                        <td className="py-2.5 pl-6">
-                          <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${item.type === 'asset' ? 'bg-blue-100 text-blue-700' : item.type === 'liability' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
-                            {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </CardContent>
-          </Card>
+          <SummaryCards
+            stats={[
+              { title: 'Total Assets', value: `₹${totalAssets.toLocaleString()}`, color: 'text-blue-600' },
+              { title: 'Total Liabilities', value: `₹${totalLiabilities.toLocaleString()}`, color: 'text-amber-600' },
+              { title: 'Total Equity', value: `₹${totalEquity.toLocaleString()}`, color: 'text-green-600' },
+            ]}
+          />
+          <SummaryTable data={data} />
         </TabsContent>
 
         <TabsContent value="detail" className="mt-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader><CardTitle>Assets</CardTitle></CardHeader>
-              <CardContent>
-                <DetailSection
-                  title="Current & Fixed Assets"
-                  items={data.filter((i: any) => i.type === 'asset')}
-                  typeColor="bg-blue-500"
-                />
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader><CardTitle>Liabilities & Equity</CardTitle></CardHeader>
-              <CardContent>
-                <DetailSection
-                  title="Liabilities"
-                  items={data.filter((i: any) => i.type === 'liability')}
-                  typeColor="bg-amber-500"
-                />
-                <DetailSection
-                  title="Equity"
-                  items={data.filter((i: any) => i.type === 'equity')}
-                  typeColor="bg-green-500"
-                />
-              </CardContent>
-            </Card>
-          </div>
+          <DetailTab data={data} />
         </TabsContent>
 
         <TabsContent value="search" className="mt-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Search size={16} className="text-muted-foreground" />
-                <Input placeholder="Search entries..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="max-w-sm" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              {filteredData.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4">No entries match your search.</p>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left text-muted-foreground">
-                      <th className="pb-2 font-medium w-1/2">Item</th>
-                      <th className="pb-2 font-medium text-right pr-6 w-1/4">Amount</th>
-                      <th className="pb-2 font-medium pl-6 w-1/4">Type</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredData.map((item: any, i: number) => (
-                      <tr key={i} className="border-b last:border-0">
-                        <td className="py-2.5 font-medium">{item.label}</td>
-                        <td className="py-2.5 text-right pr-6">₹{item.amount.toLocaleString()}</td>
-                        <td className="py-2.5 pl-6">
-                          <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${item.type === 'asset' ? 'bg-blue-100 text-blue-700' : item.type === 'liability' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
-                          {(item.type ?? '').charAt(0).toUpperCase() + (item.type ?? '').slice(1)}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </CardContent>
-          </Card>
+          <SearchTab searchQuery={searchQuery} onSearchChange={setSearchQuery} filteredData={filteredData} />
         </TabsContent>
 
         <TabsContent value="datewise" className="mt-6">
-          <Card className="mb-4">
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <Input type="date" value={datewisePick} onChange={(e) => setDatewisePick(e.target.value)} className="w-48" />
-                <Button size="sm" onClick={handleAddDateColumn} disabled={!datewisePick}>
-                  <Plus size={14} /> Fetch
-                </Button>
-              </div>
-            </CardHeader>
-          </Card>
-          {datewiseCols.length === 0 ? (
-            <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">
-              Select a date and click Fetch to add a balance sheet column.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[600px]">
-                <thead>
-                  <tr className="border-b text-left text-muted-foreground">
-                    <th className="pb-2.5 pr-4 font-medium whitespace-nowrap sticky left-0 bg-background">Item</th>
-                    {datewiseCols.map(date => (
-                      <th key={date} className="pb-2.5 px-3 font-medium text-right whitespace-nowrap">{date}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.map((item: any, i: number) => (
-                    <tr key={i} className="border-b last:border-0">
-                      <td className="py-2.5 pr-4 font-medium sticky left-0 bg-background">{item.label}</td>
-                      {datewiseCols.map(date => (
-                        <td key={date} className="py-2.5 px-3 text-right whitespace-nowrap">
-                          ₹{item.amount.toLocaleString()}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                  <tr className="border-t-2 font-medium">
-                    <td className="py-2.5 pr-4 sticky left-0 bg-background">Total</td>
-                    {datewiseCols.map(date => (
-                      <td key={date} className="py-2.5 px-3 text-right whitespace-nowrap">
-                        ₹{data.reduce((s: number, i: any) => s + i.amount, 0).toLocaleString()}
-                      </td>
-                    ))}
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          )}
+          <DatewiseTab
+            data={data}
+            datewisePick={datewisePick}
+            onDatewisePickChange={setDatewisePick}
+            datewiseCols={datewiseCols}
+            onAddDateColumn={handleAddDateColumn}
+          />
         </TabsContent>
       </Tabs>
     </div>

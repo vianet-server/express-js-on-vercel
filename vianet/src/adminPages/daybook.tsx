@@ -1,15 +1,11 @@
-import { formatIndianCurrency } from "@/lib/utils";
 import { useEffect, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Filter, ChevronDown, ChevronRight, TrendingUp, TrendingDown, DollarSign, Receipt, FileText, Loader2, BookOpen, PackageOpen } from 'lucide-react';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Bar, BarChart, XAxis, YAxis, CartesianGrid } from 'recharts';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { Search, Filter, Loader2 } from 'lucide-react';
 import { useAdminQuery } from '@/hooks/useAdminQuery';
+import { DailyChart, TransactionBreakdown, SalesmanPerformance, SummaryCards, TransactionRow } from './components/daybook';
 
 const typeColors: Record<string, string> = {
   Sale: 'bg-green-100 text-green-700',
@@ -17,12 +13,6 @@ const typeColors: Record<string, string> = {
   Expense: 'bg-red-100 text-red-700',
   Purchase: 'bg-purple-100 text-purple-700',
   Other: 'bg-gray-100 text-gray-700',
-};
-
-const chartConfig = {
-  income: { label: 'Income', color: '#16a34a' },
-  expense: { label: 'Expense', color: '#ef4444' },
-  net: { label: 'Net', color: '#2563eb' },
 };
 
 function fmtDate(d: string) {
@@ -117,107 +107,14 @@ export function Daybook() {
         </TabsList>
 
         <TabsContent value="overview" className="mt-6">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1"><TrendingUp size={14} /> Total Sales</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-bold text-green-600">{formatIndianCurrency(totalSales)}</div></CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1"><Receipt size={14} /> Total Payments</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-bold text-blue-600">{formatIndianCurrency(totalPayments)}</div></CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1"><TrendingDown size={14} /> Total Expenses</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-bold text-red-600">{formatIndianCurrency(totalExpenses)}</div></CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1"><DollarSign size={14} /> Net Cash Flow</CardTitle></CardHeader>
-              <CardContent><div className={`text-2xl font-bold ${netCash >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatIndianCurrency(netCash)}</div></CardContent>
-            </Card>
-          </div>
+          <SummaryCards totalSales={totalSales} totalPayments={totalPayments} totalExpenses={totalExpenses} netCash={netCash} />
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
-            <Card>
-              <CardHeader><CardTitle>Daily Income vs Expense</CardTitle></CardHeader>
-              <CardContent>
-                {dailyTotals.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">No daily data available</p>
-                ) : (
-                <ChartContainer config={chartConfig} className="h-64 w-full">
-                  <BarChart data={dailyTotals}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="day" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                    <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar dataKey="income" fill="var(--color-income)" radius={[4, 4, 0, 0]} barSize={24} />
-                    <Bar dataKey="expense" fill="var(--color-expense)" radius={[4, 4, 0, 0]} barSize={24} />
-                  </BarChart>
-                </ChartContainer>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader><CardTitle>Transaction Breakdown</CardTitle></CardHeader>
-              <CardContent>
-                <div className="flex flex-col gap-3">
-                  {Object.entries(typeColors).map(([type, color]) => {
-                    const total = transactionsData.filter((t: any) => t.type === type).reduce((s: number, t: any) => s + (t.amount ?? 0), 0);
-                    const count = transactionsData.filter((t: any) => t.type === type).length;
-                    const grandTotal = transactionsData.reduce((s: number, t: any) => s + (t.amount ?? 0), 0);
-                    const pct = grandTotal > 0 ? Math.round((total / grandTotal) * 100) : 0;
-                    return (
-                      <div key={type} className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${color}`}>{type}</span>
-                          <span className="text-xs text-muted-foreground">({count} entries)</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="w-24 h-2 rounded-full bg-muted overflow-hidden">
-                            <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color.match(/text-\w+-\d+/)?.[0]?.replace('text', 'bg') ? undefined : '#888' }} />
-                          </div>
-                          <span className="text-sm font-medium w-24 text-right">{formatIndianCurrency(total)}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
+            <DailyChart dailyTotals={dailyTotals} />
+            <TransactionBreakdown transactionsData={transactionsData} typeColors={typeColors} />
           </div>
 
-          <Card className="mt-4">
-            <CardHeader><CardTitle>Salesman Performance</CardTitle></CardHeader>
-            <CardContent>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-muted-foreground">
-                    <th className="pb-2 font-medium">Salesman</th>
-                    <th className="pb-2 font-medium text-right">Transactions</th>
-                    <th className="pb-2 font-medium text-right">Total Sales</th>
-                    <th className="pb-2 font-medium text-right">Avg/Trans</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.entries(
-                    transactionsData.filter((t: any) => t.type === 'Sale').reduce((acc: any, t: any) => {
-                      acc[t.salesman] = acc[t.salesman] || { count: 0, total: 0 };
-                      acc[t.salesman].count++;
-                      acc[t.salesman].total += t.amount ?? 0;
-                      return acc;
-                    }, {} as Record<string, { count: number; total: number }>)
-                  ).map(([name, data]: [string, any], i: number) => (
-                    <tr key={i} className="border-b last:border-0">
-                      <td className="py-2.5 font-medium">{name || '-'}</td>
-                      <td className="py-2.5 text-right">{data.count}</td>
-                      <td className="py-2.5 text-right">{formatIndianCurrency(data.total)}</td>
-                      <td className="py-2.5 text-right">{formatIndianCurrency(Math.round(data.total / data.count))}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </CardContent>
-          </Card>
+          <SalesmanPerformance transactionsData={transactionsData} />
         </TabsContent>
 
         <TabsContent value="detail" className="mt-6">
@@ -230,11 +127,6 @@ export function Daybook() {
                 {virtualizer.getVirtualItems().map((virtualRow: any) => {
                   const t: any = filtered[virtualRow.index];
                   const rowId = t.id ?? virtualRow.index;
-                  const open = openIds.includes(rowId);
-                  const hasInventory = (t.inventoryEntries ?? []).length > 0;
-                  const hasLedger = (t.ledgerEntries ?? []).length > 0;
-                  const hasNarration = t.narration && t.narration !== t.customer;
-                  const hasDetail = hasInventory || hasLedger || hasNarration;
                   return (
                     <div
                       key={virtualRow.key}
@@ -243,103 +135,11 @@ export function Daybook() {
                       className="absolute top-0 left-0 w-full pr-3 pb-3"
                       style={{ transform: `translateY(${virtualRow.start}px)` }}
                     >
-                      <Collapsible key={rowId} open={open} onOpenChange={() => toggle(rowId)}>
-                        <div className="flex items-center justify-between border rounded-lg px-4 py-3 hover:bg-muted/30 cursor-pointer">
-                          <CollapsibleTrigger className="flex items-center gap-3 flex-1 text-left min-w-0">
-                            {hasDetail ? (
-                              open ? <ChevronDown size={14} className="shrink-0" /> : <ChevronRight size={14} className="shrink-0" />
-                            ) : (
-                              <span className="w-3.5 shrink-0" />
-                            )}
-                            <span className="text-xs text-muted-foreground w-20 shrink-0">{fmtDate(t.date)}</span>
-                            <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium shrink-0 ${typeColors[t.type] || ''}`}>{t.type}</span>
-                            <span className="text-xs font-mono text-muted-foreground shrink-0">{t.ref}</span>
-                            <span className="text-sm font-medium truncate min-w-0">{t.customer}</span>
-                          </CollapsibleTrigger>
-                          <div className="flex items-center gap-4 shrink-0">
-                            {t.salesman ? <span className="text-xs text-muted-foreground hidden sm:inline">{t.salesman}</span> : null}
-                            <span className="text-sm font-medium tabular-nums">{formatIndianCurrency(t.amount ?? 0)}</span>
-                          </div>
-                        </div>
-                        {hasDetail && (
-                          <CollapsibleContent>
-                            <div className="ml-10 pl-4 border-l-2 border-muted space-y-4 py-3">
-                              {hasNarration && (
-                                <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                                  <FileText size={14} className="mt-0.5 shrink-0" />
-                                  <span>{t.narration}</span>
-                                </div>
-                              )}
-
-                              {hasLedger && (
-                                <div>
-                                  <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground mb-1.5">
-                                    <BookOpen size={13} /> Ledger Entries
-                                  </div>
-                                  <div className="flex flex-col gap-1.5">
-                                    {(t.ledgerEntries ?? []).map((s: any, i: number) => {
-                                      const amt = parseFloat(s.amount) || 0;
-                                      const isDr = s.isDeemedPositive === 'Yes';
-                                      const hasDesc = s.description && s.description !== s.ledgerName;
-                                      return (
-                                        <div key={i} className={`rounded border px-3 py-2 ${isDr ? 'border-red-200 bg-red-50/30' : 'border-green-200 bg-green-50/30'}`}>
-                                          <div className="flex items-center justify-between text-xs">
-                                            <span className="font-medium">{s.ledgerName}</span>
-                                            <span className={`font-semibold tabular-nums ${isDr ? 'text-red-600' : 'text-green-600'}`}>
-                                              {isDr ? 'Dr' : 'Cr'} {formatIndianCurrency(amt)}
-                                            </span>
-                                          </div>
-                                          {hasDesc && <div className="text-[11px] text-muted-foreground mt-0.5">{s.description}</div>}
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              )}
-
-                              {hasInventory && (
-                                <div>
-                                  <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground mb-1.5">
-                                    <PackageOpen size={13} /> Inventory Entries
-                                  </div>
-                                  <div className="flex flex-col gap-1.5">
-                                    {(t.inventoryEntries ?? []).map((s: any, i: number) => {
-                                      const qty = parseFloat(s.qty) || 0;
-                                      const rate = parseFloat(s.rate) || 0;
-                                      const amt = parseFloat(s.amount) || 0;
-                                      let serials: string[] = [];
-                                      try {
-                                        const p = typeof s.serialNo === 'string' ? JSON.parse(s.serialNo) : s.serialNo;
-                                        if (Array.isArray(p)) serials = p;
-                                      } catch {}
-                                      return (
-                                        <div key={i} className="rounded border px-3 py-2">
-                                          <div className="flex items-center justify-between text-xs">
-                                            <span className="font-medium">{s.item}</span>
-                                            <span className="font-semibold tabular-nums">{formatIndianCurrency(amt)}</span>
-                                          </div>
-                                          <div className="flex gap-4 mt-1 text-[11px] text-muted-foreground">
-                                            <span>Qty: <b>{qty > 0 ? qty.toLocaleString() : '-'}</b>{s.unit ? ` ${s.unit}` : ''}</span>
-                                            <span>Rate: <b>{formatIndianCurrency(rate)}</b></span>
-                                          </div>
-                                          {s.description ? (
-                                            <div className="text-[11px] text-muted-foreground mt-0.5">{s.description}</div>
-                                          ) : null}
-                                          {serials.length > 0 ? (
-                                            <div className="text-[11px] text-muted-foreground mt-0.5">
-                                              Serial: {serials.join(', ')}
-                                            </div>
-                                          ) : null}
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </CollapsibleContent>
-                        )}
-                      </Collapsible>
+                      <TransactionRow
+                        transaction={t}
+                        isOpen={openIds.includes(rowId)}
+                        onToggle={() => toggle(rowId)}
+                      />
                     </div>
                   );
                 })}

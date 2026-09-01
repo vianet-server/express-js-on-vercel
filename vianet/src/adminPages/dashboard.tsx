@@ -11,9 +11,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/
 import { ArrowUpRight, ArrowDownRight, FileDown, FileSpreadsheet, Settings, Eye, Calendar, Loader2 } from 'lucide-react';
 import { Bar, BarChart, XAxis, YAxis, CartesianGrid, Pie, PieChart, Cell } from 'recharts';
 import { useAdminQuery } from '@/hooks/useAdminQuery';
-import { DateFilter } from './DateFilter';
-import { StatCard } from './StatCard';
-import { ChartsOverview } from './ChartsOverview';
+import { DateFilter, StatCard, ChartsOverview } from './components/dashboard';
 
 const pieColors = ['#2563eb', '#16a34a', '#f59e0b', '#ef4444', '#8b5cf6'];
 
@@ -154,7 +152,7 @@ export function Dashboard() {
               <div className="text-sm text-muted-foreground">Detailed warehouse stock, fast/slow moving items, and reorder alerts will be populated here.</div>
             </CardContent>
           </Card>
-        </Tabs>
+        </TabsContent>
       </Tabs>
     </div>
   );

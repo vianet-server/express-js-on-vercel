@@ -1,76 +1,22 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Calendar, Download, FileDown, FileSpreadsheet, Search, ChevronRight, ChevronDown, Plus, Loader2, ArrowDownCircle, ArrowUpCircle, Filter } from 'lucide-react';
+import { Calendar, Download, FileDown, FileSpreadsheet, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { SummaryCards, AgeFilterDropdown, SummaryTable, DetailTab, SearchTab, DatewiseTab } from './components/outstanding';
 
-const statusStyles = {
-  due: 'bg-blue-100 text-blue-700',
-  overdue: 'bg-amber-100 text-amber-700',
-  critical: 'bg-red-100 text-red-700',
-};
-
-function DetailSection({ title, items, icon }: { title: string; items: any[]; icon: React.ReactNode }) {
-  const [openIds, setOpenIds] = useState<number[]>([]);
-  const toggle = (id: number) => setOpenIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-
-  return (
-    <div className="mb-6 last:mb-0">
-      <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">{icon}{title} ({items.length})</h3>
-      {items.map((item: any) => {
-        const open = openIds.includes(item.id);
-        return (
-          <Collapsible key={item.id} open={open} onOpenChange={() => toggle(item.id)}>
-            <div className="flex items-center justify-between border-b py-2.5 px-2 hover:bg-muted/30 rounded-sm cursor-pointer">
-              <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium flex-1 text-left">
-                {open ? <ChevronDown size={14} className="shrink-0" /> : <ChevronRight size={14} className="shrink-0" />}
-                {item.customer}
-              </CollapsibleTrigger>
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-medium">₹{item.amount.toLocaleString()}</span>
-                <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${statusStyles[item.status as keyof typeof statusStyles]}`}>
-                  {(item.status ?? '').charAt(0).toUpperCase() + (item.status ?? '').slice(1)}
-                </span>
-              </div>
-            </div>
-            <CollapsibleContent>
-              <div className="ml-7 pl-3 border-l-2 border-muted">
-                <div className="flex items-center justify-between py-1.5 text-xs text-muted-foreground font-medium">
-                  <span>Invoice</span>
-                  <span className="flex gap-4">
-                    <span>Amount</span>
-                    <span>Due Date</span>
-                  </span>
-                </div>
-                {(item.subs ?? []).map((sub: any, i: number) => (
-                  <div key={i} className="flex items-center justify-between py-1.5 text-sm text-muted-foreground border-b last:border-0">
-                    <span>{sub.invoice}</span>
-                    <span className="flex gap-4">
-                      <span className="w-20 text-right">₹{sub.amount.toLocaleString()}</span>
-                      <span className="w-24 text-right">{sub.due}</span>
-                    </span>
-                  </div>
-                ))}
-                <div className="flex items-center justify-between py-2 text-sm font-medium border-t">
-                  <span>Total</span>
-                  <span className="flex gap-4">
-                    <span className="w-20 text-right">₹{(item.subs ?? []).reduce((s: number, s2: any) => s + s2.amount, 0).toLocaleString()}</span>
-                    <span className="w-24 text-right">{item.days}d overdue</span>
-                  </span>
-                </div>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        );
-      })}
-    </div>
-  );
-}
+const AGE_BUCKETS = [
+  { label: '0-30 days', min: -Infinity, max: 30, color: 'bg-blue-500' },
+  { label: '31-60 days', min: 30, max: 60, color: 'bg-amber-500' },
+  { label: '61-90 days', min: 60, max: 90, color: 'bg-orange-400' },
+  { label: '91-120 days', min: 90, max: 120, color: 'bg-orange-600' },
+  { label: '121-150 days', min: 120, max: 150, color: 'bg-red-400' },
+  { label: '151-180 days', min: 150, max: 180, color: 'bg-red-600' },
+  { label: '180+ days', min: 180, max: Infinity, color: 'bg-red-700' },
+];
 
 export function Outstanding() {
   const [data, setData] = useState<any[]>([]);
@@ -118,21 +64,11 @@ export function Outstanding() {
   const overdueTotal = data.filter((i: any) => i.days > 30).reduce((s: number, i: any) => s + i.amount, 0);
   const criticalTotal = data.filter((i: any) => i.days > 60).reduce((s: number, i: any) => s + i.amount, 0);
 
-  const ageBuckets = [
-    { label: '0-30 days', min: -Infinity, max: 30, color: 'bg-blue-500' },
-    { label: '31-60 days', min: 30, max: 60, color: 'bg-amber-500' },
-    { label: '61-90 days', min: 60, max: 90, color: 'bg-orange-400' },
-    { label: '91-120 days', min: 90, max: 120, color: 'bg-orange-600' },
-    { label: '121-150 days', min: 120, max: 150, color: 'bg-red-400' },
-    { label: '151-180 days', min: 150, max: 180, color: 'bg-red-600' },
-    { label: '180+ days', min: 180, max: Infinity, color: 'bg-red-700' },
-  ];
-
   const filteredData = data.filter((i: any) => {
     const match = i.customer.toLowerCase().includes(searchQuery.toLowerCase());
     if (!match) return false;
     if (ageFilter === 'all') return true;
-    const bucket = ageBuckets.find(b => b.label === ageFilter);
+    const bucket = AGE_BUCKETS.find(b => b.label === ageFilter);
     if (!bucket) return true;
     return i.days > bucket.min && i.days <= bucket.max;
   });
@@ -213,217 +149,44 @@ export function Outstanding() {
         </TabsList>
 
         <TabsContent value="summary" className="mt-6">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Total Outstanding</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-bold">₹{totalOutstanding.toLocaleString()}</div></CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Overdue (&gt;30 days)</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-bold text-amber-600">₹{overdueTotal.toLocaleString()}</div></CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Critical (&gt;60 days)</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-bold text-red-600">₹{criticalTotal.toLocaleString()}</div></CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Total Customers</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-bold">{data.length}</div></CardContent>
-            </Card>
-          </div>
+          <SummaryCards
+            stats={[
+              { title: 'Total Outstanding', value: `₹${totalOutstanding.toLocaleString()}` },
+              { title: 'Overdue (>30 days)', value: `₹${overdueTotal.toLocaleString()}`, color: 'text-amber-600' },
+              { title: 'Critical (>60 days)', value: `₹${criticalTotal.toLocaleString()}`, color: 'text-red-600' },
+              { title: 'Total Customers', value: data.length },
+            ]}
+          />
           <div className="mt-4 flex items-center gap-3">
-            <DropdownMenu>
-              <DropdownMenuTrigger render={<Button variant={ageFilter !== 'all' ? 'default' : 'outline'} size="sm" className="gap-1.5" />}>
-                <Filter size={14} />
-                {ageFilter === 'all' ? 'Filter by Age' : ageFilter}
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => setAgeFilter('all')}>All</DropdownMenuItem>
-                {ageBuckets.map(b => (
-                  <DropdownMenuItem key={b.label} onClick={() => setAgeFilter(b.label)}>
-                    {b.label} ({data.filter((i: any) => i.days > b.min && i.days <= b.max).length})
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <AgeFilterDropdown ageBuckets={AGE_BUCKETS} ageFilter={ageFilter} data={data} onAgeFilterChange={setAgeFilter} />
           </div>
-          <Card className="mt-4">
-            <CardHeader><CardTitle>Outstanding Overview</CardTitle></CardHeader>
-            <CardContent>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-muted-foreground">
-                    <th className="pb-2 font-medium">Customer</th>
-                    <th className="pb-2 font-medium text-right">Amount</th>
-                    <th className="pb-2 font-medium text-right">Days</th>
-                    <th className="pb-2 font-medium">Due Date</th>
-                    <th className="pb-2 font-medium">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(ageFilter === 'all' ? data : data.filter((i: any) => {
-                    const b = ageBuckets.find(bk => bk.label === ageFilter);
-                    return b ? (i.days > b.min && i.days <= b.max) : true;
-                  })).slice(0, 5).map((item: any, i: number) => (
-                    <tr key={i} className="border-b last:border-0">
-                      <td className="py-2.5 font-medium">{item.customer}</td>
-                      <td className="py-2.5 text-right">₹{item.amount.toLocaleString()}</td>
-                      <td className="py-2.5 text-right">{item.days}d</td>
-                      <td className="py-2.5">{item.date}</td>
-                      <td className="py-2.5">
-                        <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${statusStyles[item.status as keyof typeof statusStyles]}`}>
-                          {(item.status ?? '').charAt(0).toUpperCase() + (item.status ?? '').slice(1)}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </CardContent>
-          </Card>
+          <SummaryTable data={data} ageFilter={ageFilter} ageBuckets={AGE_BUCKETS} />
         </TabsContent>
 
         <TabsContent value="detail" className="mt-6">
-          <Tabs defaultValue="receivable">
-            <TabsList>
-              <TabsTrigger value="receivable" className="gap-2"><ArrowUpCircle size={14} />Bills Receivable ({data.filter((i: any) => i.category === 'receivable').length})</TabsTrigger>
-              <TabsTrigger value="payable" className="gap-2"><ArrowDownCircle size={14} />Bills Payable ({data.filter((i: any) => i.category === 'payable').length})</TabsTrigger>
-            </TabsList>
-            <TabsContent value="receivable" className="mt-4">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card>
-                  <CardHeader><CardTitle>On Time</CardTitle></CardHeader>
-                  <CardContent>
-                    <DetailSection title={ageBuckets[0].label} items={data.filter((i: any) => i.category === 'receivable' && i.days <= ageBuckets[0].max)} icon={<span className={`size-2.5 rounded-full ${ageBuckets[0].color} inline-block`} />} />
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader><CardTitle>Overdue</CardTitle></CardHeader>
-                  <CardContent>
-                    {ageBuckets.slice(1).map(b => (
-                      <DetailSection key={b.label} title={b.label} items={data.filter((i: any) => i.category === 'receivable' && i.days > b.min && i.days <= b.max)} icon={<span className={`size-2.5 rounded-full ${b.color} inline-block`} />} />
-                    ))}
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-            <TabsContent value="payable" className="mt-4">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card>
-                  <CardHeader><CardTitle>On Time</CardTitle></CardHeader>
-                  <CardContent>
-                    <DetailSection title={ageBuckets[0].label} items={data.filter((i: any) => i.category === 'payable' && i.days <= ageBuckets[0].max)} icon={<span className={`size-2.5 rounded-full ${ageBuckets[0].color} inline-block`} />} />
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader><CardTitle>Overdue</CardTitle></CardHeader>
-                  <CardContent>
-                    {ageBuckets.slice(1).map(b => (
-                      <DetailSection key={b.label} title={b.label} items={data.filter((i: any) => i.category === 'payable' && i.days > b.min && i.days <= b.max)} icon={<span className={`size-2.5 rounded-full ${b.color} inline-block`} />} />
-                    ))}
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-          </Tabs>
+          <DetailTab data={data} ageBuckets={AGE_BUCKETS} />
         </TabsContent>
 
         <TabsContent value="search" className="mt-6">
-          <div className="mb-4 flex items-center gap-2">
-            <Search size={16} className="text-muted-foreground" />
-            <Input placeholder="Search by customer name..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="max-w-sm" />
-            <DropdownMenu>
-              <DropdownMenuTrigger render={<Button variant={ageFilter !== 'all' ? 'default' : 'outline'} size="sm" className="gap-1.5 ml-2" />}>
-                <Filter size={14} />
-                {ageFilter === 'all' ? 'Filter by Age' : ageFilter}
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => setAgeFilter('all')}>All</DropdownMenuItem>
-                {ageBuckets.map(b => (
-                  <DropdownMenuItem key={b.label} onClick={() => setAgeFilter(b.label)}>
-                    {b.label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-          <Card>
-            <CardContent>
-              {filteredData.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4">No entries match your criteria.</p>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left text-muted-foreground">
-                      <th className="pb-2 font-medium">Customer</th>
-                      <th className="pb-2 font-medium text-right">Amount</th>
-                      <th className="pb-2 font-medium text-right">Days</th>
-                      <th className="pb-2 font-medium">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredData.map((item: any, i: number) => (
-                      <tr key={i} className="border-b last:border-0">
-                        <td className="py-2.5 font-medium">{item.customer}</td>
-                        <td className="py-2.5 text-right">₹{item.amount.toLocaleString()}</td>
-                        <td className="py-2.5 text-right">{item.days}d</td>
-                        <td className="py-2.5">
-                          <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${statusStyles[item.status as keyof typeof statusStyles]}`}>
-                            {(item.status ?? '').charAt(0).toUpperCase() + (item.status ?? '').slice(1)}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </CardContent>
-          </Card>
+          <SearchTab
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            ageFilter={ageFilter}
+            onAgeFilterChange={setAgeFilter}
+            ageBuckets={AGE_BUCKETS}
+            filteredData={filteredData}
+            data={data}
+          />
         </TabsContent>
 
         <TabsContent value="datewise" className="mt-6">
-          <Card className="mb-4">
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <Input type="date" value={datewisePick} onChange={(e) => setDatewisePick(e.target.value)} className="w-48" />
-                <Button size="sm" onClick={handleAddDateColumn} disabled={!datewisePick}><Plus size={14} /> Fetch</Button>
-              </div>
-            </CardHeader>
-          </Card>
-          {datewiseCols.length === 0 ? (
-            <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">Select a date and click Fetch to add an outstanding column.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[600px]">
-                <thead>
-                  <tr className="border-b text-left text-muted-foreground">
-                    <th className="pb-2.5 pr-4 font-medium whitespace-nowrap sticky left-0 bg-background">Customer</th>
-                    {datewiseCols.map(date => <th key={date} className="pb-2.5 px-3 font-medium text-right whitespace-nowrap">{date}</th>)}
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.map((item: any, i: number) => (
-                    <tr key={i} className="border-b last:border-0">
-                      <td className="py-2.5 pr-4 font-medium sticky left-0 bg-background">{item.customer}</td>
-                      {datewiseCols.map(date => (
-                        <td key={date} className="py-2.5 px-3 text-right whitespace-nowrap">
-                          ₹{item.date <= date ? item.amount.toLocaleString() : '-'}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                  <tr className="border-t-2 font-medium">
-                    <td className="py-2.5 pr-4 sticky left-0 bg-background">Total</td>
-                    {datewiseCols.map(date => (
-                      <td key={date} className="py-2.5 px-3 text-right whitespace-nowrap">
-                        ₹{data.filter((i: any) => i.date <= date).reduce((s: number, i: any) => s + i.amount, 0).toLocaleString()}
-                      </td>
-                    ))}
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          )}
+          <DatewiseTab
+            data={data}
+            datewisePick={datewisePick}
+            onDatewisePickChange={setDatewisePick}
+            datewiseCols={datewiseCols}
+            onAddDateColumn={handleAddDateColumn}
+          />
         </TabsContent>
       </Tabs>
     </div>

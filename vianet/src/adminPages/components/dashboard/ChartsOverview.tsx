@@ -1,6 +1,6 @@
-import { BarChart, Bar, CartesianGrid, XAxis, YAxis, ChartContainer, PieChart, Pie, Cell, ChartTooltipContent } from 'recharts';
-import { formatIndianCurrency } from '@/lib/utils';
-import { Bar, PieChart, XAxis as RechartsXAxis, YAxis as RechartsYAxis, CartesianGrid, Pie, Cell, BarChart, ChartTooltipContent } from 'recharts';
+import { BarChart, Bar, CartesianGrid, XAxis, YAxis, PieChart, Pie, Cell } from 'recharts';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 
 export interface ChartOverviewProps {
   chartData: { month: string; sales: number; profit: number }[];
