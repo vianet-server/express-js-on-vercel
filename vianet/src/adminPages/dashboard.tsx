@@ -1,3 +1,5 @@
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatIndianCurrency } from "@/lib/utils";
 import { useState, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -103,14 +105,21 @@ export function Dashboard() {
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <Tabs defaultValue="executive" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="executive">Executive</TabsTrigger>
+          <TabsTrigger value="sales">Sales & Performance</TabsTrigger>
+          <TabsTrigger value="inventory">Inventory</TabsTrigger>
+        </TabsList>
+        <TabsContent value="executive" className="flex flex-col gap-6 mt-0">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard>
           <Card className="h-full hover:shadow-md transition-shadow cursor-context-menu">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Today's Sale</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <div className="text-2xl font-bold">₹{(stats.todaySale ?? 0).toLocaleString()}</div>
+              <div className="text-2xl font-bold">{formatIndianCurrency(stats.todaySale ?? 0)}</div>
               <div className="flex items-center gap-1 text-xs text-green-600">
                 <ArrowUpRight size={14} /> +{stats.saleChangePercent}% <span className="text-muted-foreground ml-1">vs yesterday</span>
               </div>
@@ -128,7 +137,7 @@ export function Dashboard() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Profit</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <div className="text-2xl font-bold">₹{(stats.totalProfit ?? 0).toLocaleString()}</div>
+              <div className="text-2xl font-bold">{formatIndianCurrency(stats.totalProfit ?? 0)}</div>
               <div className="flex items-center gap-1 text-xs text-green-600">
                 <ArrowUpRight size={14} /> +{stats.profitChangePercent}% <span className="text-muted-foreground ml-1">vs last month</span>
               </div>
@@ -148,7 +157,7 @@ export function Dashboard() {
                     <span className="text-xs font-medium text-muted-foreground w-4">{i + 1}.</span>
                     <span className="text-sm">{(s.name ?? '').split(' ')[0]}</span>
                   </div>
-                  <span className="text-sm font-medium">₹{(s.sales ?? 0).toLocaleString()}</span>
+                  <span className="text-sm font-medium">{formatIndianCurrency(s.sales ?? 0)}</span>
                 </div>
               ))}
             </CardContent>
@@ -161,7 +170,7 @@ export function Dashboard() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Spend</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <div className="text-2xl font-bold">₹{(stats.totalSpend ?? 0).toLocaleString()}</div>
+              <div className="text-2xl font-bold">{formatIndianCurrency(stats.totalSpend ?? 0)}</div>
               <div className="flex items-center gap-1 text-xs text-red-500">
                 <ArrowDownRight size={14} /> {stats.spendChangePercent}% <span className="text-muted-foreground ml-1">vs last month</span>
               </div>
@@ -214,6 +223,24 @@ export function Dashboard() {
           </CardContent>
         </Card>
       </div>
+        </TabsContent>
+        <TabsContent value="sales" className="flex flex-col gap-6 mt-0">
+          <Card>
+            <CardHeader><CardTitle>Sales Leaderboard & Trends</CardTitle></CardHeader>
+            <CardContent>
+              <div className="text-sm text-muted-foreground">More detailed sales metrics, territory tracking, and target vs achievement will be populated here.</div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="inventory" className="flex flex-col gap-6 mt-0">
+          <Card>
+            <CardHeader><CardTitle>Inventory Health & Ageing</CardTitle></CardHeader>
+            <CardContent>
+              <div className="text-sm text-muted-foreground">Detailed warehouse stock, fast/slow moving items, and reorder alerts will be populated here.</div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
