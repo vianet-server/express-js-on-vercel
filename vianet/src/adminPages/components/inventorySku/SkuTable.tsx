@@ -18,7 +18,6 @@ export function SkuTable({ filtered, visibleGroups, mounted, virtualizer, onEdit
   const navigate = useNavigate();
 
   return (
-    <div className="overflow-auto border rounded-lg max-h-[70vh]">
       <table className="w-full text-sm table-fixed">
         <thead>
           <tr className="border-b">
@@ -100,6 +99,5 @@ export function SkuTable({ filtered, visibleGroups, mounted, virtualizer, onEdit
           })()}
         </tbody>
       </table>
-    </div>
   );
 }

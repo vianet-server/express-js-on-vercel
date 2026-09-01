@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { AlertTriangle, UserCheck, Trash2, Info, Users, Loader2 } from 'lucide-react';
+import { AlertTriangle, UserCheck, Trash2, Info, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setAllAccessGroups } from '@/store/slices/inventorySlice';
@@ -122,7 +122,7 @@ export function InventoryControl() {
         </div>
       </div>
 
-      <Tabs orientation="vertical" defaultValue="overview" className="flex gap-6">
+      <Tabs defaultValue="access-group" className="flex gap-6">
         
         <TabsContent value="access-group" className="flex-1 mt-0 flex flex-col gap-6">
           <AccessGroupList

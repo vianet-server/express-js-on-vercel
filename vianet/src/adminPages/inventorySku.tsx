@@ -32,6 +32,7 @@ export function InventorySku() {
   const [allStocks, setAllStocks] = useState<SkuRow[]>([]);
   const [stocksLoading, setStocksLoading] = useState(false);
   const [showSelectedOnly, setShowSelectedOnly] = useState(false);
+  const [showOnlyWithAccess, setShowOnlyWithAccess] = useState(false);
   const STOCK_PAGE_SIZE = 10;
 
   const filteredStocks = useMemo(() =>
@@ -97,7 +98,13 @@ export function InventorySku() {
       const bLower = b.toLowerCase();
       return sBrand === bLower || sBrand.startsWith(bLower + ' ') || sBrand.startsWith(bLower + '-');
     });
-    return brandMatch && (!q || s.sku.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || sBrand.includes(q));
+    if (!brandMatch) return false;
+    if (q && !s.sku.toLowerCase().includes(q) && !s.name.toLowerCase().includes(q) && !sBrand.includes(q)) return false;
+    if (showOnlyWithAccess && visibleGroups.length > 0) {
+      const hasAccess = visibleGroups.some(g => (s.accessGroups ?? []).some((a: any) => a.group === g && a.qty > 0));
+      if (!hasAccess) return false;
+    }
+    return true;
   });
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -258,6 +265,8 @@ export function InventorySku() {
         accessGroupNames={accessGroupNames}
         selectedGroups={selectedGroups}
         onToggleGroup={toggleGroup}
+        showOnlyWithAccess={showOnlyWithAccess}
+        onShowOnlyWithAccessChange={setShowOnlyWithAccess}
         onExportTemplate={handleExportTemplate}
         uploading={uploading}
         onImport={handleImport}

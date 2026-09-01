@@ -1,12 +1,17 @@
 import { BarChart, Bar, CartesianGrid, XAxis, YAxis, PieChart, Pie, Cell } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 
 export interface ChartOverviewProps {
   chartData: { month: string; sales: number; profit: number }[];
   pieData: { name: string; value: number }[];
   pieColors: string[];
 }
+
+const chartConfig = {
+  sales: { label: 'Sales', color: '#2563eb' },
+  profit: { label: 'Profit', color: '#16a34a' },
+} as const;
 
 export function ChartsOverview({ chartData, pieData, pieColors }: ChartOverviewProps) {
   const pieTotal = pieData.reduce((s, i) => s + i.value, 0);
@@ -17,7 +22,7 @@ export function ChartsOverview({ chartData, pieData, pieColors }: ChartOverviewP
         <Card>
           <CardHeader><CardTitle>Sales & Profit Overview</CardTitle></CardHeader>
           <CardContent>
-            <ChartContainer className="h-80 w-full">
+            <ChartContainer config={chartConfig} className="h-80 w-full">
               <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
@@ -35,7 +40,7 @@ export function ChartsOverview({ chartData, pieData, pieColors }: ChartOverviewP
         <Card>
           <CardHeader><CardTitle>Product Share</CardTitle></CardHeader>
           <CardContent>
-            <ChartContainer className="h-80 w-full">
+            <ChartContainer config={chartConfig} className="h-80 w-full">
               <PieChart>
                 <Pie cx="50%" cy="50%" innerRadius={50} outerRadius={90} dataKey="value" paddingAngle={3}>
                   {pieData.map((_, i) => (

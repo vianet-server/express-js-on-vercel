@@ -176,7 +176,7 @@ export function AccessGroupStocks() {
       <div className="flex flex-col gap-4 items-center justify-center h-64 p-6">
         <h2 className="text-xl font-bold">Access Group Not Found</h2>
         {loadError && <p className="text-sm text-destructive max-w-md text-center">{loadError}</p>}
-        <Button variant="outline" onClick={() => navigate('/admin/inventory')}>
+        <Button variant="outline" onClick={() => navigate('/admin/inventory/control')}>
           <ArrowLeft size={14} /> Back
         </Button>
       </div>
@@ -189,7 +189,7 @@ export function AccessGroupStocks() {
     <div className="flex flex-col gap-6 p-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" onClick={() => navigate('/admin/inventory')}>
+          <Button variant="outline" size="icon" onClick={() => navigate('/admin/inventory/control')}>
             <ArrowLeft size={18} />
           </Button>
           <div>

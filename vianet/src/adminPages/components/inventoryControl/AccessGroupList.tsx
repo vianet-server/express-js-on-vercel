@@ -20,7 +20,7 @@ export function AccessGroupList({ groups, onDetail, onNavigate, onDelete }: Acce
         <div className="flex flex-col">
           {(groups ?? []).map((g, i) => (
             <div key={g.id} className={`flex items-center justify-between py-3 ${i < (groups ?? []).length - 1 ? 'border-b' : ''}`}>
-              <div className="flex items-start gap-3 cursor-pointer" onClick={() => onDetail(g)}>
+              <div className="flex items-start gap-3 cursor-pointer" onClick={() => onNavigate(g.name)}>
                 <div className="flex size-9 items-center justify-center rounded-lg bg-purple-100 text-purple-700">
                   <Users size={16} />
                 </div>

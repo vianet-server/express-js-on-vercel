@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import { Plus, Users, Edit3, Loader2 } from 'lucide-react';
 import { BrandFilter } from './BrandFilter';
 
@@ -8,21 +9,29 @@ interface AccessGroupPopoverProps {
   accessGroupNames: string[];
   selectedGroups: string[];
   onToggleGroup: (group: string) => void;
+  showOnlyWithAccess: boolean;
+  onShowOnlyWithAccessChange: (v: boolean) => void;
 }
 
-function AccessGroupPopover({ accessGroupNames, selectedGroups, onToggleGroup }: AccessGroupPopoverProps) {
+function AccessGroupPopover({ accessGroupNames, selectedGroups, onToggleGroup, showOnlyWithAccess, onShowOnlyWithAccessChange }: AccessGroupPopoverProps) {
   return (
     <Popover>
       <PopoverTrigger className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 cursor-pointer">
         <Users size={14} /> Select Access-Group
       </PopoverTrigger>
-      <PopoverContent className="w-56 p-2">
+      <PopoverContent className="w-64 p-2">
         <div className="flex flex-col gap-1">
           {accessGroupNames.map(g => (
             <label key={g} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer text-sm">
               <Checkbox checked={selectedGroups.includes(g)} onCheckedChange={() => onToggleGroup(g)} />{g}
             </label>
           ))}
+        </div>
+        <div className="border-t mt-2 pt-2">
+          <label className="flex items-center justify-between px-2 py-1.5 text-sm cursor-pointer">
+            <span className="text-muted-foreground">Only with access</span>
+            <Switch checked={showOnlyWithAccess} onCheckedChange={onShowOnlyWithAccessChange} />
+          </label>
         </div>
       </PopoverContent>
     </Popover>
@@ -54,6 +63,8 @@ interface PageHeaderProps {
   accessGroupNames: string[];
   selectedGroups: string[];
   onToggleGroup: (group: string) => void;
+  showOnlyWithAccess: boolean;
+  onShowOnlyWithAccessChange: (v: boolean) => void;
   onExportTemplate: () => void;
   uploading: boolean;
   onImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -62,7 +73,7 @@ interface PageHeaderProps {
 
 export function PageHeader({
   brands, selectedBrands, onSelectedBrandsChange, brandSearch, onBrandSearchChange,
-  accessGroupNames, selectedGroups, onToggleGroup,
+  accessGroupNames, selectedGroups, onToggleGroup, showOnlyWithAccess, onShowOnlyWithAccessChange,
   onExportTemplate, uploading, onImport, onAddAccess,
 }: PageHeaderProps) {
   return (
@@ -80,6 +91,8 @@ export function PageHeader({
           accessGroupNames={accessGroupNames}
           selectedGroups={selectedGroups}
           onToggleGroup={onToggleGroup}
+          showOnlyWithAccess={showOnlyWithAccess}
+          onShowOnlyWithAccessChange={onShowOnlyWithAccessChange}
         />
         <Button variant="outline" size="sm" onClick={onExportTemplate} className="gap-1 px-3" title="Export current view to Excel">
           <Edit3 size={14} /> Export Map
