@@ -9,6 +9,14 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Calendar, Download, FileDown, FileSpreadsheet, Search, TrendingUp, TrendingDown, ChevronRight, ChevronDown, Plus, Loader2, ChartLine } from 'lucide-react';
 import { Line, LineChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { api } from '@/lib/api';
+import { formatIndianCurrency } from '@/lib/utils';
+
+function formatMonth(yyyyMm: string) {
+  if (!yyyyMm) return '';
+  const [y, m] = yyyyMm.split('-');
+  const date = new Date(parseInt(y), parseInt(m) - 1);
+  return date.toLocaleDateString('default', { month: 'short', year: 'numeric' });
+}
 
 function DetailSection({ title, items, icon }: { title: string; items: any[]; icon: React.ReactNode }) {
   const [openIds, setOpenIds] = useState<number[]>([]);
@@ -31,19 +39,19 @@ function DetailSection({ title, items, icon }: { title: string; items: any[]; ic
                   {open ? <ChevronDown size={14} className="shrink-0" /> : <ChevronRight size={14} className="shrink-0" />}
                   {item.label}
                 </CollapsibleTrigger>
-                <span className="text-sm font-medium">₹{item.amount.toLocaleString()}</span>
+                <span className="text-sm font-medium">{formatIndianCurrency(item.amount)}</span>
               </div>
               <CollapsibleContent>
                 <div className="ml-7 pl-3 border-l-2 border-muted">
                   {(item.subs ?? []).map((sub: any, i: number) => (
                     <div key={i} className="flex items-center justify-between py-2 text-sm text-muted-foreground border-b last:border-0">
                       <span>{sub.label}</span>
-                      <span>₹{sub.amount.toLocaleString()}</span>
+                      <span>{formatIndianCurrency(sub.amount)}</span>
                     </div>
                   ))}
                   <div className="flex items-center justify-between py-2 text-sm font-medium border-t">
                     <span>Total</span>
-                    <span>₹{(item.subs ?? []).reduce((s: number, s2: any) => s + s2.amount, 0).toLocaleString()}</span>
+                    <span>{formatIndianCurrency((item.subs ?? []).reduce((s: number, s2: any) => s + s2.amount, 0))}</span>
                   </div>
                 </div>
               </CollapsibleContent>
@@ -191,24 +199,24 @@ export function Pnl() {
                 className={`border-b last:border-0 hover:bg-muted/30 ${hasChildren ? 'cursor-pointer select-none' : ''}`}
                 onClick={() => hasChildren && toggleMonthlyExpand(expandKey)}
               >
-                <td className="py-2.5 pr-4 pl-4 font-medium sticky left-0 bg-background whitespace-nowrap">
+                <td className="py-2.5 pr-4 pl-4 font-medium sticky left-0 z-10 bg-background z-10 whitespace-nowrap">
                   {hasChildren && (open ? <ChevronDown size={14} className="mr-1 inline shrink-0" /> : <ChevronRight size={14} className="mr-1 inline shrink-0" />)}
                   {label}
                   {hasChildren && <span className="ml-2 text-xs font-normal text-muted-foreground">({childLabels[label].length})</span>}
                 </td>
                 {monthlyData.map(m => {
                   const row = m.data.find((d: any) => d.label === label && d.type === type);
-                  return <td key={m.month} className="py-2.5 px-3 text-right whitespace-nowrap">{row ? `₹${row.amount.toLocaleString()}` : '-'}</td>;
+                  return <td key={formatMonth(m.month)} className="py-2.5 px-3 text-right whitespace-nowrap">{row ? `${formatIndianCurrency(row.amount)}` : '-'}</td>;
                 })}
               </tr>
               {open && (childLabels[label] ?? []).map(child => (
                 <tr key={`${label}-${child}`} className="border-b last:border-0 hover:bg-muted/30 text-xs text-muted-foreground">
-                  <td className="py-1.5 pr-4 pl-8 sticky left-0 bg-background whitespace-nowrap">↳ {child}</td>
+                  <td className="py-1.5 pr-4 pl-8 sticky left-0 z-10 bg-background z-10 whitespace-nowrap">↳ {child}</td>
                   {monthlyData.map(m => {
                     const sub = m.data
                       .find((d: any) => d.label === label && d.type === type)
                       ?.subs?.find((s: any) => s.label === child);
-                    return <td key={m.month} className="py-1.5 px-3 text-right whitespace-nowrap">{sub ? `₹${sub.amount.toLocaleString()}` : '-'}</td>;
+                    return <td key={formatMonth(m.month)} className="py-1.5 px-3 text-right whitespace-nowrap">{sub ? `₹${sub.amount.toLocaleString()}` : '-'}</td>;
                   })}
                 </tr>
               ))}
@@ -314,15 +322,15 @@ export function Pnl() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Total Income</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-bold text-green-600 flex items-center gap-1"><TrendingUp size={18} /> ₹{totalIncome.toLocaleString()}</div></CardContent>
+              <CardContent><div className="text-2xl font-bold text-green-600 flex items-center gap-1"><TrendingUp size={18} /> {formatIndianCurrency(totalIncome)}</div></CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Total Expenses</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-bold text-red-600 flex items-center gap-1"><TrendingDown size={18} /> ₹{totalExpenses.toLocaleString()}</div></CardContent>
+              <CardContent><div className="text-2xl font-bold text-red-600 flex items-center gap-1"><TrendingDown size={18} /> {formatIndianCurrency(totalExpenses)}</div></CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Net {netProfit >= 0 ? 'Profit' : 'Loss'}</CardTitle></CardHeader>
-              <CardContent><div className={`text-2xl font-bold ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>₹{Math.abs(netProfit).toLocaleString()}</div></CardContent>
+              <CardContent><div className={`text-2xl font-bold ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatIndianCurrency(netProfit)}</div></CardContent>
             </Card>
           </div>
           <Card className="mt-4">
@@ -347,7 +355,7 @@ export function Pnl() {
                     data.map((item: any, i: number) => (
                       <tr key={i} className="border-b last:border-0">
                         <td className="py-2.5 font-medium">{item.label}</td>
-                        <td className="py-2.5 text-right pr-6">₹{item.amount.toLocaleString()}</td>
+                        <td className="py-2.5 text-right pr-6">{formatIndianCurrency(item.amount)}</td>
                         <td className="py-2.5 pl-6">
                           <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${item.type === 'income' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                             {(item.type ?? '').charAt(0).toUpperCase() + (item.type ?? '').slice(1)}
@@ -403,7 +411,7 @@ export function Pnl() {
                     {filteredData.map((item: any, i: number) => (
                       <tr key={i} className="border-b last:border-0">
                         <td className="py-2.5 font-medium">{item.label}</td>
-                        <td className="py-2.5 text-right">₹{item.amount.toLocaleString()}</td>
+                        <td className="py-2.5 text-right">{formatIndianCurrency(item.amount)}</td>
                         <td className="py-2.5">
                           <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${item.type === 'income' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                             {(item.type ?? '').charAt(0).toUpperCase() + (item.type ?? '').slice(1)}
@@ -430,30 +438,30 @@ export function Pnl() {
           {datewiseCols.length === 0 ? (
             <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">Select a date and click Fetch to add a P&L column.</div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-auto max-h-[600px] border rounded-md">
               <table className="w-full text-sm min-w-[600px]">
                 <thead>
                   <tr className="border-b text-left text-muted-foreground">
-                    <th className="pb-2.5 pr-4 font-medium whitespace-nowrap sticky left-0 bg-background">Item</th>
+                    <th className="pb-2.5 pr-4 font-medium whitespace-nowrap sticky left-0 z-10 bg-background z-10">Item</th>
                     {datewiseCols.map(date => <th key={date} className="pb-2.5 px-3 font-medium text-right whitespace-nowrap">{date}</th>)}
                   </tr>
                 </thead>
                 <tbody>
                   {data.map((item: any, i: number) => (
                     <tr key={i} className="border-b last:border-0">
-                      <td className="py-2.5 pr-4 font-medium sticky left-0 bg-background">{item.label}</td>
+                      <td className="py-2.5 pr-4 font-medium sticky left-0 z-10 bg-background z-10">{item.label}</td>
                       {datewiseCols.map(date => (
                         <td key={date} className="py-2.5 px-3 text-right whitespace-nowrap">
-                          ₹{item.date <= date ? item.amount.toLocaleString() : '-'}
+                          {item.date <= date ? formatIndianCurrency(item.amount) : '-'}
                         </td>
                       ))}
                     </tr>
                   ))}
                   <tr className="border-t-2 font-medium">
-                    <td className="py-2.5 pr-4 sticky left-0 bg-background">Total</td>
+                    <td className="py-2.5 pr-4 sticky left-0 z-10 bg-background z-10">Total</td>
                     {datewiseCols.map(date => (
                       <td key={date} className="py-2.5 px-3 text-right whitespace-nowrap">
-                        ₹{data.filter((i: any) => i.date <= date).reduce((s: number, i: any) => s + i.amount, 0).toLocaleString()}
+                        {formatIndianCurrency(data.filter((i: any) => i.date <= date).reduce((s: number, i: any) => s + i.amount, 0))}
                       </td>
                     ))}
                   </tr>
@@ -474,25 +482,25 @@ export function Pnl() {
                   <p className="text-xs">Ensure your Tally sync pushes to the /api/admin/reports/pnl-monthly endpoint.</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="overflow-auto max-h-[600px] border rounded-md">
                   <table className="w-full text-sm min-w-[600px]">
                     <thead>
                       <tr className="border-b text-left text-muted-foreground">
-                        <th className="pb-2.5 pr-4 font-medium whitespace-nowrap sticky left-0 bg-background">Category</th>
+                        <th className="pb-2.5 pr-4 pl-4 font-medium whitespace-nowrap sticky left-0 z-10 top-0 z-30 bg-background border-b shadow-sm">Category</th>
                         {monthlyData.map(m => (
-                          <th key={m.month} className="pb-2.5 px-3 font-medium text-right whitespace-nowrap">{m.month}</th>
+                          <th key={formatMonth(m.month)} className="pb-2.5 px-3 font-medium text-right whitespace-nowrap">{formatMonth(m.month)}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {/* INCOMES */}
                       <tr className="bg-muted/50">
-                        <td colSpan={monthlyData.length + 1} className="py-2 px-2 font-semibold text-green-700 sticky left-0">Income</td>
+                        <td colSpan={monthlyData.length + 1} className="py-2 px-2 pl-4 font-semibold text-green-700 sticky left-0 z-10">Income</td>
                       </tr>
                       {renderMonthlyGroup('income')}
                       {/* EXPENSES */}
                       <tr className="bg-muted/50">
-                        <td colSpan={monthlyData.length + 1} className="py-2 px-2 font-semibold text-red-700 sticky left-0 border-t">Expenses</td>
+                        <td colSpan={monthlyData.length + 1} className="py-2 px-2 pl-4 font-semibold text-red-700 sticky left-0 z-10 border-t">Expenses</td>
                       </tr>
                       {renderMonthlyGroup('expense')}
                     </tbody>

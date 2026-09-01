@@ -1,3 +1,4 @@
+import { formatIndianCurrency } from "@/lib/utils";
 import { useEffect, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Button } from '@/components/ui/button';
@@ -119,19 +120,19 @@ export function Daybook() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1"><TrendingUp size={14} /> Total Sales</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-bold text-green-600">₹{totalSales.toLocaleString()}</div></CardContent>
+              <CardContent><div className="text-2xl font-bold text-green-600">{formatIndianCurrency(totalSales)}</div></CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1"><Receipt size={14} /> Total Payments</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-bold text-blue-600">₹{totalPayments.toLocaleString()}</div></CardContent>
+              <CardContent><div className="text-2xl font-bold text-blue-600">{formatIndianCurrency(totalPayments)}</div></CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1"><TrendingDown size={14} /> Total Expenses</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-bold text-red-600">₹{totalExpenses.toLocaleString()}</div></CardContent>
+              <CardContent><div className="text-2xl font-bold text-red-600">{formatIndianCurrency(totalExpenses)}</div></CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1"><DollarSign size={14} /> Net Cash Flow</CardTitle></CardHeader>
-              <CardContent><div className={`text-2xl font-bold ${netCash >= 0 ? 'text-green-600' : 'text-red-600'}`}>₹{netCash.toLocaleString()}</div></CardContent>
+              <CardContent><div className={`text-2xl font-bold ${netCash >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatIndianCurrency(netCash)}</div></CardContent>
             </Card>
           </div>
 
@@ -175,7 +176,7 @@ export function Daybook() {
                           <div className="w-24 h-2 rounded-full bg-muted overflow-hidden">
                             <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color.match(/text-\w+-\d+/)?.[0]?.replace('text', 'bg') ? undefined : '#888' }} />
                           </div>
-                          <span className="text-sm font-medium w-24 text-right">₹{total.toLocaleString()}</span>
+                          <span className="text-sm font-medium w-24 text-right">{formatIndianCurrency(total)}</span>
                         </div>
                       </div>
                     );
@@ -209,8 +210,8 @@ export function Daybook() {
                     <tr key={i} className="border-b last:border-0">
                       <td className="py-2.5 font-medium">{name || '-'}</td>
                       <td className="py-2.5 text-right">{data.count}</td>
-                      <td className="py-2.5 text-right">₹{data.total.toLocaleString()}</td>
-                      <td className="py-2.5 text-right">₹{Math.round(data.total / data.count).toLocaleString()}</td>
+                      <td className="py-2.5 text-right">{formatIndianCurrency(data.total)}</td>
+                      <td className="py-2.5 text-right">{formatIndianCurrency(Math.round(data.total / data.count))}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -257,7 +258,7 @@ export function Daybook() {
                           </CollapsibleTrigger>
                           <div className="flex items-center gap-4 shrink-0">
                             {t.salesman ? <span className="text-xs text-muted-foreground hidden sm:inline">{t.salesman}</span> : null}
-                            <span className="text-sm font-medium tabular-nums">₹{(t.amount ?? 0).toLocaleString()}</span>
+                            <span className="text-sm font-medium tabular-nums">{formatIndianCurrency(t.amount ?? 0)}</span>
                           </div>
                         </div>
                         {hasDetail && (
@@ -285,7 +286,7 @@ export function Daybook() {
                                           <div className="flex items-center justify-between text-xs">
                                             <span className="font-medium">{s.ledgerName}</span>
                                             <span className={`font-semibold tabular-nums ${isDr ? 'text-red-600' : 'text-green-600'}`}>
-                                              {isDr ? 'Dr' : 'Cr'} ₹{Math.abs(amt).toLocaleString()}
+                                              {isDr ? 'Dr' : 'Cr'} {formatIndianCurrency(amt)}
                                             </span>
                                           </div>
                                           {hasDesc && <div className="text-[11px] text-muted-foreground mt-0.5">{s.description}</div>}
@@ -315,11 +316,11 @@ export function Daybook() {
                                         <div key={i} className="rounded border px-3 py-2">
                                           <div className="flex items-center justify-between text-xs">
                                             <span className="font-medium">{s.item}</span>
-                                            <span className="font-semibold tabular-nums">₹{amt.toLocaleString()}</span>
+                                            <span className="font-semibold tabular-nums">{formatIndianCurrency(amt)}</span>
                                           </div>
                                           <div className="flex gap-4 mt-1 text-[11px] text-muted-foreground">
                                             <span>Qty: <b>{qty > 0 ? qty.toLocaleString() : '-'}</b>{s.unit ? ` ${s.unit}` : ''}</span>
-                                            <span>Rate: <b>₹{rate.toLocaleString()}</b></span>
+                                            <span>Rate: <b>{formatIndianCurrency(rate)}</b></span>
                                           </div>
                                           {s.description ? (
                                             <div className="text-[11px] text-muted-foreground mt-0.5">{s.description}</div>
