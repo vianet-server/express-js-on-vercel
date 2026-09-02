@@ -1,11 +1,18 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { api } from '@/lib/api';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setSkuData, updateSkuItem, setAllAccessGroups, type SkuRow } from '@/store/slices/inventorySlice';
-import { SkuTable, AddAccessDialog, EditDialog, ContextMenu, PageHeader, SearchBar, GroupPills } from './components/inventorySku';
+
+const SkuTable = lazy(() => import('./components/inventorySku').then(m => ({ default: m.SkuTable })));
+const AddAccessDialog = lazy(() => import('./components/inventorySku').then(m => ({ default: m.AddAccessDialog })));
+const EditDialog = lazy(() => import('./components/inventorySku').then(m => ({ default: m.EditDialog })));
+const ContextMenu = lazy(() => import('./components/inventorySku').then(m => ({ default: m.ContextMenu })));
+const PageHeader = lazy(() => import('./components/inventorySku').then(m => ({ default: m.PageHeader })));
+const SearchBar = lazy(() => import('./components/inventorySku').then(m => ({ default: m.SearchBar })));
+const GroupPills = lazy(() => import('./components/inventorySku').then(m => ({ default: m.GroupPills })));
 
 export function InventorySku() {
   const navigate = useNavigate();
@@ -254,6 +261,7 @@ export function InventorySku() {
   }
 
   return (
+    <Suspense fallback={<Loader2 className="animate-spin size-8 text-muted-foreground" />}>
     <div className="flex flex-col gap-6 p-6">
       <PageHeader
         brands={brands}
@@ -329,5 +337,6 @@ export function InventorySku() {
 
       <GroupPills visibleGroups={visibleGroups} />
     </div>
+    </Suspense>
   );
 }

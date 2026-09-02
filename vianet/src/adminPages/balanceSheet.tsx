@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -6,7 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calendar, Download, FileDown, FileSpreadsheet, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
-import { SummaryCards, SummaryTable, DetailTab, SearchTab, DatewiseTab } from './components/balanceSheet';
+
+const SummaryCards = lazy(() => import('./components/balanceSheet').then(m => ({ default: m.SummaryCards })));
+const SummaryTable = lazy(() => import('./components/balanceSheet').then(m => ({ default: m.SummaryTable })));
+const DetailTab = lazy(() => import('./components/balanceSheet').then(m => ({ default: m.DetailTab })));
+const SearchTab = lazy(() => import('./components/balanceSheet').then(m => ({ default: m.SearchTab })));
+const DatewiseTab = lazy(() => import('./components/balanceSheet').then(m => ({ default: m.DatewiseTab })));
 
 export function BalanceSheet() {
   const [data, setData] = useState<any[]>([]);
@@ -76,6 +81,7 @@ export function BalanceSheet() {
   }
 
   return (
+    <Suspense fallback={<Loader2 className="animate-spin size-8 text-muted-foreground" />}>
     <div className="flex flex-col gap-6 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Balance Sheet</h1>
@@ -186,5 +192,6 @@ export function BalanceSheet() {
         </TabsContent>
       </Tabs>
     </div>
+    </Suspense>
   );
 }

@@ -1,11 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ArrowLeft, Save, Upload, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
-import { MediaSection, ProductForm, StockStatusCard, PricingCard } from './components/inventoryStockDetail';
+
+const MediaSection = lazy(() => import('./components/inventoryStockDetail').then(m => ({ default: m.MediaSection })));
+const ProductForm = lazy(() => import('./components/inventoryStockDetail').then(m => ({ default: m.ProductForm })));
+const StockStatusCard = lazy(() => import('./components/inventoryStockDetail').then(m => ({ default: m.StockStatusCard })));
+const PricingCard = lazy(() => import('./components/inventoryStockDetail').then(m => ({ default: m.PricingCard })));
 
 interface StockItem {
   id: number; name: string; brand: string; model: string; variant: string; color: string;
@@ -70,6 +74,7 @@ export function InventoryStockDetail() {
   };
 
   return (
+    <Suspense fallback={<Loader2 className="animate-spin size-8 text-muted-foreground" />}>
     <div className="flex flex-col gap-6 p-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -114,5 +119,6 @@ export function InventoryStockDetail() {
         </DialogContent>
       </Dialog>
     </div>
+    </Suspense>
   );
 }

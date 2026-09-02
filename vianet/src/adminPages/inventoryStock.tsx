@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/set-state-in-effect -- server data fetch is a valid effect use */
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,11 @@ import { Search, Loader2, RefreshCw } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setStockPage, updateStockItem, resetStockPagination } from '@/store/slices/inventorySlice';
-import { StockOverviewCards, StockOverviewTable, StockDetailedTable, StockEditDialog } from './components/inventoryStock';
+
+const StockOverviewCards = lazy(() => import('./components/inventoryStock').then(m => ({ default: m.StockOverviewCards })));
+const StockOverviewTable = lazy(() => import('./components/inventoryStock').then(m => ({ default: m.StockOverviewTable })));
+const StockDetailedTable = lazy(() => import('./components/inventoryStock').then(m => ({ default: m.StockDetailedTable })));
+const StockEditDialog = lazy(() => import('./components/inventoryStock').then(m => ({ default: m.StockEditDialog })));
 
 interface StockItem {
   id: number; name: string; brand: string; group: string; model: string; variant: string; color: string;
@@ -146,6 +150,7 @@ export function InventoryStock() {
   }
 
   return (
+    <Suspense fallback={<Loader2 className="animate-spin size-8 text-muted-foreground" />}>
     <div className="flex flex-col gap-6 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Inventory Stock</h1>
@@ -236,5 +241,6 @@ export function InventoryStock() {
         onSave={confirmEditAll}
       />
     </div>
+    </Suspense>
   );
 }

@@ -1,9 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ChevronLeft, ChevronRight, Plus, Search } from 'lucide-react';
 import { api } from '@/lib/api';
-import { UserTable, CreateUserForm, PermissionsDialog } from './components/adminUsers';
+
+const UserTable = lazy(() => import('./components/adminUsers').then(m => ({ default: m.UserTable })));
+const CreateUserForm = lazy(() => import('./components/adminUsers').then(m => ({ default: m.CreateUserForm })));
+const PermissionsDialog = lazy(() => import('./components/adminUsers').then(m => ({ default: m.PermissionsDialog })));
 
 const LIMIT = 50;
 
@@ -91,6 +94,7 @@ export function AdminUsers() {
   const currentPage = Math.floor(offset / LIMIT) + 1;
 
   return (
+    <Suspense fallback={<Loader2 className="animate-spin size-8 text-muted-foreground" />}>
     <div className="flex flex-col gap-6 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">User Management</h1>
@@ -137,5 +141,6 @@ export function AdminUsers() {
         accessGroups={accessGroups}
       />
     </div>
+    </Suspense>
   );
 }

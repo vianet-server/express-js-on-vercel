@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -6,20 +6,19 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input';
 import { Calendar, Download, FileDown, FileSpreadsheet, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
-import {
-  BasicStatsCards,
-  RevenueOrdersChartCard,
-  CategoryPieChartCard,
-  MonthlyComparisonCard,
-  TopCustomersCard,
-  DailySalesCard,
-  SalesByRegionCard,
-  OrdersByChannelCard,
-  AdvancedStatsCards,
-  DeepLearningForecastCard,
-  PredictiveInsightsCard,
-  ModelHealthCard,
-} from './components/analytics';
+
+const BasicStatsCards = lazy(() => import('./components/analytics').then(m => ({ default: m.BasicStatsCards })));
+const RevenueOrdersChartCard = lazy(() => import('./components/analytics').then(m => ({ default: m.RevenueOrdersChartCard })));
+const CategoryPieChartCard = lazy(() => import('./components/analytics').then(m => ({ default: m.CategoryPieChartCard })));
+const MonthlyComparisonCard = lazy(() => import('./components/analytics').then(m => ({ default: m.MonthlyComparisonCard })));
+const TopCustomersCard = lazy(() => import('./components/analytics').then(m => ({ default: m.TopCustomersCard })));
+const DailySalesCard = lazy(() => import('./components/analytics').then(m => ({ default: m.DailySalesCard })));
+const SalesByRegionCard = lazy(() => import('./components/analytics').then(m => ({ default: m.SalesByRegionCard })));
+const OrdersByChannelCard = lazy(() => import('./components/analytics').then(m => ({ default: m.OrdersByChannelCard })));
+const AdvancedStatsCards = lazy(() => import('./components/analytics').then(m => ({ default: m.AdvancedStatsCards })));
+const DeepLearningForecastCard = lazy(() => import('./components/analytics').then(m => ({ default: m.DeepLearningForecastCard })));
+const PredictiveInsightsCard = lazy(() => import('./components/analytics').then(m => ({ default: m.PredictiveInsightsCard })));
+const ModelHealthCard = lazy(() => import('./components/analytics').then(m => ({ default: m.ModelHealthCard })));
 
 export function Analytics() {
   const [loading, setLoading] = useState(true);
@@ -76,6 +75,7 @@ export function Analytics() {
   }
 
   return (
+    <Suspense fallback={<Loader2 className="animate-spin size-8 text-muted-foreground" />}>
     <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col gap-6 p-6">
 
       <div className="flex items-center justify-between">
@@ -180,5 +180,6 @@ export function Analytics() {
       </TabsContent>
 
     </Tabs>
+    </Suspense>
   );
 }

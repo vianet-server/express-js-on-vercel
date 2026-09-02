@@ -1,9 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
-import { ApiKeyTable, UsageCards, EndpointsTable, CreateKeyDialog } from './components/api';
+
+const ApiKeyTable = lazy(() => import('./components/api').then(m => ({ default: m.ApiKeyTable })));
+const UsageCards = lazy(() => import('./components/api').then(m => ({ default: m.UsageCards })));
+const EndpointsTable = lazy(() => import('./components/api').then(m => ({ default: m.EndpointsTable })));
+const CreateKeyDialog = lazy(() => import('./components/api').then(m => ({ default: m.CreateKeyDialog })));
 
 interface ApiKey {
   id: string;
@@ -103,6 +107,7 @@ export function Api() {
   const activeKeyCount = keys.filter(k => k.status === 'active').length;
 
   return (
+    <Suspense fallback={<Loader2 className="animate-spin size-8 text-muted-foreground" />}>
     <div className="flex flex-col gap-6 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">API</h1>
@@ -132,5 +137,6 @@ export function Api() {
         onSubmit={createKey}
       />
     </div>
+    </Suspense>
   );
 }

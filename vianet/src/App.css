@@ -6,6 +6,11 @@
 
 @custom-variant dark (&:is(.dark *));
 
+body {
+  margin: 0;
+  zoom: 80%;
+}
+
 .counter {
   font-size: 16px;
   padding: 5px 10px;

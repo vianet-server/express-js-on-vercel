@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -6,7 +6,13 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calendar, Download, FileDown, FileSpreadsheet, Loader2, ChartLine } from 'lucide-react';
 import { api } from '@/lib/api';
-import { SummaryTab, DetailTab, SearchTab, DatewiseTab, MonthlyTab, GraphTab } from './components/pnl';
+
+const SummaryTab = lazy(() => import('./components/pnl').then(m => ({ default: m.SummaryTab })));
+const DetailTab = lazy(() => import('./components/pnl').then(m => ({ default: m.DetailTab })));
+const SearchTab = lazy(() => import('./components/pnl').then(m => ({ default: m.SearchTab })));
+const DatewiseTab = lazy(() => import('./components/pnl').then(m => ({ default: m.DatewiseTab })));
+const MonthlyTab = lazy(() => import('./components/pnl').then(m => ({ default: m.MonthlyTab })));
+const GraphTab = lazy(() => import('./components/pnl').then(m => ({ default: m.GraphTab })));
 
 export function Pnl() {
   const [data, setData] = useState<any[]>([]);
@@ -112,6 +118,7 @@ export function Pnl() {
   }
 
   return (
+    <Suspense fallback={<Loader2 className="animate-spin size-8 text-muted-foreground" />}>
     <div className="flex flex-col gap-6 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Profit & Loss</h1>
@@ -219,5 +226,6 @@ export function Pnl() {
         </TabsContent>
       </Tabs>
     </div>
+    </Suspense>
   );
 }

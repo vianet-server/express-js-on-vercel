@@ -1,12 +1,15 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatIndianCurrency } from '@/lib/utils';
-import { useState, useCallback} from 'react';
+import { useState, useCallback, lazy, Suspense } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { ArrowUpRight, ArrowDownRight, FileSpreadsheet, Loader2 } from 'lucide-react';
 import { Bar, BarChart, XAxis, CartesianGrid } from 'recharts';
 import { useAdminQuery } from '@/hooks/useAdminQuery';
-import { DateFilter, StatCard, ChartsOverview } from './components/dashboard';
+
+const DateFilter = lazy(() => import('./components/dashboard').then(m => ({ default: m.DateFilter })));
+const StatCard = lazy(() => import('./components/dashboard').then(m => ({ default: m.StatCard })));
+const ChartsOverview = lazy(() => import('./components/dashboard').then(m => ({ default: m.ChartsOverview })));
 
 const pieColors = ['#2563eb', '#16a34a', '#f59e0b', '#ef4444', '#8b5cf6'];
 
@@ -54,6 +57,7 @@ export function Dashboard() {
   );
 
   return (
+    <Suspense fallback={<Loader2 className="animate-spin size-8 text-muted-foreground" />}>
     <div className="flex flex-col gap-6 p-6">
       <DateFilter
         activePeriod={activePeriod}
@@ -210,5 +214,6 @@ export function Dashboard() {
         </TabsContent>
       </Tabs>
     </div>
+    </Suspense>
   );
 }

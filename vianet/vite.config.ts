@@ -7,11 +7,14 @@ import type { ProxyOptions } from 'vite'
 const proxyTarget = 'http://localhost:3000'
 
 const proxyBypass: ProxyOptions['bypass'] = (req) => {
-  // FIX 1: Prevent static assets (like .js and .css) from being proxied to the backend.
-  // If the proxy sends a .js request to your backend, and your backend doesn't find it, 
-  // it might return a 404 HTML page, causing the exact MIME type error you are seeing.
-  if (req.url && req.url.match(/\.(js|css|svg|png|jpg|jpeg|gif|ico|woff|woff2)$/)) {
-    return req.url; // Returns the asset locally instead of proxying
+  // Skip proxying for any asset/static file request (JS, CSS, images, fonts, chunks, sourcemaps)
+  if (req.url && req.url.match(/\.(js|mjs|cjs|css|svg|png|jpg|jpeg|gif|ico|woff|woff2|map|json|wasm)$/)) {
+    return req.url;
+  }
+
+  // Skip proxying for Vite's internal module requests
+  if (req.url && (req.url.startsWith('/@') || req.url.startsWith('/__'))) {
+    return req.url;
   }
 
   if (req.headers.accept?.includes('text/html')) {

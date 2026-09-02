@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,14 +6,15 @@ import { ArrowLeft, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setCurrentAccessGroupDetail, type AccessGroupDetailData } from '@/store/slices/inventorySlice';
-import { AccessGroupHeader } from './components/AccessGroupHeader';
-import { AccessGroupInfoCard } from './components/AccessGroupInfoCard';
-import { AccessGroupPricingCards } from './components/AccessGroupPricingCards';
-import { AccessGroupPrivilegesCard } from './components/AccessGroupPrivilegesCard';
-import { AccessGroupStatusCard } from './components/AccessGroupStatusCard';
-import { AccessGroupComparisonTable } from './components/AccessGroupComparisonTable';
-import { AccessGroupStockList } from './components/AccessGroupStockList';
-import { AccessGroupStockSettings } from './components/AccessGroupStockSettings';
+
+const AccessGroupHeader = lazy(() => import('./components/AccessGroupHeader').then(m => ({ default: m.AccessGroupHeader })));
+const AccessGroupInfoCard = lazy(() => import('./components/AccessGroupInfoCard').then(m => ({ default: m.AccessGroupInfoCard })));
+const AccessGroupPricingCards = lazy(() => import('./components/AccessGroupPricingCards').then(m => ({ default: m.AccessGroupPricingCards })));
+const AccessGroupPrivilegesCard = lazy(() => import('./components/AccessGroupPrivilegesCard').then(m => ({ default: m.AccessGroupPrivilegesCard })));
+const AccessGroupStatusCard = lazy(() => import('./components/AccessGroupStatusCard').then(m => ({ default: m.AccessGroupStatusCard })));
+const AccessGroupComparisonTable = lazy(() => import('./components/AccessGroupComparisonTable').then(m => ({ default: m.AccessGroupComparisonTable })));
+const AccessGroupStockList = lazy(() => import('./components/AccessGroupStockList').then(m => ({ default: m.AccessGroupStockList })));
+const AccessGroupStockSettings = lazy(() => import('./components/AccessGroupStockSettings').then(m => ({ default: m.AccessGroupStockSettings })));
 
 export function AccessGroupDetail() {
   const { sku, group } = useParams<{ sku: string; group: string }>();
@@ -83,6 +84,7 @@ export function AccessGroupDetail() {
   const hasAccess = ag.qty > 0;
 
   return (
+    <Suspense fallback={<Loader2 className="animate-spin size-8 text-muted-foreground" />}>
     <div className="flex flex-col gap-6 p-6">
       <AccessGroupHeader groupName={decodedGroup} hasAccess={hasAccess} onBack={() => navigate('/admin/inventory/sku')} />
 
@@ -117,5 +119,6 @@ export function AccessGroupDetail() {
           </CardContent>
         </Card>
     </div>
+    </Suspense>
   );
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -6,7 +6,13 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calendar, Download, FileDown, FileSpreadsheet, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
-import { SummaryCards, AgeFilterDropdown, SummaryTable, DetailTab, SearchTab, DatewiseTab } from './components/outstanding';
+
+const SummaryCards = lazy(() => import('./components/outstanding').then(m => ({ default: m.SummaryCards })));
+const AgeFilterDropdown = lazy(() => import('./components/outstanding').then(m => ({ default: m.AgeFilterDropdown })));
+const SummaryTable = lazy(() => import('./components/outstanding').then(m => ({ default: m.SummaryTable })));
+const DetailTab = lazy(() => import('./components/outstanding').then(m => ({ default: m.DetailTab })));
+const SearchTab = lazy(() => import('./components/outstanding').then(m => ({ default: m.SearchTab })));
+const DatewiseTab = lazy(() => import('./components/outstanding').then(m => ({ default: m.DatewiseTab })));
 
 const AGE_BUCKETS = [
   { label: '0-30 days', min: -Infinity, max: 30, color: 'bg-blue-500' },
@@ -82,6 +88,7 @@ export function Outstanding() {
   }
 
   return (
+    <Suspense fallback={<Loader2 className="animate-spin size-8 text-muted-foreground" />}>
     <div className="flex flex-col gap-6 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Outstanding</h1>
@@ -190,5 +197,6 @@ export function Outstanding() {
         </TabsContent>
       </Tabs>
     </div>
+    </Suspense>
   );
 }

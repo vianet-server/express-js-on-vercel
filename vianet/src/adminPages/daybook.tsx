@@ -1,11 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Search, Filter, Loader2 } from 'lucide-react';
 import { useAdminQuery } from '@/hooks/useAdminQuery';
-import { DailyChart, TransactionBreakdown, SalesmanPerformance, SummaryCards, TransactionRow } from './components/daybook';
+
+const DailyChart = lazy(() => import('./components/daybook').then(m => ({ default: m.DailyChart })));
+const TransactionBreakdown = lazy(() => import('./components/daybook').then(m => ({ default: m.TransactionBreakdown })));
+const SalesmanPerformance = lazy(() => import('./components/daybook').then(m => ({ default: m.SalesmanPerformance })));
+const SummaryCards = lazy(() => import('./components/daybook').then(m => ({ default: m.SummaryCards })));
+const TransactionRow = lazy(() => import('./components/daybook').then(m => ({ default: m.TransactionRow })));
 
 const typeColors: Record<string, string> = {
   Sale: 'bg-green-100 text-green-700',
@@ -78,6 +83,7 @@ export function Daybook() {
   }
 
   return (
+    <Suspense fallback={<Loader2 className="animate-spin size-8 text-muted-foreground" />}>
     <div className="flex flex-col gap-6 p-6">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-3xl font-bold tracking-tight">Daybook</h1>
@@ -142,5 +148,6 @@ export function Daybook() {
         </TabsContent>
       </Tabs>
     </div>
+    </Suspense>
   );
 }

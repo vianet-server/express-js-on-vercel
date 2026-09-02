@@ -1,8 +1,15 @@
+import { lazy, Suspense } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TrendingUp, Loader2 } from 'lucide-react';
 import { useAdminQuery } from '@/hooks/useAdminQuery';
-import { CandlestickChart, MarketIndexCards, TopMoversTable, MarketSummary, SalesTrendChart, CategoryBreakdown } from './components/market';
+
+const CandlestickChart = lazy(() => import('./components/market').then(m => ({ default: m.CandlestickChart })));
+const MarketIndexCards = lazy(() => import('./components/market').then(m => ({ default: m.MarketIndexCards })));
+const TopMoversTable = lazy(() => import('./components/market').then(m => ({ default: m.TopMoversTable })));
+const MarketSummary = lazy(() => import('./components/market').then(m => ({ default: m.MarketSummary })));
+const SalesTrendChart = lazy(() => import('./components/market').then(m => ({ default: m.SalesTrendChart })));
+const CategoryBreakdown = lazy(() => import('./components/market').then(m => ({ default: m.CategoryBreakdown })));
 
 export function Market() {
   const { data: raw, loading } = useAdminQuery<any>('market', '/api/admin/market');
@@ -26,6 +33,7 @@ export function Market() {
   const candleData: any[] = candleRaw ?? [];
 
   return (
+    <Suspense fallback={<Loader2 className="animate-spin size-8 text-muted-foreground" />}>
     <div className="flex flex-col gap-6 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Market</h1>
@@ -69,5 +77,6 @@ export function Market() {
         </TabsContent>
       </Tabs>
     </div>
+    </Suspense>
   );
 }

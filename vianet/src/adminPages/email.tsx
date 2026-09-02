@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { api } from '@/lib/api';
-import { EmailList, EmailForm } from './components/email';
+
+const EmailList = lazy(() => import('./components/email').then(m => ({ default: m.EmailList })));
+const EmailForm = lazy(() => import('./components/email').then(m => ({ default: m.EmailForm })));
 
 interface EmailCampaign {
   id: number;
@@ -111,6 +113,7 @@ export function Email() {
   };
 
   return (
+    <Suspense fallback={<Loader2 className="animate-spin size-8 text-muted-foreground" />}>
     <div className="flex flex-col gap-6 p-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Email Marketing</h1>
@@ -141,5 +144,6 @@ export function Email() {
         </TabsContent>
       </Tabs>
     </div>
+    </Suspense>
   );
 }

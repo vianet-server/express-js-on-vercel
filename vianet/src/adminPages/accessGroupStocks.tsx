@@ -1,9 +1,11 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Download, Loader2, Plus } from 'lucide-react';
 import { api } from '@/lib/api';
-import { StockGrid, AddStockDialog } from './components/accessGroupStocks';
+
+const StockGrid = lazy(() => import('./components/accessGroupStocks').then(m => ({ default: m.StockGrid })));
+const AddStockDialog = lazy(() => import('./components/accessGroupStocks').then(m => ({ default: m.AddStockDialog })));
 
 interface StockItem {
   id: number;
@@ -186,6 +188,7 @@ export function AccessGroupStocks() {
   const totalQty = items.reduce((s, i) => s + Number(i.qty), 0);
 
   return (
+    <Suspense fallback={<Loader2 className="animate-spin size-8 text-muted-foreground" />}>
     <div className="flex flex-col gap-6 p-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-4">
@@ -238,5 +241,6 @@ export function AccessGroupStocks() {
         onAddStock={addStockAccess}
       />
     </div>
+    </Suspense>
   );
 }

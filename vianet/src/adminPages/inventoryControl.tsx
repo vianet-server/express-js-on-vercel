@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
@@ -8,7 +8,11 @@ import { api } from '@/lib/api';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setAllAccessGroups } from '@/store/slices/inventorySlice';
 import { Badge } from '@/components/ui/badge';
-import { AccessGroupList, GroupSettingsTable, ControlSettings, CreateGroupDialog } from './components/inventoryControl';
+
+const AccessGroupList = lazy(() => import('./components/inventoryControl').then(m => ({ default: m.AccessGroupList })));
+const GroupSettingsTable = lazy(() => import('./components/inventoryControl').then(m => ({ default: m.GroupSettingsTable })));
+const ControlSettings = lazy(() => import('./components/inventoryControl').then(m => ({ default: m.ControlSettings })));
+const CreateGroupDialog = lazy(() => import('./components/inventoryControl').then(m => ({ default: m.CreateGroupDialog })));
 
 interface Category {
   category: string; items: number; value: number; status: string;
@@ -114,6 +118,7 @@ export function InventoryControl() {
   }
 
   return (
+    <Suspense fallback={<Loader2 className="animate-spin size-8 text-muted-foreground" />}>
     <div className="flex flex-col gap-6 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Inventory Control</h1>
@@ -205,5 +210,6 @@ export function InventoryControl() {
       </Dialog>
 
     </div>
+    </Suspense>
   );
 }
