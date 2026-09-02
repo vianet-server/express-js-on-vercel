@@ -1,6 +1,6 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatIndianCurrency } from '@/lib/utils';
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback} from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { ArrowUpRight, ArrowDownRight, FileSpreadsheet, Loader2 } from 'lucide-react';
