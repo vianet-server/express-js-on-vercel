@@ -1,4 +1,4 @@
-import { LayoutDashboard, BarChart3, TrendingUp, FileSpreadsheet, DollarSign, ChartPie, BookOpen, UserCircle, Settings, Code2, RefreshCw, Package, Sliders, Barcode, Gauge, LogOut, Receipt, Users, UserCheck, Mail } from "lucide-react"
+import { LayoutDashboard, BarChart3, TrendingUp, FileSpreadsheet, DollarSign, ChartPie, BookOpen, UserCircle, Settings, Code2, RefreshCw, Package, Sliders, Barcode, Gauge, LogOut, Receipt, Users, UserCheck, Mail, Sparkles } from "lucide-react"
 import { Link, useLocation } from "react-router-dom"
 
 import {
@@ -53,7 +53,7 @@ const marketingItems = [
   { title: "Email", url: "/admin/email", icon: Mail },
 ]
 
-export function AdminSidebar() {
+export function AdminSidebar({ chatOpen, onToggleChat }: { chatOpen: boolean; onToggleChat: () => void }) {
   const location = useLocation()
   const { logout } = useAuth()
 
@@ -207,16 +207,17 @@ export function AdminSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="border-t p-2">
+      <SidebarFooter className="border-t P-1">
         <SidebarMenu>
           <SidebarMenuItem>
-            
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            
+            <SidebarMenuButton
+              onClick={onToggleChat}
+              isActive={chatOpen}
+              tooltip="AI Chat (Shift + C)"
+            >
+              <Sparkles />
+              <span>AI Chat</span>
+            </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton render={<Link to="/admin/login" />} onClick={logout} tooltip="Logout">
