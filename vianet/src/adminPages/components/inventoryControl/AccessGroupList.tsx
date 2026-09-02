@@ -5,12 +5,11 @@ import { Pencil, Users, Trash2 } from 'lucide-react';
 
 interface AccessGroupListProps {
   groups: any[];
-  onDetail: (g: any) => void;
   onNavigate: (name: string) => void;
   onDelete: (g: any) => void;
 }
 
-export function AccessGroupList({ groups, onDetail, onNavigate, onDelete }: AccessGroupListProps) {
+export function AccessGroupList({ groups, onNavigate, onDelete }: AccessGroupListProps) {
   return (
     <Card>
       <CardHeader>

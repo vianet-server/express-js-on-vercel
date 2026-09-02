@@ -1,4 +1,4 @@
-import { Suspense, type ComponentType, type ReactNode, type SuspenseProps } from 'react';
+import { Suspense, type ComponentType, type SuspenseProps } from 'react';
 import { ErrorBoundary } from './ErrorBoundary';
 import { PageSkeleton } from './PageSkeleton';
 

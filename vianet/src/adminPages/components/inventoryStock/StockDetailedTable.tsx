@@ -7,7 +7,7 @@ interface StockDetailedTableProps {
   loading: boolean;
   onRowClick: (id: number) => void;
   onEdit: (item: any) => void;
-  scrollRef: React.RefObject<HTMLDivElement>;
+  scrollRef: React.RefObject<HTMLDivElement | null>;
   virtualizer: any;
   spacers: { top: number; bottom: number };
 }

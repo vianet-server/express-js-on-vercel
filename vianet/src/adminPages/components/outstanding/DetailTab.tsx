@@ -15,7 +15,7 @@ interface DetailTabProps {
   ageBuckets: AgeBucket[];
 }
 
-function DetailCategory({ title, data, ageBuckets }: { title: string; data: any[]; ageBuckets: AgeBucket[] }) {
+function DetailCategory({ data, ageBuckets }: { title: string; data: any[]; ageBuckets: AgeBucket[] }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <Card>

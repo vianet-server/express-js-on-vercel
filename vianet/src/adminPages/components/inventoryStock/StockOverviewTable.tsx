@@ -6,7 +6,7 @@ interface StockOverviewTableProps {
   items: any[];
   loading: boolean;
   onRowClick: (id: number) => void;
-  scrollRef: React.RefObject<HTMLDivElement>;
+  scrollRef: React.RefObject<HTMLDivElement | null>;
   virtualizer: any;
   spacers: { top: number; bottom: number };
 }

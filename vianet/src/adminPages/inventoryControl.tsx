@@ -127,7 +127,6 @@ export function InventoryControl() {
         <TabsContent value="access-group" className="flex-1 mt-0 flex flex-col gap-6">
           <AccessGroupList
             groups={accessGroups ?? []}
-            onDetail={setDetailGroup}
             onNavigate={(name) => navigate(`/admin/inventory/access-group/${encodeURIComponent(name)}`)}
             onDelete={setDeleteTarget}
           />

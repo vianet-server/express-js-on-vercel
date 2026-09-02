@@ -41,7 +41,7 @@ export function MarketIndexCards({ marketIndex }: MarketIndexCardsProps) {
           <div className={`text-2xl font-bold ${(marketIndex.dayChange ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
             ₹{Math.round(marketIndex.dayChange ?? 0).toLocaleString('en-IN')}
           </div>
-          <div className={`flex items-center gap-1 text-xs mt-1 ${(marketIndex.dayChangePct ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+          <div className={`flex items-center gap-1 text-xs mt-1 ${Number(marketIndex.dayChangePct ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
             <TrendingUp size={14} /> {marketIndex.dayChangePct ?? '0'}%
           </div>
         </CardContent>

@@ -1,4 +1,4 @@
-import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator } from '@/components/ui/context-menu';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export interface StatCardProps {
   title: string;
@@ -7,22 +7,28 @@ export interface StatCardProps {
   changeLabel: string;
   icon: React.ReactNode;
   variant?: 'positive' | 'negative' | 'neutral';
+  children?: React.ReactNode;
 }
 
-export function StatCard({ title, value, change, changeLabel, icon, variant = 'neutral' }: StatCardProps) {
+export function StatCard({ title, value, change, changeLabel, icon, variant = 'neutral', children }: StatCardProps) {
   const changeClass = variant === 'positive' ? 'text-green-600' : variant === 'negative' ? 'text-red-500' : 'text-muted-foreground';
-  const iconSvg = variant === 'positive' ? 'ArrowUpRight' : variant === 'negative' ? 'ArrowDownRight' : 'ArrowUpRight';
 
   return (
-    <ContextMenu>
-      <ContextMenuTrigger className="block h-full">{icon}</ContextMenuTrigger>
-      <ContextMenuContent>
-        <ContextMenuItem onClick={() => {}}><i18n key="export-pdf" /> Export to PDF</ContextMenuItem>
-        <ContextMenuItem onClick={() => {}}><i18n key="export-excel" /> Export to Excel</ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem onClick={() => {}}><i18n key="detail" /> Detail</ContextMenuItem>
-        <ContextMenuItem onClick={() => {}}><i18n key="settings" /> Settings</ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+          {icon} {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold">{typeof value === 'number' ? `₹${value.toLocaleString()}` : value}</div>
+        {change !== 0 && (
+          <div className={`text-xs mt-1 ${changeClass}`}>
+            {change > 0 ? '+' : ''}{change}% {changeLabel}
+          </div>
+        )}
+        {children}
+      </CardContent>
+    </Card>
   );
 }

@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Activity, Loader2 } from 'lucide-react';
+import { Activity } from 'lucide-react';
 
 interface UsageCardsProps {
   usage: any;

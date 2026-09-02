@@ -118,7 +118,7 @@ export function AccessGroupStocks() {
     }
   };
 
-  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleSearchKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       searchStocks(searchQuery);
     }

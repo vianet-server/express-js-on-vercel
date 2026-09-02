@@ -51,7 +51,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 : 'An unexpected error occurred while loading this page.'}
             </p>
           </div>
-          {process.env.NODE_ENV === 'development' && this.state.error && (
+          {typeof window !== 'undefined' && window.location?.hostname === 'localhost' && this.state.error && (
             <pre className="max-w-lg overflow-auto rounded-md border bg-muted p-3 text-xs text-left text-muted-foreground">
               {this.state.error.message}
             </pre>

@@ -15,14 +15,6 @@ const typeColors: Record<string, string> = {
   Other: 'bg-gray-100 text-gray-700',
 };
 
-function fmtDate(d: string) {
-  if (!d) return '';
-  const parts = d.split('T')[0].split('-');
-  if (parts.length !== 3) return d;
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return `${parseInt(parts[2])} ${months[parseInt(parts[1]) - 1]} ${parts[0]}`;
-}
-
 export function Daybook() {
   const [search, setSearch] = useState('');
   const yesterdayDate = new Date();

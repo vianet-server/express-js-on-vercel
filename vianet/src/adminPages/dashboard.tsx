@@ -1,24 +1,14 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatIndianCurrency } from '@/lib/utils';
 import { useState, useCallback, useMemo } from 'react';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@/components/ui/context-menu';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { ArrowUpRight, ArrowDownRight, FileDown, FileSpreadsheet, Settings, Eye, Calendar, Loader2 } from 'lucide-react';
-import { Bar, BarChart, XAxis, YAxis, CartesianGrid, Pie, PieChart, Cell } from 'recharts';
+import { ArrowUpRight, ArrowDownRight, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { Bar, BarChart, XAxis, CartesianGrid } from 'recharts';
 import { useAdminQuery } from '@/hooks/useAdminQuery';
 import { DateFilter, StatCard, ChartsOverview } from './components/dashboard';
 
 const pieColors = ['#2563eb', '#16a34a', '#f59e0b', '#ef4444', '#8b5cf6'];
-
-const chartConfig = {
-  sales: { label: 'Sales', color: '#2563eb' },
-  profit: { label: 'Profit', color: '#16a34a' },
-};
 
 const defaultStats = {
   todaySale: 0,
@@ -48,7 +38,6 @@ export function Dashboard() {
   const topSalesmen = topSalesmenRaw ?? [];
   const chartData = chartDataRaw ?? [];
   const pieData = pieDataRaw ?? [];
-  const pieTotal = useMemo(() => pieData.reduce((s, i) => s + i.value, 0), [pieData]);
   const loading = !statsRaw;
 
   const handleCustomApply = useCallback(() => {
@@ -96,7 +85,7 @@ export function Dashboard() {
               title="Today's Sale"
               value={stats.todaySale ?? 0}
               change={stats.saleChangePercent}
-              changeLabel="+{stats.saleChangePercent}% vs yesterday"
+              changeLabel="vs yesterday"
               icon={<ArrowUpRight size={14} />}
               variant="positive"
             />
@@ -105,7 +94,7 @@ export function Dashboard() {
               title="Total Profit"
               value={stats.totalProfit ?? 0}
               change={stats.profitChangePercent}
-              changeLabel="+{stats.profitChangePercent}% vs last month"
+              changeLabel="vs last month"
               icon={<ArrowUpRight size={14} />}
               variant="positive"
             />
@@ -133,7 +122,7 @@ export function Dashboard() {
               title="Total Spend"
               value={stats.totalSpend ?? 0}
               change={stats.spendChangePercent}
-              changeLabel="{stats.spendChangePercent}% vs last month"
+              changeLabel="vs last month"
               icon={<ArrowDownRight size={14} />}
               variant="negative"
             />
@@ -141,15 +130,13 @@ export function Dashboard() {
         </TabsContent>
         <TabsContent value="sales" className="flex flex-col gap-6 mt-0">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <StatCard>
-              <Card className="h-full">
-                <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">30-Day Sales</CardTitle></CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{salesSemantic ? formatIndianCurrency(salesSemantic.overview?.total_sales) : '...'}</div>
-                  <div className="text-sm text-muted-foreground">{salesSemantic?.overview?.total_orders} Orders</div>
-                </CardContent>
-              </Card>
-            </StatCard>
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">30-Day Sales</CardTitle></CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{salesSemantic ? formatIndianCurrency(salesSemantic.overview?.total_sales) : '...'}</div>
+                <div className="text-sm text-muted-foreground">{salesSemantic?.overview?.total_orders} Orders</div>
+              </CardContent>
+            </Card>
             <Card className="sm:col-span-1 lg:col-span-2">
               <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Top Salespeople (30 Days)</CardTitle></CardHeader>
               <CardContent>
@@ -180,15 +167,13 @@ export function Dashboard() {
         </TabsContent>
         <TabsContent value="inventory" className="flex flex-col gap-6 mt-0">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <StatCard>
-              <Card className="h-full">
-                <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Total Stock Value</CardTitle></CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{inventorySemantic ? formatIndianCurrency(inventorySemantic.overview?.total_value) : '...'}</div>
-                  <div className="text-sm text-muted-foreground">{inventorySemantic?.overview?.total_qty?.toLocaleString()} Items</div>
-                </CardContent>
-              </Card>
-            </StatCard>
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Total Stock Value</CardTitle></CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{inventorySemantic ? formatIndianCurrency(inventorySemantic.overview?.total_value) : '...'}</div>
+                <div className="text-sm text-muted-foreground">{inventorySemantic?.overview?.total_qty?.toLocaleString()} Items</div>
+              </CardContent>
+            </Card>
             <Card className="sm:col-span-1 lg:col-span-2 overflow-auto max-h-64">
               <CardHeader className="pb-2 sticky top-0 bg-background"><CardTitle className="text-sm font-medium text-muted-foreground">Out of Stock Alerts</CardTitle></CardHeader>
               <CardContent>
