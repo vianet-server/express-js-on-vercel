@@ -1,6 +1,5 @@
 {
   "buildCommand": "cd vianet && npm ci && npm run build",
-  "outputDirectory": "vianet/dist",
   "installCommand": "npm install",
   "functions": {
     "src/index.ts": {
@@ -9,7 +8,7 @@
   },
   "rewrites": [
     {
-      "source": "/((?!assets/).*)",
+      "source": "/((?!.*\\.).*)",
       "destination": "/src/index.ts"
     }
   ]
