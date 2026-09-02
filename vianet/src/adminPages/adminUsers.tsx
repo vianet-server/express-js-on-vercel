@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ChevronLeft, ChevronRight, Plus, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Search, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
 
 const UserTable = lazy(() => import('./components/adminUsers').then(m => ({ default: m.UserTable })));

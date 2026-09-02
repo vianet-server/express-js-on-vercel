@@ -1,5 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
 
 const EmailList = lazy(() => import('./components/email').then(m => ({ default: m.EmailList })));
