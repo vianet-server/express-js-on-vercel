@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Download, Loader2, Plus } from 'lucide-react';
+import { ArrowLeft, Download, Loader2, Plus, Settings } from 'lucide-react';
 import { api } from '@/lib/api';
 
 const StockGrid = lazy(() => import('./components/accessGroupStocks').then(m => ({ default: m.StockGrid })));
@@ -201,6 +201,9 @@ export function AccessGroupStocks() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => navigate(`/admin/inventory/access-group/${encodeURIComponent(decodedName)}/settings`)}>
+            <Settings size={14} /> Settings
+          </Button>
           <Button variant="outline" onClick={exportExcel}>
             <Download size={14} /> sidnosnd
           </Button>

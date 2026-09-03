@@ -647,6 +647,87 @@ async function getAccessGroupStocks(name) {
   return { group, rows: rows.rows };
 }
 
+/**
+ * Bulk-assign every stock of one brand to an access group. Inserts one
+ * app.inventory_access_group row per matching app.inventory row (brand matched
+ * case-insensitively) that is not already mapped to the group. New rows get
+ * quantity 0 so an admin can adjust them afterwards.
+ * @param {object} input
+ * @param {string} input.groupName - access group name (case-insensitive)
+ * @param {string} input.brand - brand name (case-insensitive exact match)
+ * @param {string} [input.priceMode] - 'default' (inventory price), 'zero', or
+ *   'addition' (inventory price + priceAdd)
+ * @param {number} [input.priceAdd] - amount added to the inventory price when
+ *   priceMode is 'addition'
+ * @returns {Promise<{group: object|null, assigned: number, skipped: number, priceMode: string}>}
+ * @route Used by POST /api/admin/inventory/access-group/:name/assign-brand
+ */
+async function assignBrandToAccessGroup({ groupName, brand, priceMode, priceAdd }) {
+  const cleanBrand = String(brand || '').trim();
+  if (!cleanBrand) throw new Error('brand is required');
+  const mode = priceMode === 'zero' ? 'zero' : priceMode === 'addition' ? 'addition' : 'default';
+  const add = Number(priceAdd) || 0;
+  const groupResult = await neonDb.query('SELECT id, name FROM app.access_groups WHERE TRIM(name) ILIKE TRIM($1)', [groupName]);
+  const group = groupResult.rows[0];
+  if (!group) return { group: null, assigned: 0, skipped: 0, priceMode: mode };
+
+  const totalResult = await neonDb.query(
+    "SELECT COUNT(*) AS cnt FROM app.inventory WHERE TRIM(brand) ILIKE TRIM($1) AND isblocked IS NOT TRUE",
+    [cleanBrand]
+  );
+  const total = parseInt(totalResult.rows[0].cnt, 10) || 0;
+
+  let priceExpr = 'COALESCE(inv.price, 0)';
+  const params = [cleanBrand, group.id];
+  if (mode === 'zero') {
+    priceExpr = '0';
+  } else if (mode === 'addition') {
+    priceExpr = 'COALESCE(inv.price, 0) + $3';
+    params.push(add);
+  }
+  const insertResult = await neonDb.query(
+    `INSERT INTO app.inventory_access_group (inventoryid, accessgroupid, quantity, oprice, partner_sku_name)
+     SELECT inv.id, $2, 0, ${priceExpr}, NULL
+     FROM app.inventory inv
+     WHERE TRIM(inv.brand) ILIKE TRIM($1) AND inv.isblocked IS NOT TRUE
+       AND NOT EXISTS (
+         SELECT 1 FROM app.inventory_access_group iag
+         WHERE iag.inventoryid = inv.id AND iag.accessgroupid = $2
+       )`,
+    params
+  );
+  const assigned = insertResult.rowCount || 0;
+  return { group, assigned, skipped: Math.max(total - assigned, 0), priceMode: mode };
+}
+
+/**
+ * Bulk-remove one brand from an access group. Deletes every
+ * app.inventory_access_group row of this group whose inventory row has the
+ * given brand (case-insensitive). Inventory rows themselves are untouched.
+ * @param {object} input
+ * @param {string} input.groupName - access group name (case-insensitive)
+ * @param {string} input.brand - brand name (case-insensitive exact match)
+ * @returns {Promise<{group: object|null, removed: number}>}
+ * @route Used by DELETE /api/admin/inventory/access-group/:name/brand/:brand
+ */
+async function removeBrandFromAccessGroup({ groupName, brand }) {
+  const cleanBrand = String(brand || '').trim();
+  if (!cleanBrand) throw new Error('brand is required');
+  const groupResult = await neonDb.query('SELECT id, name FROM app.access_groups WHERE TRIM(name) ILIKE TRIM($1)', [groupName]);
+  const group = groupResult.rows[0];
+  if (!group) return { group: null, removed: 0 };
+
+  const delResult = await neonDb.query(
+    `DELETE FROM app.inventory_access_group iag
+     USING app.inventory inv
+     WHERE iag.inventoryid = inv.id
+       AND iag.accessgroupid = $2
+       AND TRIM(inv.brand) ILIKE TRIM($1)`,
+    [cleanBrand, group.id]
+  );
+  return { group, removed: delResult.rowCount || 0 };
+}
+
 // ===========================================================================
 // API key management (/api/admin/api)
 // ===========================================================================
@@ -1560,6 +1641,8 @@ const ADMIN_META = {
   updateStockGst: { role: 'write', tables: ['app.inventory'] },
   removeStockGroupMapping: { role: 'write', tables: ['app.inventory_access_group'] },
   getAccessGroupStocks: { role: 'read', tables: ['app.inventory', 'app.inventory_access_group', 'app.access_groups'] },
+  assignBrandToAccessGroup: { role: 'write', tables: ['app.inventory_access_group'] },
+  removeBrandFromAccessGroup: { role: 'write', tables: ['app.inventory_access_group'] },
   ensureApiColumns: { role: 'write', tables: [] },
   findAccessGroupByName: { role: 'read', tables: ['app.access_groups'] },
   getAccessGroupName: { role: 'read', tables: ['app.access_groups'] },
@@ -1642,6 +1725,8 @@ module.exports = {
     updateStockGst,
     removeStockGroupMapping,
     getAccessGroupStocks,
+    assignBrandToAccessGroup,
+    removeBrandFromAccessGroup,
     ensureApiColumns,
     findAccessGroupByName,
     getAccessGroupName,

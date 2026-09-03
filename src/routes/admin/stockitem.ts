@@ -595,6 +595,89 @@ router.get('/inventory/access-group/:name', async (req, res) => {
 });
 
 /**
+ * POST /api/admin/inventory/access-group/:name/assign-brand
+ *
+ * Bulk-assign every stock whose app.inventory.brand matches the given brand
+ * (case-insensitive) to the access group by inserting the missing
+ * app.inventory_access_group rows. Rows that already exist are left untouched.
+ *
+ * Auth: adminAuth.
+ * Path params: { name } — access group name (case-insensitive).
+ * Requires (JSON body): { brand, priceMode?, priceAdd? } — priceMode is
+ *   'default' (inventory price), 'zero', or 'addition' (inventory price +
+ *   priceAdd); defaults to 'default'.
+ * Returns:
+ *   200 { message, group: { id, name }, brand, assigned, skipped, priceMode }
+ *   400 when brand is missing
+ *   404 when group not found
+ *   500 on error
+ *
+ * Called by: vianet/src/adminPages/AccessGroupSettings.tsx -> api.post(`/api/admin/inventory/access-group/${name}/assign-brand`, { brand, priceMode, priceAdd })
+ *   Displays: "Assign New Brand" dialog in the Assigned Brands card.
+ */
+router.post('/inventory/access-group/:name/assign-brand', async (req, res) => {
+  try {
+    const { name } = req.params;
+    const { brand, priceMode, priceAdd } = req.body || {};
+    if (!brand || !String(brand).trim()) {
+      return res.status(400).json({ message: 'brand is required' });
+    }
+    const cleanBrand = String(brand).trim();
+    const { group, assigned, skipped, priceMode: mode } = await dbq.assignBrandToAccessGroup({ groupName: name, brand: cleanBrand, priceMode, priceAdd });
+    if (!group) {
+      return res.status(404).json({ message: `Access group "${name}" not found` });
+    }
+    res.json({
+      message: `Assigned ${assigned} stock(s) of brand "${cleanBrand}" to "${group.name}"${skipped ? ` (${skipped} already assigned)` : ''}`,
+      group,
+      brand: cleanBrand,
+      assigned,
+      skipped,
+      priceMode: mode,
+    });
+  } catch (err) {
+    console.error('[stockitem] POST access-group assign-brand error:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+/**
+ * DELETE /api/admin/inventory/access-group/:name/brand/:brand
+ *
+ * Bulk-remove one brand from an access group by deleting every
+ * app.inventory_access_group row of this group whose inventory row has the
+ * given brand (case-insensitive). Inventory rows themselves are untouched.
+ *
+ * Auth: adminAuth.
+ * Path params: { name } — access group name; { brand } — brand name.
+ * Returns:
+ *   200 { message, group: { id, name }, brand, removed }
+ *   404 when group not found
+ *   500 on error
+ *
+ * Called by: vianet/src/adminPages/AccessGroupSettings.tsx -> api.delete(`/api/admin/inventory/access-group/${name}/brand/${brand}`)
+ *   Displays: per-brand delete button in the Assigned Brands card (with confirm).
+ */
+router.delete('/inventory/access-group/:name/brand/:brand', async (req, res) => {
+  try {
+    const { name, brand } = req.params;
+    const { group, removed } = await dbq.removeBrandFromAccessGroup({ groupName: name, brand });
+    if (!group) {
+      return res.status(404).json({ message: `Access group "${name}" not found` });
+    }
+    res.json({
+      message: `Removed ${removed} stock(s) of brand "${String(brand).trim()}" from "${group.name}"`,
+      group,
+      brand: String(brand).trim(),
+      removed,
+    });
+  } catch (err) {
+    console.error('[stockitem] DELETE access-group brand error:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+/**
  * POST /api/admin/inventory/access/upload
  *
  * Bulk upsert stock-to-access-group mappings from an array of rows

@@ -70,6 +70,7 @@ const InventoryStockDetail = lazyAdminPage('InventoryStockDetail');
 const InventoryControl = lazyAdminPage('InventoryControl');
 const InventorySku = lazyAdminPage('InventorySku');
 const AccessGroupStocks = lazyAdminPage('AccessGroupStocks');
+const AccessGroupSettings = lazyAdminPage('AccessGroupSettings');
 const Voucher = lazyAdminPage('Voucher');
 const Ledger = lazyAdminPage('Ledger');
 const StockItem = lazyAdminPage('StockItem');
@@ -224,6 +225,7 @@ const router = createBrowserRouter([
       { path: 'inventory/stock/:id', element: <PageBoundary><InventoryStockDetail /></PageBoundary> },
       { path: 'inventory/control', element: <PageBoundary><InventoryControl /></PageBoundary> },
       { path: 'inventory/sku', element: <PageBoundary><InventorySku /></PageBoundary> },
+      { path: 'inventory/access-group/:name/settings', element: <PageBoundary><AccessGroupSettings /></PageBoundary> },
       { path: 'inventory/access-group/:name', element: <PageBoundary><AccessGroupStocks /></PageBoundary> },
       { path: 'stock/voucher', element: <PageBoundary><Voucher /></PageBoundary> },
       { path: 'stock/ledger', element: <PageBoundary><Ledger /></PageBoundary> },
