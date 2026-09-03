@@ -65,6 +65,12 @@ export function InventorySku() {
     setAddAccess({ selectedSkus: preselectSku ? [preselectSku] : [], group: '', qty: 0, price: 0 });
     setStockFilter('');
     setStockPage(1);
+    // Reuse the already-loaded table data instead of re-fetching the full
+    // SKU aggregation (the heaviest query in the app) every time the dialog opens.
+    if (skuData && skuData.length > 0) {
+      setAllStocks(skuData);
+      return;
+    }
     setStocksLoading(true);
     api.get<SkuRow[]>('/api/admin/inventory/sku').then(res => {
       setAllStocks(res || []);

@@ -17,8 +17,11 @@ if (!prismaUrl) {
 
 const neonPool = new Pool({
   connectionString: neonUrl,
-  max: 1,
-  idleTimeoutMillis: 5000,
+  // Allow a handful of concurrent connections so parallel API calls from one
+  // page (e.g. the SKU access-control page fires /sku + /control together) do
+  // not serialize behind a single connection.
+  max: 5,
+  idleTimeoutMillis: 30000,
 })
 
 const prismaPool = new Pool({

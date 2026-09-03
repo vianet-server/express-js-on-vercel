@@ -346,7 +346,18 @@ async function ensureInventoryUnification() {
       ADD COLUMN IF NOT EXISTS category_level_1 TEXT,
       ADD COLUMN IF NOT EXISTS category_level_2 TEXT
   `);
-  await neonDb.query(`
+  // Backfill from the legacy app.stock table when it exists. Newer databases
+  // only have app.inventory (Option B single source of truth), so a missing
+  // app.stock must skip — never throw — otherwise the index creation below
+  // never runs and the inventory/SKU pages stay slow.
+  try {
+    const stockCheck = await neonDb.query(
+      "SELECT 1 FROM information_schema.tables WHERE table_schema = 'app' AND table_name = 'stock' LIMIT 1"
+    );
+    if (stockCheck.rows.length === 0) {
+      console.warn('[startup] app.stock not found; skipping inventory backfill (app.inventory is the source of truth).');
+    } else {
+      await neonDb.query(`
     INSERT INTO app.inventory (
       id, fullname, quantity, price,
       stockname, guid, masterid, costing_meth, unit, data,
@@ -378,7 +389,11 @@ async function ensureInventoryUnification() {
       data              = COALESCE(app.inventory.data, EXCLUDED.data),
       category_level_1  = COALESCE(app.inventory.category_level_1, EXCLUDED.category_level_1),
       category_level_2  = COALESCE(app.inventory.category_level_2, EXCLUDED.category_level_2)
-  `);
+      `);
+    }
+  } catch (e) {
+    console.warn('[startup] inventory backfill skipped:', e.message);
+  }
   await neonDb.query('CREATE INDEX IF NOT EXISTS idx_inventory_id ON app.inventory (id)').catch(() => {});
   // Speed up the heavy admin inventory list: partial expression index that serves
   // both the `isblocked IS NOT TRUE` filter and the `ORDER BY COALESCE(...)` +
@@ -392,6 +407,16 @@ async function ensureInventoryUnification() {
     `CREATE INDEX IF NOT EXISTS idx_inventory_brand_active
        ON app.inventory (brand)
        WHERE isblocked IS NOT TRUE`
+  ).catch(() => {});
+  // Speed up the SKU access-control aggregation (full GROUP BY + joins on
+  // every load of /api/admin/inventory/sku).
+  await neonDb.query(
+    `CREATE INDEX IF NOT EXISTS idx_iag_inventory
+       ON app.inventory_access_group (inventoryid)`
+  ).catch(() => {});
+  await neonDb.query(
+    `CREATE INDEX IF NOT EXISTS idx_iag_group
+       ON app.inventory_access_group (accessgroupid)`
   ).catch(() => {});
 }
 
