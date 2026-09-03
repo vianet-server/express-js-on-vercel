@@ -6,15 +6,31 @@
 
 @custom-variant dark (&:is(.dark *));
 
-html,body {
+html {
   margin: 0;
-  height: 100%;
+  padding: 0;
   width: 100%;
-  margin: 0 auto;
-  box-sizing: border-box;
-
+  height: 100%;
+  overflow-x: hidden; /* Prevents unwanted horizontal scrollbars */
 }
 
+body {
+  margin: 0;
+  box-sizing: border-box;
+  
+  /* Scale the body */
+  transform: scale(0.8);
+  transform-origin: top left; /* Keeps layout pinned to top-left */
+  
+  /* Expand dimensions so it fills the screen properly */
+  width: calc(100% / 0.8);   /* 125% */
+  min-height: calc(100vh / 0.8);
+  
+  /* Fixes blurry text and rendering artifacts */
+  backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 
 
 .counter {
