@@ -59,7 +59,7 @@ export function AiChat() {
   };
 
   return (
-    <div className="flex flex-col w-[300px] shrink-0 border-l bg-background min-h-screen">
+    <div className="flex flex-col w-[300px] h-screen border-l bg-background ">
       <div className="flex items-center gap-2 border-b px-4 py-2.5">
         <div className="flex size-6 items-center justify-center rounded-md bg-primary/10">
           <Sparkles size={12} className="text-primary" />

@@ -59,15 +59,11 @@
   box-sizing: border-box;
 }
 
-html {
-  transform: scale(0.8);
-  transform-origin: 0 0; /* Ensures scaling starts from the top-left */
-  
-}
+
 
 body {
   margin: 0;
-  zoom: 80%;
+  
 }
 
 h1,

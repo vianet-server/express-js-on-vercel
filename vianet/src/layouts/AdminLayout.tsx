@@ -13,24 +13,37 @@ export default function AdminLayout() {
   const [lastSync, setLastSync] = useState<string | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
 
-  const toggleChat = useCallback(() => setChatOpen(prev => !prev), []);
+  const toggleChat = useCallback(() => setChatOpen((prev) => !prev), []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'C' && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        const tag = (e.target as HTMLElement).tagName;
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target instanceof HTMLTextAreaElement) return;
+        const target = e.target as HTMLElement;
+        const tag = target?.tagName;
+
+        // Prevent triggering while typing in inputs, textareas, or rich text editors
+        if (
+          tag === 'INPUT' ||
+          tag === 'TEXTAREA' ||
+          target instanceof HTMLTextAreaElement ||
+          target?.isContentEditable
+        ) {
+          return;
+        }
+
         e.preventDefault();
         toggleChat();
       }
     };
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [toggleChat]);
 
   useEffect(() => {
-    api.get<any>('/api/admin/settings/last-sync')
-      .then(res => {
+    api
+      .get<any>('/api/admin/settings/last-sync')
+      .then((res) => {
         if (res?.last_sync) {
           const d = new Date(res.last_sync);
           setLastSync(d.toLocaleString());
@@ -40,9 +53,11 @@ export default function AdminLayout() {
   }, []);
 
   return (
-    <SidebarProvider className="min-h-screen">
+    <SidebarProvider className="h-screen overflow-hidden">
       <AdminSidebar chatOpen={chatOpen} onToggleChat={toggleChat} />
-      <SidebarInset>
+
+      {/* h-screen and flex-col allow flex-1 children to fill the exact viewport height without overflow */}
+      <SidebarInset className="flex h-screen flex-col overflow-hidden">
         <header className="flex h-12 shrink-0 items-center justify-between border-b px-4">
           <div className="flex items-center gap-2">
             <SidebarTrigger className="-ml-1" />
@@ -51,14 +66,15 @@ export default function AdminLayout() {
           </div>
           <div className="flex items-center gap-2">
             {lastSync && (
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-md">
+              <div className="flex items-center gap-1.5 rounded-md bg-muted/50 px-2 py-1 text-xs text-muted-foreground">
                 <Clock size={12} />
                 <span>Last Synced: {lastSync}</span>
               </div>
             )}
             <Button
               variant="ghost"
-              size="icon-sm"
+              size="icon"
+              className="h-8 w-8"
               onClick={toggleChat}
               title="AI Chat (Shift + C)"
             >
@@ -66,8 +82,10 @@ export default function AdminLayout() {
             </Button>
           </div>
         </header>
-        <div className="flex flex-1 overflow-hidden min-h-screen">
-          <div className="flex flex-1 flex-col gap-4 p-4 overflow-y-auto">
+
+        {/* Removed min-h-screen to prevent double scrollbars; flex-1 handles the remaining vertical space */}
+        <div className="flex flex-1 overflow-hidden">
+          <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
             <Outlet />
           </div>
           {chatOpen && <AiChat />}
