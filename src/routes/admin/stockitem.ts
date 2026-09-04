@@ -160,6 +160,71 @@ router.get('/inventory/groups', async (req, res) => {
 
 
 /**
+ * GET /api/admin/inventory/stock/stream
+ *
+ * Streaming version of the inventory stock list. Sends rows in progressive
+ * batches via newline-delimited JSON (NDJSON) so the frontend can render rows
+ * as soon as the first batch arrives instead of waiting for the full response.
+ *
+ * Auth: adminAuth.
+ * Query params: { search?, brand?, group?, batchSize? (default 200) }
+ * Returns: NDJSON chunks, one JSON object per line:
+ *   { type: "count", total: number }
+ *   { type: "rows",   rows: [...], offset: number }
+ *   { type: "done" }
+ *
+ * Called by: vianet/src/adminPages/inventoryStock.tsx fetchAll() (streaming consumer)
+ */
+router.get('/inventory/stock/stream', async (req, res) => {
+  try {
+    const search = (req.query.search as string) || '';
+    const brand = (req.query.brand as string) || '';
+    const group = (req.query.group as string) || '';
+    const batchSize = Math.min(parseInt(req.query.batchSize as string) || 200, 500);
+
+    res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    const write = (obj: any) => {
+      res.write(JSON.stringify(obj) + '\n');
+    };
+
+    const stream = dbq.listInventoryStockBatched({ search, brand, group, batchSize });
+
+    const mapRow = (r: any) => ({
+      id: r.id,
+      name: r.fullname || r.stockname,
+      brand: r.brand || '',
+      group: r.category_level_1 || '',
+      model: r.model || '',
+      variant: r.varient || '',
+      color: r.color || '',
+      qty: (parseFloat(r.quantity) || 0) + (parseFloat(r.vquantity) || 0),
+      price: parseFloat(r.inv_price) || 0,
+      gst: parseFloat(r.gst) || 0,
+      min: parseFloat(r.min_stock ?? r.min) || 0,
+      max: parseFloat(r.max_stock ?? r.max) || 0,
+    });
+
+    for await (const batch of stream) {
+      write({ type: 'rows', rows: batch.rows.map(mapRow), offset: batch.offset, total: batch.total });
+      if (batch.offset === 0) {
+        write({ type: 'count', total: batch.total });
+      }
+    }
+
+    write({ type: 'done' });
+    res.end();
+  } catch (err) {
+    console.error('[stockitem] GET /inventory/stock/stream error:', err);
+    res.write(JSON.stringify({ type: 'error', message: err.message }) + '\n');
+    res.end();
+  }
+});
+
+/**
  * GET /api/admin/inventory/stock
  *
  * Paginated stock list joined with app.inventory for brand/model/variant/color/gst.

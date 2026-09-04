@@ -275,6 +275,57 @@ async function listInventoryStock({ search, brand, group, limit, offset }) {
 }
 
 /**
+ * Same as listInventoryStock but fetches rows in batches so the route can
+ * stream them progressively. Runs the COUNT query once, then fetches
+ * {@link batchSize} rows per call via OFFSET pagination.
+ *
+ * @returns an async generator that yields `{ rows, total, offset }` per batch.
+ *   The first yield always includes `total` (from the COUNT query). Subsequent
+ *   yields stream more rows until all are exhausted.
+ */
+async function* listInventoryStockBatched({ search, brand, group, batchSize = 200 }: any = {}) {
+  let countQuery = 'SELECT COUNT(*) FROM app.inventory inv WHERE 1=1 AND inv.isblocked IS NOT TRUE';
+  let dataQuery = 'SELECT inv.*, COALESCE(inv.fullname, inv.stockname) AS display_name, COALESCE(inv.price, 0) AS inv_price FROM app.inventory inv WHERE 1=1 AND inv.isblocked IS NOT TRUE';
+  const params: any[] = [];
+  let idx = 1;
+
+  if (search) {
+    const clause = ` AND (inv.stockname ILIKE $${idx} OR inv.brand ILIKE $${idx} OR inv.model ILIKE $${idx} OR inv.fullname ILIKE $${idx} OR inv.category_level_1 ILIKE $${idx})`;
+    countQuery += clause;
+    dataQuery += clause;
+    params.push(`%${search}%`);
+    idx++;
+  }
+  if (brand && brand !== 'all') {
+    const clause = ` AND inv.brand ILIKE $${idx}`;
+    countQuery += clause;
+    dataQuery += clause;
+    params.push(brand);
+    idx++;
+  }
+  if (group && group !== 'all') {
+    const clause = ` AND inv.category_level_1 ILIKE $${idx}`;
+    countQuery += clause;
+    dataQuery += clause;
+    params.push(group);
+    idx++;
+  }
+
+  const countResult = await neonDb.query(countQuery, [...params]);
+  const total = parseInt(countResult.rows[0].count);
+
+  dataQuery += ` ORDER BY COALESCE(NULLIF(inv.fullname, ''), inv.stockname) ASC`;
+
+  let offset = 0;
+  while (offset < total) {
+    const batchParams = [...params, batchSize, offset];
+    const result = await neonDb.query(dataQuery + ` LIMIT $${idx} OFFSET $${idx + 1}`, batchParams);
+    yield { rows: result.rows, total, offset };
+    offset += batchSize;
+  }
+}
+
+/**
  * SKU listing with per-access-group pricing aggregated as a JSON array per item.
  * @param {object} [input]
  * @param {string} [input.brand] - brand filter (ILIKE contains)
@@ -1722,6 +1773,7 @@ const ADMIN_META = {
 };
 
 module.exports = {
+  listInventoryStockBatched,
   ...shared,
   ...cache.wrapExports({
     loginUser,

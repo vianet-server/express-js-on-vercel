@@ -21,9 +21,6 @@ interface StockItem {
   qty: number; price: number; gst: number; min: number; max: number;
 }
 
-/** API caps each response at 500 rows, so the full list is fetched in batches. */
-const FETCH_BATCH = 500
-
 export function InventoryStock() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
@@ -38,36 +35,47 @@ export function InventoryStock() {
   const [groups, setGroups] = useState<string[]>([]);
   const [selectedGroup, setSelectedGroup] = useState('all');
 
-  interface StockPageResponse {
-    rows: StockItem[];
-    total: number;
-    limit: number;
-    offset: number;
-  }
-
   /**
-   * Fetches the entire stock list for the current brand/group filters by
-   * walking the API's paginated endpoint in FETCH_BATCH chunks. Rendering
-   * cost stays flat thanks to table virtualization.
+   * Streams the full stock list via NDJSON so rows appear progressively.
+   * Sends the count first, then rows in batches as they arrive from the server.
    */
   const fetchAll = useCallback(async (brand = selectedBrand, group = selectedGroup) => {
     setLoading(true)
     try {
-      let url = (offset: number) =>
-        `/api/admin/inventory/stock?limit=${FETCH_BATCH}&offset=${offset}&brand=${brand}&group=${group}`
-      const first = await api.get<StockPageResponse>(url(0))
-      let all = [...first.rows]
-      let total = first.total
-      while (all.length < total) {
-        const next = await api.get<StockPageResponse>(url(all.length))
-        if (!next.rows || next.rows.length === 0) break
-        all = all.concat(next.rows)
-        total = next.total
+      const params = new URLSearchParams({ brand, group });
+      const token = (() => { try { return JSON.parse(JSON.parse(localStorage.getItem('persist:root') || '{}').auth || '{}').token } catch { return null } })();
+      const res = await fetch(`${window.location.origin}/api/admin/inventory/stock/stream?${params}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok || !res.body) throw new Error(`Stream failed: ${res.status}`);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let all: StockItem[] = [];
+      let total = 0;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const evt = JSON.parse(line);
+          if (evt.type === 'count') {
+            total = evt.total;
+          } else if (evt.type === 'rows') {
+            all = all.concat(evt.rows);
+            dispatch(setStockPage({ items: [...all], total: total || evt.total, limit: Math.max(all.length, 1), offset: 0 }));
+          } else if (evt.type === 'done' || evt.type === 'error') {
+            break;
+          }
+        }
       }
-      dispatch(setStockPage({ items: all, total, limit: Math.max(all.length, 1), offset: 0 }))
-      return all
+      return all;
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }, [dispatch, selectedBrand, selectedGroup])
 
