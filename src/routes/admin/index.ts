@@ -39,6 +39,7 @@ const settingsRouter = require('./settings');
 const marketRouter = require('./market');
 const emailRouter = require('./email');
 const semanticRouter = require('./semantic');
+const mcpRouter = require('./mcp');
 
 const router = express.Router();
 
@@ -57,5 +58,6 @@ router.use('/settings', settingsRouter);
 router.use('/market', marketRouter);
 router.use(emailRouter);
 router.use('/semantic', semanticRouter);
+router.use(mcpRouter);
 
 module.exports = router;
